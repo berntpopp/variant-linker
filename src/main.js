@@ -1,10 +1,20 @@
 #!/usr/bin/env node
+// src/main.js
 
 const yargs = require('yargs');
 const debug = require('debug')('variant-linker:main');
 const variantRecoder = require('./variantRecoder');
 const vepAnnotation = require('./vepAnnotation');
+const {
+  processVariantLinking,
+  filterAndFormatResults,
+  outputResults
+} = require('./variantLinkerProcessor');
 
+
+/**
+ * Sets up the command-line arguments for the Variant-Linker tool.
+ */
 const argv = yargs
   .option('variant', {
     alias: 'v',
@@ -17,6 +27,11 @@ const argv = yargs
     description: 'Output format (JSON, CSV, etc.)',
     type: 'string',
     default: 'JSON'
+  })
+  .option('save', {
+    alias: 's',
+    description: 'Filename to save the results',
+    type: 'string'
   })
   .option('debug', {
     alias: 'd',
@@ -33,32 +48,26 @@ if (argv.debug) {
   require('debug').enable('variant-linker:*');
 }
 
+
+/**
+ * The main function that orchestrates the variant analysis process.
+ * It links the variant recoding and VEP annotation, applies optional filtering,
+ * formats the results, and handles the output.
+ */
 async function main() {
-    try {
-      const variantData = await variantRecoder(argv.variant);
-      if (!variantData || variantData.length === 0) {
-        throw new Error('No data returned from Variant Recoder');
-      }
-  
-      // Example: Select the first HGVS notation and possibly a transcript
-      const selectedHgvs = variantData[0].T.hgvsc[0]; // Simplified selection for this example
-      const selectedTranscript = selectedHgvs.split(':')[0];
-  
-      const annotationData = await vepAnnotation(selectedHgvs, selectedTranscript);
-      if (!annotationData || annotationData.length === 0) {
-        throw new Error('No annotation data returned from VEP');
-      }
-  
-      // Output formatting (for now, only JSON is supported)
-      if (argv.output.toUpperCase() === 'JSON') {
-        console.log(JSON.stringify(annotationData, null, 2));
-      } else {
-        // Additional output formats can be added here
-        console.log('Currently only JSON format is supported for output.');
-      }
-    } catch (error) {
+  try {
+      const { variantData, annotationData } = await processVariantLinking(argv.variant, variantRecoder, vepAnnotation);
+      
+      // Define a filter function as needed
+      const filterFunction = null; // Example: (results) => { /* filtering logic */ }
+
+      const formattedResults = filterAndFormatResults({ variantData, annotationData }, filterFunction, argv.output);
+      outputResults(formattedResults, argv.save);
+
+      // Additional logic if needed
+  } catch (error) {
       console.error('Error:', error.message);
-    }
   }
+}
 
 main();
