@@ -43,6 +43,11 @@ const argv = yargs
     description: 'Optional parameters for VEP annotation in key=value format, separated by commas (default: "CADD=1")',
     type: 'string'
   })
+  .option('recoder_params', {
+    alias: 'rp',
+    description: 'Optional parameters for Variant Recoder in key=value format, separated by commas (default: "vcf_string=1")',
+    type: 'string'
+  })
   .help()
   .alias('help', 'h')
   .argv;
@@ -57,11 +62,11 @@ if (argv.debug) {
  * 
  * @returns {Object} The parsed optional parameters.
  */
-function parseOptionalParameters() {
-  let options = { CADD: '1' }; // Default value
+function parseOptionalParameters(paramString, defaultParams) {
+  let options = { ...defaultParams };
 
-  if (argv.vep_params) {
-    const paramsArray = argv.vep_params.split(',');
+  if (paramString) {
+    const paramsArray = paramString.split(',');
     paramsArray.forEach(param => {
       const [key, value] = param.split('=');
       if (key && value) {
@@ -80,8 +85,10 @@ function parseOptionalParameters() {
  */
 async function main() {
   try {
-    const options = parseOptionalParameters();
-    const { variantData, annotationData } = await processVariantLinking(argv.variant, variantRecoder, vepAnnotation, options);
+    const recoderOptions = parseOptionalParameters(argv.recoder_params, { vcf_string: '1' });
+    const vepOptions = parseOptionalParameters(argv.vep_params, { CADD: '1' });
+    
+    const { variantData, annotationData } = await processVariantLinking(argv.variant, variantRecoder, vepAnnotation, recoderOptions, vepOptions);
     
     // Define a filter function as needed
     const filterFunction = null; // Example: (results) => { /* filtering logic */ }
