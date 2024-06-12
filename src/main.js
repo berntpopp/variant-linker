@@ -38,8 +38,8 @@ const argv = yargs
     description: 'Enable debug mode',
     default: false
   })
-  .option('params', {
-    alias: 'p',
+  .option('vep_params', {
+    alias: 'vp',
     description: 'Optional parameters for VEP annotation in key=value format, separated by commas (default: "CADD=1")',
     type: 'string'
   })
@@ -60,8 +60,8 @@ if (argv.debug) {
 function parseOptionalParameters() {
   let options = { CADD: '1' }; // Default value
 
-  if (argv.params) {
-    const paramsArray = argv.params.split(',');
+  if (argv.vep_params) {
+    const paramsArray = argv.vep_params.split(',');
     paramsArray.forEach(param => {
       const [key, value] = param.split('=');
       if (key && value) {
