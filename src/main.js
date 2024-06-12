@@ -11,7 +11,6 @@ const {
   outputResults
 } = require('./variantLinkerProcessor');
 
-
 /**
  * Sets up the command-line arguments for the Variant-Linker tool.
  */
@@ -39,6 +38,11 @@ const argv = yargs
     description: 'Enable debug mode',
     default: false
   })
+  .option('params', {
+    alias: 'p',
+    description: 'Optional parameters for VEP annotation in key=value format, separated by commas (default: "CADD=1")',
+    type: 'string'
+  })
   .help()
   .alias('help', 'h')
   .argv;
@@ -48,6 +52,26 @@ if (argv.debug) {
   require('debug').enable('variant-linker:*');
 }
 
+/**
+ * Parses optional parameters from command line.
+ * 
+ * @returns {Object} The parsed optional parameters.
+ */
+function parseOptionalParameters() {
+  let options = { CADD: '1' }; // Default value
+
+  if (argv.params) {
+    const paramsArray = argv.params.split(',');
+    paramsArray.forEach(param => {
+      const [key, value] = param.split('=');
+      if (key && value) {
+        options[key] = value;
+      }
+    });
+  }
+
+  return options;
+}
 
 /**
  * The main function that orchestrates the variant analysis process.
@@ -56,17 +80,17 @@ if (argv.debug) {
  */
 async function main() {
   try {
-      const { variantData, annotationData } = await processVariantLinking(argv.variant, variantRecoder, vepAnnotation);
-      
-      // Define a filter function as needed
-      const filterFunction = null; // Example: (results) => { /* filtering logic */ }
+    const options = parseOptionalParameters();
+    const { variantData, annotationData } = await processVariantLinking(argv.variant, variantRecoder, vepAnnotation, options);
+    
+    // Define a filter function as needed
+    const filterFunction = null; // Example: (results) => { /* filtering logic */ }
 
-      const formattedResults = filterAndFormatResults({ variantData, annotationData }, filterFunction, argv.output);
-      outputResults(formattedResults, argv.save);
+    const formattedResults = filterAndFormatResults({ variantData, annotationData }, filterFunction, argv.output);
+    outputResults(formattedResults, argv.save);
 
-      // Additional logic if needed
   } catch (error) {
-      console.error('Error:', error.message);
+    console.error('Error:', error.message);
   }
 }
 
