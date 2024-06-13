@@ -1,4 +1,3 @@
-
 # Variant-Linker: Source Code Overview
 
 This directory contains the core scripts of the Variant-Linker tool. Each script is responsible for a specific part of the functionality. Below is an overview of each script and how they work together.
@@ -71,9 +70,30 @@ Processes the linking between variant recoding and VEP annotations, filters, for
 5. **variantLinkerProcessor.js**:
    - Orchestrates the data processing, filtering, and formatting.
 
+## Default Parameters
+
+### vep_params
+
+By default, the `vep_params` include the following parameters:
+
+- `CADD=1`: Includes CADD scores in the VEP annotation results.
+- `hgvs=1`: Ensures that HGVS notations are always included in the VEP annotation results.
+- `merged=1`: Uses the merged Ensembl and RefSeq transcript set for more comprehensive annotation data.
+- `mane=1`: Includes MANE Select transcripts in the VEP annotation results.
+
+These defaults can be overridden by specifying additional parameters via the command line.
+
+### recoder_params
+
+By default, the `recoder_params` include the following parameter:
+
+- `vcf_string=1`: Ensures that the VCF string is included in the Variant Recoder results.
+
+These defaults can be overridden by specifying additional parameters via the command line.
+
 ## Mermaid Diagram
 
-```mermaid
+\```mermaid
 graph TD;
     A[main.js] --> B[variantRecoder.js];
     A --> C[vepRegionsAnnotation.js];
@@ -84,13 +104,13 @@ graph TD;
     E --> D;
     E --> F[filterAndFormatResults];
     E --> G[outputResults];
-```
+\```
 
 ## Example Usage
 
-```bash
+\```bash
 node main.js --variant "ENST00000366667:c.803C>T" --output JSON --save results.json --debug
-```
+\```
 
 This command will analyze the specified variant, format the results as JSON, save them to `results.json`, and enable debug mode.
 

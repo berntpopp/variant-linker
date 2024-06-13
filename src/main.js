@@ -41,7 +41,7 @@ const argv = yargs
   })
   .option('vep_params', {
     alias: 'vp',
-    description: 'Optional parameters for VEP annotation in key=value format, separated by commas (default: "CADD=1")',
+    description: 'Optional parameters for VEP annotation in key=value format, separated by commas (default: "CADD=1,hgvs=1,merged=1")',
     type: 'string'
   })
   .option('recoder_params', {
@@ -98,7 +98,7 @@ function detectInputFormat(variant) {
 async function main() {
   try {
     const recoderOptions = parseOptionalParameters(argv.recoder_params, { vcf_string: '1' });
-    const vepOptions = parseOptionalParameters(argv.vep_params, { CADD: '1' });
+    const vepOptions = parseOptionalParameters(argv.vep_params, { CADD: '1', hgvs: '1', merged: '1', mane: '1' });
     const inputFormat = detectInputFormat(argv.variant);
     let variantData, annotationData;
 
