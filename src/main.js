@@ -107,7 +107,11 @@ async function main() {
       annotationData = await vepRegionsAnnotation(region, allele, vepOptions);
     } else {
       variantData = await variantRecoder(argv.variant, recoderOptions);
-      const vcfString = variantData[0].T.vcf_string[0];
+      const firstVariant = variantData[0]; // Assuming the first object in the array
+      const vcfString = firstVariant[Object.keys(firstVariant)[0]].vcf_string.find(vcf => /^[0-9]+-[0-9]+-[ACGT]+\-[ACGT]+$/i.test(vcf));
+      if (!vcfString) {
+        throw new Error('No valid VCF string found in Variant Recoder response');
+      }
       const { region, allele } = convertVcfToEnsemblFormat(vcfString);
       annotationData = await vepRegionsAnnotation(region, allele, vepOptions);
     }
@@ -124,3 +128,8 @@ async function main() {
 }
 
 main();
+
+/**
+ * Future Enhancements:
+ * - Support ambiguous input like protein level data ("p.") in future updates.
+ */
