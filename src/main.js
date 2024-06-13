@@ -86,6 +86,9 @@ function parseOptionalParameters(paramString, defaultParams) {
  * @returns {string} The detected format ("VCF" or "HGVS").
  */
 function detectInputFormat(variant) {
+  // Remove "chr" prefix if present
+  variant = variant.replace(/^chr/i, '');
+  
   const vcfPattern = /^[0-9XYM]+\-[0-9]+\-[ACGT]+\-[ACGT]+$/i;
   return vcfPattern.test(variant) ? 'VCF' : 'HGVS';
 }
@@ -108,7 +111,7 @@ async function main() {
     } else {
       variantData = await variantRecoder(argv.variant, recoderOptions);
       const firstVariant = variantData[0]; // Assuming the first object in the array
-      const vcfString = firstVariant[Object.keys(firstVariant)[0]].vcf_string.find(vcf => /^[0-9]+-[0-9]+-[ACGT]+\-[ACGT]+$/i.test(vcf));
+      const vcfString = firstVariant[Object.keys(firstVariant)[0]].vcf_string.find(vcf => /^chr?[0-9]+-[0-9]+-[ACGT]+-[ACGT]+$/i.test(vcf));
       if (!vcfString) {
         throw new Error('No valid VCF string found in Variant Recoder response');
       }
