@@ -1,7 +1,7 @@
-// src/vepAnnotation.js
+// src/vepHgvsAnnotation.js
 
 const axios = require('axios');
-const debug = require('debug')('variant-linker:vepAnnotation');
+const debug = require('debug')('variant-linker:vepHgvsAnnotation');
 
 /**
  * Retrieves VEP (Variant Effect Predictor) annotations for a given HGVS notation.
@@ -12,7 +12,7 @@ const debug = require('debug')('variant-linker:vepAnnotation');
  * @returns {Object} The annotation data retrieved from the VEP API.
  * @throws Will throw an error if the request to the VEP API fails.
  */
-async function vepAnnotation(hgvs, transcript, options = {}) {
+async function vepHgvsAnnotation(hgvs, transcript, options = {}) {
   try {
     // Construct the query parameters from the options object
     const params = new URLSearchParams({ 'content-type': 'application/json', ...options }).toString();
@@ -23,9 +23,9 @@ async function vepAnnotation(hgvs, transcript, options = {}) {
     debug(`Response received: ${JSON.stringify(response.data)}`);
     return response.data;
   } catch (error) {
-    debug(`Error in vepAnnotation: ${error.message}`);
+    debug(`Error in vepHgvsAnnotation: ${error.message}`);
     throw error; // Rethrow the error after logging
   }
 }
 
-module.exports = vepAnnotation;
+module.exports = vepHgvsAnnotation;

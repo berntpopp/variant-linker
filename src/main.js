@@ -4,7 +4,8 @@
 const yargs = require('yargs');
 const debug = require('debug')('variant-linker:main');
 const variantRecoder = require('./variantRecoder');
-const vepAnnotation = require('./vepAnnotation');
+const vepRegionsAnnotation = require('./vepRegionsAnnotation');
+const convertVcfToEnsemblFormat = require('./convertVcfToEnsemblFormat');
 const {
   processVariantLinking,
   filterAndFormatResults,
@@ -79,6 +80,17 @@ function parseOptionalParameters(paramString, defaultParams) {
 }
 
 /**
+ * Detects the input format (VCF or HGVS).
+ * 
+ * @param {string} variant - The variant input.
+ * @returns {string} The detected format ("VCF" or "HGVS").
+ */
+function detectInputFormat(variant) {
+  const vcfPattern = /^[0-9XYM]+\-[0-9]+\-[ACGT]+\-[ACGT]+$/i;
+  return vcfPattern.test(variant) ? 'VCF' : 'HGVS';
+}
+
+/**
  * The main function that orchestrates the variant analysis process.
  * It links the variant recoding and VEP annotation, applies optional filtering,
  * formats the results, and handles the output.
@@ -87,8 +99,18 @@ async function main() {
   try {
     const recoderOptions = parseOptionalParameters(argv.recoder_params, { vcf_string: '1' });
     const vepOptions = parseOptionalParameters(argv.vep_params, { CADD: '1' });
-    
-    const { variantData, annotationData } = await processVariantLinking(argv.variant, variantRecoder, vepAnnotation, recoderOptions, vepOptions);
+    const inputFormat = detectInputFormat(argv.variant);
+    let variantData, annotationData;
+
+    if (inputFormat === 'VCF') {
+      const { region, allele } = convertVcfToEnsemblFormat(argv.variant);
+      annotationData = await vepRegionsAnnotation(region, allele, vepOptions);
+    } else {
+      variantData = await variantRecoder(argv.variant, recoderOptions);
+      const vcfString = variantData[0].T.vcf_string[0];
+      const { region, allele } = convertVcfToEnsemblFormat(vcfString);
+      annotationData = await vepRegionsAnnotation(region, allele, vepOptions);
+    }
     
     // Define a filter function as needed
     const filterFunction = null; // Example: (results) => { /* filtering logic */ }

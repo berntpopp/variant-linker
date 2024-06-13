@@ -4,17 +4,17 @@ const fs = require('fs');
 const debug = require('debug')('variant-linker:processor');
 
 /**
- * Processes the variant linking by obtaining data from the variantRecoder and vepAnnotation.
+ * Processes the variant linking by obtaining data from the variantRecoder and vepHgvsAnnotation.
  * 
  * @param {string} variant - The genetic variant to be analyzed.
  * @param {function} variantRecoder - Function to recode the variant into various formats.
- * @param {function} vepAnnotation - Function to annotate the variant using VEP.
+ * @param {function} vepHgvsAnnotation - Function to annotate the variant using VEP.
  * @param {Object} recoderOptions - Optional parameters for the Variant Recoder API request.
  * @param {Object} vepOptions - Optional parameters for the VEP API request.
  * @returns {Object} An object containing the variant data and the annotation data.
- * @throws Will throw an error if no data is returned from variantRecoder or vepAnnotation.
+ * @throws Will throw an error if no data is returned from variantRecoder or vepHgvsAnnotation.
  */
-async function processVariantLinking(variant, variantRecoder, vepAnnotation, recoderOptions, vepOptions) {
+async function processVariantLinking(variant, variantRecoder, vepHgvsAnnotation, recoderOptions, vepOptions) {
   try {
     const variantData = await variantRecoder(variant, recoderOptions);
     if (!variantData || variantData.length === 0) {
@@ -25,7 +25,7 @@ async function processVariantLinking(variant, variantRecoder, vepAnnotation, rec
     const selectedHgvs = variantData[0].T.hgvsc[0];
     const selectedTranscript = selectedHgvs.split(':')[0];
 
-    const annotationData = await vepAnnotation(selectedHgvs, selectedTranscript, vepOptions);
+    const annotationData = await vepHgvsAnnotation(selectedHgvs, selectedTranscript, vepOptions);
     if (!annotationData || annotationData.length === 0) {
       throw new Error('No annotation data returned from VEP');
     }

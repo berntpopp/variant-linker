@@ -21,23 +21,32 @@ Handles the API call to the Variant Recoder. It fetches the recoded information 
 - **Functionality**:
   - Sends a request to the Variant Recoder API.
   - Logs the request and response.
-  - Returns the recoded variant information.
+  - Returns the recoded variant information, including VCF string.
 
-### vepAnnotation.js
+### vepRegionsAnnotation.js
 
-Handles the API call to VEP (Variant Effect Predictor). It retrieves VEP annotations for a given HGVS notation.
+Handles the API call to VEP (Variant Effect Predictor) using genomic coordinates. It retrieves VEP annotations for a given region and allele.
 
 - **Functionality**:
-  - Sends a request to the VEP API.
+  - Sends a request to the VEP API using the region endpoint.
   - Logs the request and response.
   - Returns the annotation data.
+
+### convertVcfToEnsemblFormat.js
+
+Converts VCF notation to Ensembl region and allele format required by the VEP API.
+
+- **Functionality**:
+  - Parses the VCF string.
+  - Converts it to the Ensembl format.
+  - Returns the region and allele.
 
 ### variantLinkerProcessor.js
 
 Processes the linking between variant recoding and VEP annotations, filters, formats, and outputs the results.
 
 - **Functionality**:
-  - Processes variant linking by obtaining data from `variantRecoder` and `vepAnnotation`.
+  - Processes variant linking by obtaining data from `variantRecoder` and `vepRegionsAnnotation`.
   - Filters and formats the results based on user input.
   - Outputs the results to either the console or a file.
 
@@ -45,17 +54,21 @@ Processes the linking between variant recoding and VEP annotations, filters, for
 
 1. **main.js**:
    - Sets up the CLI and parses arguments.
-   - Calls `processVariantLinking` with the provided variant, which internally calls `variantRecoder` and `vepAnnotation`.
+   - Detects input format (VCF or HGVS).
+   - Calls `processVariantLinking` with the provided variant, which internally calls `variantRecoder` and `vepRegionsAnnotation`.
    - Calls `filterAndFormatResults` to filter and format the results.
    - Calls `outputResults` to display or save the final results.
 
 2. **variantRecoder.js**:
-   - Fetches recoded variant information from the Variant Recoder API.
+   - Fetches recoded variant information from the Variant Recoder API, including the VCF string.
 
-3. **vepAnnotation.js**:
-   - Fetches VEP annotations from the VEP API.
+3. **vepRegionsAnnotation.js**:
+   - Fetches VEP annotations from the VEP API using genomic coordinates.
 
-4. **variantLinkerProcessor.js**:
+4. **convertVcfToEnsemblFormat.js**:
+   - Converts VCF notation to the required Ensembl format for the VEP API.
+
+5. **variantLinkerProcessor.js**:
    - Orchestrates the data processing, filtering, and formatting.
 
 ## Mermaid Diagram
@@ -63,12 +76,14 @@ Processes the linking between variant recoding and VEP annotations, filters, for
 ```mermaid
 graph TD;
     A[main.js] --> B[variantRecoder.js];
-    A --> C[vepAnnotation.js];
-    A --> D[variantLinkerProcessor.js];
-    D --> B;
-    D --> C;
-    D --> E[filterAndFormatResults];
-    D --> F[outputResults];
+    A --> C[vepRegionsAnnotation.js];
+    A --> D[convertVcfToEnsemblFormat.js];
+    A --> E[variantLinkerProcessor.js];
+    E --> B;
+    E --> C;
+    E --> D;
+    E --> F[filterAndFormatResults];
+    E --> G[outputResults];
 ```
 
 ## Example Usage
