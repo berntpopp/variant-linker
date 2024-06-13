@@ -84,7 +84,6 @@ function outputResults(results, filename) {
     debug(`Results saved to file: ${filename}`);
   } else {
     console.log(results);
-    debug('Results output to console');
   }
 }
 

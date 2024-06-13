@@ -118,10 +118,16 @@ async function main() {
       variantData = await variantRecoder(argv.variant, recoderOptions);
       debug(`Variant Recoder data received: ${JSON.stringify(variantData)}`);
       const firstVariant = variantData[0]; // Assuming the first object in the array
-      const vcfString = firstVariant[Object.keys(firstVariant)[0]].vcf_string.find(vcf => /^chr?[0-9]+-[0-9]+-[ACGT]+-[ACGT]+$/i.test(vcf));
+      
+      // Find the first valid VCF string that matches the expected pattern
+      const vcfString = firstVariant[Object.keys(firstVariant)[0]].vcf_string.find(vcf => /^[0-9XYM]+-[0-9]+-[ACGT]+-[ACGT]+$/i.test(vcf));
+      
       if (!vcfString) {
+        // Log all available VCF strings for better debugging
+        debug(`Available VCF strings: ${JSON.stringify(firstVariant[Object.keys(firstVariant)[0]].vcf_string)}`);
         throw new Error('No valid VCF string found in Variant Recoder response');
       }
+      
       const { region, allele } = convertVcfToEnsemblFormat(vcfString);
       debug(`Converted VCF to Ensembl format from Recoder: region = ${region}, allele = ${allele}`);
       annotationData = await vepRegionsAnnotation(region, allele, vepOptions);
