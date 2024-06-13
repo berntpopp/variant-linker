@@ -16,7 +16,9 @@ const debug = require('debug')('variant-linker:processor');
  */
 async function processVariantLinking(variant, variantRecoder, vepHgvsAnnotation, recoderOptions, vepOptions) {
   try {
+    debug('Starting variant linking process');
     const variantData = await variantRecoder(variant, recoderOptions);
+    debug(`Variant Recoder data received: ${JSON.stringify(variantData)}`);
     if (!variantData || variantData.length === 0) {
       throw new Error('No data returned from Variant Recoder');
     }
@@ -24,15 +26,18 @@ async function processVariantLinking(variant, variantRecoder, vepHgvsAnnotation,
     // Logic to extract HGVS and transcript (can be expanded for more versatility)
     const selectedHgvs = variantData[0].T.hgvsc[0];
     const selectedTranscript = selectedHgvs.split(':')[0];
+    debug(`Selected HGVS: ${selectedHgvs}, Selected Transcript: ${selectedTranscript}`);
 
     const annotationData = await vepHgvsAnnotation(selectedHgvs, selectedTranscript, vepOptions);
+    debug(`VEP annotation data received: ${JSON.stringify(annotationData)}`);
     if (!annotationData || annotationData.length === 0) {
       throw new Error('No annotation data returned from VEP');
     }
 
+    debug('Variant linking process completed successfully');
     return { variantData, annotationData };
   } catch (error) {
-    debug(`Error in processVariantLinking: ${error.message}`);
+    debug(`Error in variant linking process: ${error.message}`);
     throw error;
   }
 }
@@ -47,17 +52,23 @@ async function processVariantLinking(variant, variantRecoder, vepHgvsAnnotation,
  * @throws Will throw an error if an unsupported format is provided.
  */
 function filterAndFormatResults(results, filterFunction, format) {
+  debug('Starting results filtering and formatting');
   // Apply the filter
   const filteredResults = filterFunction ? filterFunction(results) : results;
+  debug(`Filtered results: ${JSON.stringify(filteredResults)}`);
 
   // Format the results
+  let formattedResults;
   switch (format.toUpperCase()) {
     case 'JSON':
-      return JSON.stringify(filteredResults, null, 2);
+      formattedResults = JSON.stringify(filteredResults, null, 2);
+      break;
     // Add more formats here if needed
     default:
       throw new Error('Unsupported format');
   }
+  debug(`Formatted results: ${formattedResults}`);
+  return formattedResults;
 }
 
 /**
@@ -67,10 +78,13 @@ function filterAndFormatResults(results, filterFunction, format) {
  * @param {string} [filename] - An optional filename to save the results to a file.
  */
 function outputResults(results, filename) {
+  debug('Starting results output');
   if (filename) {
     fs.writeFileSync(filename, results);
+    debug(`Results saved to file: ${filename}`);
   } else {
     console.log(results);
+    debug('Results output to console');
   }
 }
 

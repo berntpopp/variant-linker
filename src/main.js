@@ -56,6 +56,7 @@ const argv = yargs
 if (argv.debug) {
   debug.enabled = true;
   require('debug').enable('variant-linker:*');
+  debug('Debug mode enabled');
 }
 
 /**
@@ -100,32 +101,42 @@ function detectInputFormat(variant) {
  */
 async function main() {
   try {
+    debug('Starting main variant analysis process');
     const recoderOptions = parseOptionalParameters(argv.recoder_params, { vcf_string: '1' });
     const vepOptions = parseOptionalParameters(argv.vep_params, { CADD: '1', hgvs: '1', merged: '1', mane: '1' });
+    debug(`Parsed options: recoderOptions = ${JSON.stringify(recoderOptions)}, vepOptions = ${JSON.stringify(vepOptions)}`);
     const inputFormat = detectInputFormat(argv.variant);
+    debug(`Detected input format: ${inputFormat}`);
     let variantData, annotationData;
 
     if (inputFormat === 'VCF') {
       const { region, allele } = convertVcfToEnsemblFormat(argv.variant);
+      debug(`Converted VCF to Ensembl format: region = ${region}, allele = ${allele}`);
       annotationData = await vepRegionsAnnotation(region, allele, vepOptions);
+      debug(`VEP annotation data received: ${JSON.stringify(annotationData)}`);
     } else {
       variantData = await variantRecoder(argv.variant, recoderOptions);
+      debug(`Variant Recoder data received: ${JSON.stringify(variantData)}`);
       const firstVariant = variantData[0]; // Assuming the first object in the array
       const vcfString = firstVariant[Object.keys(firstVariant)[0]].vcf_string.find(vcf => /^chr?[0-9]+-[0-9]+-[ACGT]+-[ACGT]+$/i.test(vcf));
       if (!vcfString) {
         throw new Error('No valid VCF string found in Variant Recoder response');
       }
       const { region, allele } = convertVcfToEnsemblFormat(vcfString);
+      debug(`Converted VCF to Ensembl format from Recoder: region = ${region}, allele = ${allele}`);
       annotationData = await vepRegionsAnnotation(region, allele, vepOptions);
+      debug(`VEP annotation data received: ${JSON.stringify(annotationData)}`);
     }
     
     // Define a filter function as needed
     const filterFunction = null; // Example: (results) => { /* filtering logic */ }
 
     const formattedResults = filterAndFormatResults({ variantData, annotationData }, filterFunction, argv.output);
+    debug(`Formatted results: ${JSON.stringify(formattedResults)}`);
     outputResults(formattedResults, argv.save);
-
+    debug('Variant analysis process completed successfully');
   } catch (error) {
+    debug(`Error in main variant analysis process: ${error.message}`);
     console.error('Error:', error.message);
   }
 }
