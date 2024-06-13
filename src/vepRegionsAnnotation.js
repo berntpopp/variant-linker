@@ -18,8 +18,13 @@ async function vepRegionsAnnotation(region, allele, options = {}) {
     const params = new URLSearchParams({ 'content-type': 'application/json', ...options }).toString();
     const url = `https://rest.ensembl.org/vep/homo_sapiens/region/${region}/${allele}?${params}`;
     
+    // Log the full URL and parameters
+    debug(`Request URL: ${url}`);
     debug(`Requesting VEP Annotation for region: ${region}, allele: ${allele} with options: ${JSON.stringify(options)}`);
+    
     const response = await axios.get(url);
+    
+    // Log the response
     debug(`Response received: ${JSON.stringify(response.data)}`);
     return response.data;
   } catch (error) {

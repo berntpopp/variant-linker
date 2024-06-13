@@ -17,8 +17,13 @@ async function variantRecoder(variant, options = { vcf_string: '1' }) {
     const params = new URLSearchParams({ 'content-type': 'application/json', ...options }).toString();
     const url = `https://rest.ensembl.org/variant_recoder/human/${variant}?${params}`;
     
+    // Log the full URL and parameters
+    debug(`Request URL: ${url}`);
     debug(`Requesting Variant Recoder for variant: ${variant} with options: ${JSON.stringify(options)}`);
+    
     const response = await axios.get(url);
+    
+    // Log the response
     debug(`Response received: ${JSON.stringify(response.data)}`);
     return response.data;
   } catch (error) {
