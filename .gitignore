@@ -1,7 +1,6 @@
 .DS_Store
 node_modules
 /dist
-/test
 /input
 
 
@@ -25,5 +24,6 @@ pnpm-debug.log*
 *.sw?
 
 # any test files
-*test*
-*TEST*
+*test.json
+*TEST.json
+*results.json
