@@ -5,6 +5,9 @@ const fs = require('fs');
 const path = require('path');
 const yargs = require('yargs');
 
+// Load the package.json file for the version number
+const packageJson = require('../package.json'); // Adjust the path to your package.json if needed
+
 // Enable different levels of debug logs
 const debug = require('debug')('variant-linker:main');
 const debugDetailed = require('debug')('variant-linker:detailed');
@@ -45,8 +48,8 @@ const argv = yargs
   .option('debug', {
     alias: 'd',
     description: 'Enable debug mode with levels (1: basic, 2: detailed, 3: all)',
-    count: true,
-    default: 0
+    type: 'number',
+    default: 1
   })
   .option('vep_params', {
     alias: 'vp',
@@ -65,6 +68,8 @@ const argv = yargs
   })
   .help()
   .alias('help', 'h')
+  .version(packageJson.version)
+  .alias('version', 'V')
   .argv;
 
 if (argv.debug) {
@@ -145,7 +150,7 @@ async function main() {
       
       if (!vcfString) {
         // Log all available VCF strings for better debugging
-        debugAll(`Available VCF strings: ${JSON.stringify(firstVariant[Object.keys(firstVariant)[0]].vcf_string)}`);
+        debug(`Available VCF strings: ${JSON.stringify(firstVariant[Object.keys(firstVariant)[0]].vcf_string)}`);
         throw new Error('No valid VCF string found in Variant Recoder response');
       }
       
@@ -157,22 +162,19 @@ async function main() {
     
     // Apply scoring if scoring configuration is provided
     if (argv.scoring_config_path) {
-      debugDetailed('Reading scoring configuration');
       const scoringConfig = readScoringConfig(argv.scoring_config_path);
       annotationData = applyScoring(annotationData, scoringConfig);
-      debugDetailed(`Applied scoring to annotation data: ${JSON.stringify(annotationData)}`);
     }
     
     // Define a filter function as needed
     const filterFunction = null; // Example: (results) => { /* filtering logic */ }
 
-    debugDetailed('Filtering and formatting results');
     const formattedResults = filterAndFormatResults({ variantData, annotationData }, filterFunction, argv.output);
 
     outputResults(formattedResults, argv.save);
     debug('Variant analysis process completed successfully');
   } catch (error) {
-    debugAll(`Error in main variant analysis process: ${error.message}`);
+    debug(`Error in main variant analysis process: ${error.message}`);
     console.error('Error:', error.message);
   }
 }
