@@ -1,7 +1,9 @@
 // src/vepHgvsAnnotation.js
 
 const axios = require('axios');
-const debug = require('debug')('variant-linker:vepHgvsAnnotation');
+const debug = require('debug')('variant-linker:main');
+const debugDetailed = require('debug')('variant-linker:detailed');
+const debugAll = require('debug')('variant-linker:all');
 
 /**
  * Retrieves VEP (Variant Effect Predictor) annotations for a given HGVS notation.
@@ -18,12 +20,18 @@ async function vepHgvsAnnotation(hgvs, transcript, options = {}) {
     const params = new URLSearchParams({ 'content-type': 'application/json', ...options }).toString();
     const url = `https://rest.ensembl.org/vep/human/hgvs/${hgvs}?${params}`;
     
-    debug(`Requesting VEP Annotation for HGVS: ${hgvs} with transcript: ${transcript} and options: ${JSON.stringify(options)}`);
+    // Log the full URL and parameters
+    debug(`Requesting VEP Annotation for HGVS: ${hgvs} with transcript: ${transcript}`);
+    debugDetailed(`Request URL: ${url}`);
+    debugDetailed(`Request options: ${JSON.stringify(options)}`);
+    
     const response = await axios.get(url);
-    debug(`Response received: ${JSON.stringify(response.data)}`);
+    
+    // Log the response
+    debugDetailed(`Response received: ${JSON.stringify(response.data)}`);
     return response.data;
   } catch (error) {
-    debug(`Error in vepHgvsAnnotation: ${error.message}`);
+    debugAll(`Error in vepHgvsAnnotation: ${error.message}`);
     throw error; // Rethrow the error after logging
   }
 }

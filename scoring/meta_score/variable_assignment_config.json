@@ -1,0 +1,9 @@
+{
+  "@context": "https://schema.org/",
+  "@type": "Configuration",
+  "variables": {
+    "impact": "impact_variant",
+    "cadd_phred": "cadd_phred_variant",
+    "colocated_variants.*.frequencies.*.gnomade": "gnomade_variant"
+  }
+}

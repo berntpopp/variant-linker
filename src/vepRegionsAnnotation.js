@@ -1,7 +1,9 @@
 // src/vepRegionsAnnotation.js
 
 const axios = require('axios');
-const debug = require('debug')('variant-linker:vepRegionsAnnotation');
+const debug = require('debug')('variant-linker:main');
+const debugDetailed = require('debug')('variant-linker:detailed');
+const debugAll = require('debug')('variant-linker:all');
 
 /**
  * Retrieves VEP (Variant Effect Predictor) annotations for a given genomic region and allele.
@@ -19,16 +21,17 @@ async function vepRegionsAnnotation(region, allele, options = {}) {
     const url = `https://rest.ensembl.org/vep/homo_sapiens/region/${region}/${allele}?${params}`;
     
     // Log the full URL and parameters
-    debug(`Request URL: ${url}`);
-    debug(`Requesting VEP Annotation for region: ${region}, allele: ${allele} with options: ${JSON.stringify(options)}`);
+    debug(`Requesting VEP Annotation for region: ${region}, allele: ${allele}`);
+    debugDetailed(`Request URL: ${url}`);
+    debugDetailed(`Request options: ${JSON.stringify(options)}`);
     
     const response = await axios.get(url);
     
     // Log the response
-    debug(`Response received: ${JSON.stringify(response.data)}`);
+    debugDetailed(`Response received: ${JSON.stringify(response.data)}`);
     return response.data;
   } catch (error) {
-    debug(`Error in vepRegionsAnnotation: ${error.message}`);
+    debugAll(`Error in vepRegionsAnnotation: ${error.message}`);
     throw error; // Rethrow the error after logging
   }
 }

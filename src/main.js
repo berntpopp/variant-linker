@@ -1,8 +1,16 @@
 #!/usr/bin/env node
 // src/main.js
 
+const fs = require('fs');
+const path = require('path');
 const yargs = require('yargs');
+
+// Enable different levels of debug logs
 const debug = require('debug')('variant-linker:main');
+const debugDetailed = require('debug')('variant-linker:detailed');
+const debugAll = require('debug')('variant-linker:all');
+
+// Import the required functions from the modules
 const variantRecoder = require('./variantRecoder');
 const vepRegionsAnnotation = require('./vepRegionsAnnotation');
 const convertVcfToEnsemblFormat = require('./convertVcfToEnsemblFormat');
@@ -11,6 +19,7 @@ const {
   filterAndFormatResults,
   outputResults
 } = require('./variantLinkerProcessor');
+const { readScoringConfig, applyScoring } = require('./scoring');
 
 /**
  * Sets up the command-line arguments for the Variant-Linker tool.
@@ -35,9 +44,9 @@ const argv = yargs
   })
   .option('debug', {
     alias: 'd',
-    type: 'boolean',
-    description: 'Enable debug mode',
-    default: false
+    description: 'Enable debug mode with levels (1: basic, 2: detailed, 3: all)',
+    count: true,
+    default: 0
   })
   .option('vep_params', {
     alias: 'vp',
@@ -49,14 +58,26 @@ const argv = yargs
     description: 'Optional parameters for Variant Recoder in key=value format, separated by commas (default: "vcf_string=1")',
     type: 'string'
   })
+  .option('scoring_config_path', {
+    alias: 'scp',
+    description: 'Path to the scoring configuration directory',
+    type: 'string'
+  })
   .help()
   .alias('help', 'h')
   .argv;
 
 if (argv.debug) {
-  debug.enabled = true;
-  require('debug').enable('variant-linker:*');
-  debug('Debug mode enabled');
+  if (argv.debug >= 1) {
+    require('debug').enable('variant-linker:main');
+    if (argv.debug >= 2) {
+      require('debug').enable('variant-linker:main,variant-linker:detailed');
+      if (argv.debug >= 3) {
+        require('debug').enable('variant-linker:main,variant-linker:detailed,variant-linker:all');
+      }
+    }
+    debug('Debug mode enabled');
+  }
 }
 
 /**
@@ -124,7 +145,7 @@ async function main() {
       
       if (!vcfString) {
         // Log all available VCF strings for better debugging
-        debug(`Available VCF strings: ${JSON.stringify(firstVariant[Object.keys(firstVariant)[0]].vcf_string)}`);
+        debugAll(`Available VCF strings: ${JSON.stringify(firstVariant[Object.keys(firstVariant)[0]].vcf_string)}`);
         throw new Error('No valid VCF string found in Variant Recoder response');
       }
       
@@ -134,22 +155,26 @@ async function main() {
       debug(`VEP annotation data received: ${JSON.stringify(annotationData)}`);
     }
     
+    // Apply scoring if scoring configuration is provided
+    if (argv.scoring_config_path) {
+      debugDetailed('Reading scoring configuration');
+      const scoringConfig = readScoringConfig(argv.scoring_config_path);
+      annotationData = applyScoring(annotationData, scoringConfig);
+      debugDetailed(`Applied scoring to annotation data: ${JSON.stringify(annotationData)}`);
+    }
+    
     // Define a filter function as needed
     const filterFunction = null; // Example: (results) => { /* filtering logic */ }
 
+    debugDetailed('Filtering and formatting results');
     const formattedResults = filterAndFormatResults({ variantData, annotationData }, filterFunction, argv.output);
-    debug(`Formatted results: ${JSON.stringify(formattedResults)}`);
+
     outputResults(formattedResults, argv.save);
     debug('Variant analysis process completed successfully');
   } catch (error) {
-    debug(`Error in main variant analysis process: ${error.message}`);
+    debugAll(`Error in main variant analysis process: ${error.message}`);
     console.error('Error:', error.message);
   }
 }
 
 main();
-
-/**
- * Future Enhancements:
- * - Support ambiguous input like protein level data ("p.") in future updates.
- */

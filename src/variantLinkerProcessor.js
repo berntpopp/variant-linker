@@ -67,7 +67,6 @@ function filterAndFormatResults(results, filterFunction, format) {
     default:
       throw new Error('Unsupported format');
   }
-  debug(`Formatted results: ${formattedResults}`);
   return formattedResults;
 }
 

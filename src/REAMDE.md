@@ -10,7 +10,7 @@ The entry point of the Variant-Linker CLI tool. This script sets up command-line
 
 - **Functionality**:
   - Sets up command-line arguments using `yargs`.
-  - Enables debug mode if specified.
+  - Enables debug mode with multiple levels (`basic`, `detailed`, `all`).
   - Orchestrates the process by calling `processVariantLinking`, `filterAndFormatResults`, and `outputResults`.
 
 ### variantRecoder.js
@@ -19,7 +19,7 @@ Handles the API call to the Variant Recoder. It fetches the recoded information 
 
 - **Functionality**:
   - Sends a request to the Variant Recoder API.
-  - Logs the request and response.
+  - Logs the request and response at different debug levels.
   - Returns the recoded variant information, including VCF string.
 
 ### vepRegionsAnnotation.js
@@ -28,7 +28,16 @@ Handles the API call to VEP (Variant Effect Predictor) using genomic coordinates
 
 - **Functionality**:
   - Sends a request to the VEP API using the region endpoint.
-  - Logs the request and response.
+  - Logs the request and response at different debug levels.
+  - Returns the annotation data.
+
+### vepHgvsAnnotation.js
+
+Handles the API call to VEP (Variant Effect Predictor) using HGVS notation. It retrieves VEP annotations for a given HGVS notation.
+
+- **Functionality**:
+  - Sends a request to the VEP API using the HGVS endpoint.
+  - Logs the request and response at different debug levels.
   - Returns the annotation data.
 
 ### convertVcfToEnsemblFormat.js
@@ -38,7 +47,18 @@ Converts VCF notation to Ensembl region and allele format required by the VEP AP
 - **Functionality**:
   - Parses the VCF string.
   - Converts it to the Ensembl format.
+  - Logs the conversion process at different debug levels.
   - Returns the region and allele.
+
+### scoring.js
+
+Handles the application of scoring algorithms based on VEP annotations.
+
+- **Functionality**:
+  - Reads and parses scoring configuration files.
+  - Applies scoring algorithms to VEP annotations.
+  - Extracts variables and calculates scores.
+  - Logs the process at different debug levels.
 
 ### variantLinkerProcessor.js
 
@@ -54,7 +74,7 @@ Processes the linking between variant recoding and VEP annotations, filters, for
 1. **main.js**:
    - Sets up the CLI and parses arguments.
    - Detects input format (VCF or HGVS).
-   - Calls `processVariantLinking` with the provided variant, which internally calls `variantRecoder` and `vepRegionsAnnotation`.
+   - Calls `processVariantLinking` with the provided variant, which internally calls `variantRecoder`, `vepRegionsAnnotation`, and `vepHgvsAnnotation`.
    - Calls `filterAndFormatResults` to filter and format the results.
    - Calls `outputResults` to display or save the final results.
 
@@ -64,10 +84,16 @@ Processes the linking between variant recoding and VEP annotations, filters, for
 3. **vepRegionsAnnotation.js**:
    - Fetches VEP annotations from the VEP API using genomic coordinates.
 
-4. **convertVcfToEnsemblFormat.js**:
+4. **vepHgvsAnnotation.js**:
+   - Fetches VEP annotations from the VEP API using HGVS notation.
+
+5. **convertVcfToEnsemblFormat.js**:
    - Converts VCF notation to the required Ensembl format for the VEP API.
 
-5. **variantLinkerProcessor.js**:
+6. **scoring.js**:
+   - Reads and applies scoring configurations to VEP annotations.
+
+7. **variantLinkerProcessor.js**:
    - Orchestrates the data processing, filtering, and formatting.
 
 ## Default Parameters
@@ -93,24 +119,26 @@ These defaults can be overridden by specifying additional parameters via the com
 
 ## Mermaid Diagram
 
-\```mermaid
+```mermaid
 graph TD;
     A[main.js] --> B[variantRecoder.js];
     A --> C[vepRegionsAnnotation.js];
     A --> D[convertVcfToEnsemblFormat.js];
     A --> E[variantLinkerProcessor.js];
+    A --> F[scoring.js];
     E --> B;
     E --> C;
     E --> D;
-    E --> F[filterAndFormatResults];
-    E --> G[outputResults];
-\```
+    E --> F;
+    E --> G[filterAndFormatResults];
+    E --> H[outputResults];
+```
 
 ## Example Usage
 
-\```bash
-node main.js --variant "ENST00000366667:c.803C>T" --output JSON --save results.json --debug
-\```
+```bash
+variant-linker --variant "ENST00000366667:c.803C>T" --output JSON --save results.json --debug  --scoring_config_path "scoring/meta_score/"
+```
 
 This command will analyze the specified variant, format the results as JSON, save them to `results.json`, and enable debug mode.
 
