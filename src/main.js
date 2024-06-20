@@ -25,14 +25,45 @@ const {
 const { readScoringConfig, applyScoring } = require('./scoring');
 
 /**
+ * Reads and parses the configuration file if specified.
+ * @param {string} configFilePath - Path to the configuration file.
+ * @returns {Object} The parsed configuration object.
+ */
+function readConfigFile(configFilePath) {
+  if (!configFilePath) return {};
+  try {
+    const configFile = fs.readFileSync(configFilePath, 'utf8');
+    return JSON.parse(configFile);
+  } catch (error) {
+    console.error(`Error reading configuration file: ${error.message}`);
+    return {};
+  }
+}
+
+/**
+ * Merges parameters from the configuration file with command-line arguments.
+ * Command-line arguments take precedence over configuration file parameters.
+ * @param {Object} configParams - Parameters from the configuration file.
+ * @param {Object} cliParams - Parameters from the command line.
+ * @returns {Object} The merged parameters.
+ */
+function mergeParams(configParams, cliParams) {
+  return { ...configParams, ...cliParams };
+}
+
+/**
  * Sets up the command-line arguments for the Variant-Linker tool.
  */
 const argv = yargs
+  .option('config', {
+    alias: 'c',
+    description: 'Path to the configuration file',
+    type: 'string'
+  })
   .option('variant', {
     alias: 'v',
     description: 'The variant to be analyzed',
-    type: 'string',
-    demandOption: true
+    type: 'string'
   })
   .option('output', {
     alias: 'o',
@@ -72,17 +103,29 @@ const argv = yargs
   .alias('version', 'V')
   .argv;
 
-if (argv.debug) {
-  if (argv.debug >= 1) {
+const configParams = readConfigFile(argv.config);
+const mergedParams = mergeParams(configParams, argv);
+
+/**
+ * Enable debugging based on the debug level.
+ * 
+ * @param {number} debugLevel - The debug level (1, 2, or 3).
+ */
+function enableDebugging(debugLevel) {
+  if (debugLevel >= 1) {
     require('debug').enable('variant-linker:main');
-    if (argv.debug >= 2) {
+    if (debugLevel >= 2) {
       require('debug').enable('variant-linker:main,variant-linker:detailed');
-      if (argv.debug >= 3) {
+      if (debugLevel >= 3) {
         require('debug').enable('variant-linker:main,variant-linker:detailed,variant-linker:all');
       }
     }
     debug('Debug mode enabled');
   }
+}
+
+if (mergedParams.debug) {
+  enableDebugging(mergedParams.debug);
 }
 
 /**
@@ -113,6 +156,10 @@ function parseOptionalParameters(paramString, defaultParams) {
  * @returns {string} The detected format ("VCF" or "HGVS").
  */
 function detectInputFormat(variant) {
+  if (!variant) {
+    throw new Error('Variant not specified. Please provide a variant using --variant or in the configuration file.');
+  }
+
   // Remove "chr" prefix if present
   variant = variant.replace(/^chr/i, '');
   
@@ -128,20 +175,20 @@ function detectInputFormat(variant) {
 async function main() {
   try {
     debug('Starting main variant analysis process');
-    const recoderOptions = parseOptionalParameters(argv.recoder_params, { vcf_string: '1' });
-    const vepOptions = parseOptionalParameters(argv.vep_params, { CADD: '1', hgvs: '1', merged: '1', mane: '1' });
+    const recoderOptions = parseOptionalParameters(mergedParams.recoder_params, { vcf_string: '1' });
+    const vepOptions = parseOptionalParameters(mergedParams.vep_params, { CADD: '1', hgvs: '1', merged: '1', mane: '1' });
     debug(`Parsed options: recoderOptions = ${JSON.stringify(recoderOptions)}, vepOptions = ${JSON.stringify(vepOptions)}`);
-    const inputFormat = detectInputFormat(argv.variant);
+    const inputFormat = detectInputFormat(mergedParams.variant);
     debug(`Detected input format: ${inputFormat}`);
     let variantData, annotationData;
 
     if (inputFormat === 'VCF') {
-      const { region, allele } = convertVcfToEnsemblFormat(argv.variant);
+      const { region, allele } = convertVcfToEnsemblFormat(mergedParams.variant);
       debug(`Converted VCF to Ensembl format: region = ${region}, allele = ${allele}`);
       annotationData = await vepRegionsAnnotation(region, allele, vepOptions);
       debug(`VEP annotation data received: ${JSON.stringify(annotationData)}`);
     } else {
-      variantData = await variantRecoder(argv.variant, recoderOptions);
+      variantData = await variantRecoder(mergedParams.variant, recoderOptions);
       debug(`Variant Recoder data received: ${JSON.stringify(variantData)}`);
       const firstVariant = variantData[0]; // Assuming the first object in the array
       
@@ -161,17 +208,17 @@ async function main() {
     }
     
     // Apply scoring if scoring configuration is provided
-    if (argv.scoring_config_path) {
-      const scoringConfig = readScoringConfig(argv.scoring_config_path);
+    if (mergedParams.scoring_config_path) {
+      const scoringConfig = readScoringConfig(mergedParams.scoring_config_path);
       annotationData = applyScoring(annotationData, scoringConfig);
     }
     
     // Define a filter function as needed
     const filterFunction = null; // Example: (results) => { /* filtering logic */ }
 
-    const formattedResults = filterAndFormatResults({ variantData, annotationData }, filterFunction, argv.output);
+    const formattedResults = filterAndFormatResults({ variantData, annotationData }, filterFunction, mergedParams.output);
 
-    outputResults(formattedResults, argv.save);
+    outputResults(formattedResults, mergedParams.save);
     debug('Variant analysis process completed successfully');
   } catch (error) {
     debug(`Error in main variant analysis process: ${error.message}`);
