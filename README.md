@@ -11,6 +11,7 @@ Variant-Linker is a command-line interface (CLI) tool designed to facilitate the
 - **Extensibility**: Prepared for future extensions to include local installations of VEP and Variant Recoder.
 - **Output Customization**: Users can specify the output format (e.g., JSON, CSV).
 - **VCF Handling**: Detects and processes VCF formatted input, converting it to the necessary format for Ensembl region-based annotation.
+- **Configuration File Support**: Allows users to provide parameters through a structured configuration file.
 
 ## Installation
 
@@ -43,12 +44,30 @@ variant-linker --variant <variant_input> --output <output_format> [--debug]
 ```
 
 ### Command-Line Options
-- `--variant`, `-v`: Specify the genetic variant to be analyzed. This is a required parameter.
+- `--config`, `-c`: Path to the configuration file.
+- `--variant`, `-v`: Specify the genetic variant to be analyzed. This can be provided via command line or configuration file.
 - `--output`, `-o`: Define the desired output format (e.g., JSON, CSV). Default is JSON.
 - `--save`, `-s`: Filename to save the results. If not specified, results will be printed to the console.
 - `--debug`, `-d`: Enable debug mode for detailed logging. This is optional and is not enabled by default.
 - `--vep_params`, `-vp`: Optional parameters for VEP annotation in key=value format, separated by commas (default: "CADD=1").
 - `--recoder_params`, `-rp`: Optional parameters for Variant Recoder in key=value format, separated by commas (default: "vcf_string=1").
+- `--scoring_config_path`, `-scp`: Path to the scoring configuration directory.
+
+### Configuration File
+
+Variant-Linker can accept a JSON configuration file to specify parameters. Command-line parameters will override configuration file parameters if both are provided.
+
+#### Example Configuration File (`example_input.json`):
+
+```json
+{
+  "variant": "ENST00000366667:c.803C>T",
+  "output": "JSON",
+  "save": "output/example_output.json",
+  "debug": 3,
+  "scoring_config_path": "scoring/meta_score/"
+}
+```
 
 ### VCF Handling
 Variant-Linker can detect and process variants provided in VCF format. When a VCF formatted variant is detected, the tool:
@@ -62,12 +81,14 @@ Variant-Linker can detect and process variants provided in VCF format. When a VC
 
 ### Example Usage
 
+Using command-line parameters:
 ```bash
 variant-linker --variant 'ENST00000366667:c.803C>T' --output JSON
 ```
 
+Using a configuration file:
 ```bash
-variant-linker --variant '1-65568-A-C' --output JSON
+variant-linker --config example_input.json
 ```
 
 ## Contributing
