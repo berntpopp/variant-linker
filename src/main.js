@@ -48,8 +48,8 @@ const argv = yargs
   .option('debug', {
     alias: 'd',
     description: 'Enable debug mode with levels (1: basic, 2: detailed, 3: all)',
-    type: 'number',
-    default: 1
+    count: true,
+    type: 'number'
   })
   .option('vep_params', {
     alias: 'vp',
