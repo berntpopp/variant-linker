@@ -41,17 +41,6 @@ function readConfigFile(configFilePath) {
 }
 
 /**
- * Merges parameters from the configuration file with command-line arguments.
- * Command-line arguments take precedence over configuration file parameters.
- * @param {Object} configParams - Parameters from the configuration file.
- * @param {Object} cliParams - Parameters from the command line.
- * @returns {Object} The merged parameters.
- */
-function mergeParams(configParams, cliParams) {
-  return { ...configParams, ...cliParams };
-}
-
-/**
  * Sets up the command-line arguments for the Variant-Linker tool.
  */
 const argv = yargs
@@ -108,6 +97,29 @@ const argv = yargs
   .alias('version', 'V')
   .argv;
 
+/**
+ * Merges parameters from the configuration file with command-line arguments.
+ * Command-line arguments take precedence over configuration file parameters.
+ * @param {Object} configParams - Parameters from the configuration file.
+ * @param {Object} cliParams - Parameters from the command line.
+ * @returns {Object} The merged parameters.
+ */
+function mergeParams(configParams, cliParams) {
+  const merged = { ...configParams };
+  for (const key in cliParams) {
+    if (cliParams[key] !== undefined && cliParams[key] !== 0) {
+      merged[key] = cliParams[key];
+    }
+  }
+
+  // Remove short options that duplicate long options
+  const shortOptions = ['c', 'v', 'o', 's', 'd', 'vp', 'rp', 'scp', 'lf'];
+  shortOptions.forEach(option => delete merged[option]);
+
+  return merged;
+};
+
+// Usage example:
 const configParams = readConfigFile(argv.config);
 const mergedParams = mergeParams(configParams, argv);
 
