@@ -97,6 +97,11 @@ const argv = yargs
     description: 'Path to the scoring configuration directory',
     type: 'string'
   })
+  .option('log_file', {
+    alias: 'lf',
+    description: 'Path to the log file for saving debug information',
+    type: 'string'
+  })  
   .help()
   .alias('help', 'h')
   .version(packageJson.version)
@@ -110,8 +115,21 @@ const mergedParams = mergeParams(configParams, argv);
  * Enable debugging based on the debug level.
  * 
  * @param {number} debugLevel - The debug level (1, 2, or 3).
+ * @param {string} logFilePath - Path to the log file.
  */
-function enableDebugging(debugLevel) {
+function enableDebugging(debugLevel, logFilePath) {
+  if (logFilePath) {
+    const logStream = fs.createWriteStream(logFilePath, { flags: 'w' }); // Overwrite the log file
+    const originalWrite = logStream.write;
+    logStream.write = (msg) => {
+      const timestamp = new Date().toISOString();
+      originalWrite.call(logStream, `[${timestamp}] ${msg.replace(/\x1b\[[0-9;]*m/g, '')}`);
+    };
+    debug.log = (msg) => logStream.write(msg + '\n');
+    debugDetailed.log = (msg) => logStream.write(msg + '\n');
+    debugAll.log = (msg) => logStream.write(msg + '\n');
+  }
+
   if (debugLevel >= 1) {
     require('debug').enable('variant-linker:main');
     if (debugLevel >= 2) {
@@ -125,7 +143,7 @@ function enableDebugging(debugLevel) {
 }
 
 if (mergedParams.debug) {
-  enableDebugging(mergedParams.debug);
+  enableDebugging(mergedParams.debug, mergedParams.log_file);
 }
 
 /**
@@ -183,11 +201,14 @@ async function main() {
     let variantData, annotationData;
 
     if (inputFormat === 'VCF') {
+      debug('Processing variant as VCF format');
+      debug('Skipping Variant Recoder step as the input is already in VCF format');
       const { region, allele } = convertVcfToEnsemblFormat(mergedParams.variant);
       debug(`Converted VCF to Ensembl format: region = ${region}, allele = ${allele}`);
       annotationData = await vepRegionsAnnotation(region, allele, vepOptions);
       debug(`VEP annotation data received: ${JSON.stringify(annotationData)}`);
     } else {
+      debug('Processing variant as HGVS format');
       variantData = await variantRecoder(mergedParams.variant, recoderOptions);
       debug(`Variant Recoder data received: ${JSON.stringify(variantData)}`);
       const firstVariant = variantData[0]; // Assuming the first object in the array
@@ -211,6 +232,7 @@ async function main() {
     if (mergedParams.scoring_config_path) {
       const scoringConfig = readScoringConfig(mergedParams.scoring_config_path);
       annotationData = applyScoring(annotationData, scoringConfig);
+      debug(`Applied scoring to annotation data: ${JSON.stringify(annotationData)}`);
     }
     
     // Define a filter function as needed
