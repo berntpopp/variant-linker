@@ -41,6 +41,29 @@ function readConfigFile(configFilePath) {
 }
 
 /**
+ * Validates configuration parameters.
+ * @param {Object} params - Configuration parameters to validate.
+ */
+function validateParams(params) {
+  const requiredParams = ['variant', 'output'];
+  const validOutputs = ['JSON', 'CSV'];
+
+  for (const param of requiredParams) {
+    if (!params[param]) {
+      throw new Error(`Missing required parameter: ${param}`);
+    }
+  }
+
+  if (!validOutputs.includes(params.output)) {
+    throw new Error(`Invalid output format: ${params.output}. Valid formats are ${validOutputs.join(', ')}`);
+  }
+
+  if (params.debug && (typeof params.debug !== 'number' || params.debug < 1 || params.debug > 3)) {
+    throw new Error('Debug level must be a number between 1 and 3');
+  }
+}
+
+/**
  * Sets up the command-line arguments for the Variant-Linker tool.
  */
 const argv = yargs
@@ -122,6 +145,13 @@ function mergeParams(configParams, cliParams) {
 // Usage example:
 const configParams = readConfigFile(argv.config);
 const mergedParams = mergeParams(configParams, argv);
+
+try {
+  validateParams(mergedParams);
+} catch (error) {
+  console.error(`Configuration validation error: ${error.message}`);
+  process.exit(1);
+}
 
 /**
  * Enable debugging based on the debug level.
@@ -224,29 +254,29 @@ async function main() {
       variantData = await variantRecoder(mergedParams.variant, recoderOptions);
       debug(`Variant Recoder data received: ${JSON.stringify(variantData)}`);
       const firstVariant = variantData[0]; // Assuming the first object in the array
-      
+
       // Find the first valid VCF string that matches the expected pattern
       const vcfString = firstVariant[Object.keys(firstVariant)[0]].vcf_string.find(vcf => /^[0-9XYM]+-[0-9]+-[ACGT]+-[ACGT]+$/i.test(vcf));
-      
+
       if (!vcfString) {
         // Log all available VCF strings for better debugging
         debug(`Available VCF strings: ${JSON.stringify(firstVariant[Object.keys(firstVariant)[0]].vcf_string)}`);
         throw new Error('No valid VCF string found in Variant Recoder response');
       }
-      
+
       const { region, allele } = convertVcfToEnsemblFormat(vcfString);
       debug(`Converted VCF to Ensembl format from Recoder: region = ${region}, allele = ${allele}`);
       annotationData = await vepRegionsAnnotation(region, allele, vepOptions);
       debug(`VEP annotation data received: ${JSON.stringify(annotationData)}`);
     }
-    
+
     // Apply scoring if scoring configuration is provided
     if (mergedParams.scoring_config_path) {
       const scoringConfig = readScoringConfig(mergedParams.scoring_config_path);
       annotationData = applyScoring(annotationData, scoringConfig);
       debug(`Applied scoring to annotation data: ${JSON.stringify(annotationData)}`);
     }
-    
+
     // Define a filter function as needed
     const filterFunction = null; // Example: (results) => { /* filtering logic */ }
 
