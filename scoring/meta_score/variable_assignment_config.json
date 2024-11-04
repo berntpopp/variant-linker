@@ -2,8 +2,8 @@
   "@context": "https://schema.org/",
   "@type": "Configuration",
   "variables": {
-    "impact": "impact_variant",
-    "cadd_phred": "cadd_phred_variant",
+    "transcript_consequences.*.impact": "impact_variant.map(val => ({ 'HIGH': 4, 'MODERATE': 3, 'LOW': 2, 'MODIFIER': 1 }[val] || 0))",
+    "transcript_consequences[0].cadd_phred": "cadd_phred_variant",
     "colocated_variants.*.frequencies.*.gnomade": "gnomade_variant"
   }
 }

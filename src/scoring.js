@@ -40,22 +40,35 @@ function readScoringConfig(configPath) {
  */
 function applyScoring(annotationData, scoringConfig) {
   debug(`Applying scoring with configuration: ${JSON.stringify(scoringConfig)}`);
-  const variablesConfig = scoringConfig.variableAssignmentConfig;
-  const formulasConfig = scoringConfig.formulaConfig;
 
-  if (!Array.isArray(formulasConfig)) {
-    throw new Error('formulasConfig is not an array');
+  const variablesConfig = scoringConfig.variableAssignmentConfig;
+  const formulasConfig = scoringConfig.formulaConfig.formulas;
+
+  if (!formulasConfig || !formulasConfig.annotation_level || !formulasConfig.transcript_level) {
+    throw new Error('Formulas configuration should contain annotation_level and transcript_level formulas under formulas');
   }
 
+  // Process each annotation in the annotationData array
   annotationData.forEach(annotation => {
+    // Apply annotation-level formulas
+    const annotationVariables = extractVariables(annotation, variablesConfig);
+
+    formulasConfig.annotation_level.forEach(formula => {
+      const scoreName = Object.keys(formula)[0];
+      const formulaStr = formula[scoreName];
+      annotation[scoreName] = calculateScore(formulaStr, annotationVariables);
+      debugDetailed(`Calculated ${scoreName} for annotation: ${annotation[scoreName]}`);
+    });
+
+    // Apply transcript-level formulas if transcript_consequences exist
     if (annotation.transcript_consequences) {
       annotation.transcript_consequences.forEach(transcript => {
-        const variables = extractVariables(transcript, variablesConfig, annotation);
+        const transcriptVariables = extractVariables(transcript, variablesConfig, annotation);
 
-        formulasConfig.forEach(formula => {
+        formulasConfig.transcript_level.forEach(formula => {
           const scoreName = Object.keys(formula)[0];
           const formulaStr = formula[scoreName];
-          transcript[scoreName] = calculateScore(formulaStr, variables);
+          transcript[scoreName] = calculateScore(formulaStr, transcriptVariables);
           debugDetailed(`Calculated ${scoreName} for transcript: ${transcript[scoreName]}`);
         });
       });
