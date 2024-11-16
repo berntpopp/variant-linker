@@ -40,14 +40,10 @@ function readScoringConfig(configPath) {
  */
 function applyScoring(annotationData, scoringConfig) {
   debug(`Applying scoring with configuration: ${JSON.stringify(scoringConfig)}`);
-
   const variablesConfig = scoringConfig.variableAssignmentConfig;
-  const formulasConfig = scoringConfig.formulaConfig.formulas;
-
-  if (!formulasConfig || !formulasConfig.annotation_level || !formulasConfig.transcript_level) {
-    throw new Error('Formulas configuration should contain annotation_level and transcript_level formulas under formulas');
-  }
-
+  const formulasConfig = scoringConfig.formulaConfig;
+  const { annotation_level, transcript_level } = formulasConfig;
+  
   // Process each annotation in the annotationData array
   annotationData.forEach(annotation => {
     // Apply annotation-level formulas
