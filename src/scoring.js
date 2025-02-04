@@ -19,9 +19,10 @@ const debugAll = require('debug')('variant-linker:all');
  * - variable_assignment_config.json: containing a "variables" object.
  * - formula_config.json: containing scoring formulas.
  *
- * If the formula config file contains a property "formulas" (an array), it is assumed
+ * If the formula config file contains a property "formulas" that is an array, it is assumed
  * to represent annotation-level formulas and transcript-level formulas will be set empty.
- * Otherwise, the function expects an object with keys "annotation_level" and "transcript_level".
+ * Otherwise, if "formulas" is an object, the keys "annotation_level" and "transcript_level"
+ * are used.
  *
  * @param {string} configPath - The path to the scoring configuration directory.
  * @returns {{ variables: Object, formulas: { annotation_level: Array, transcript_level: Array } }}
@@ -44,15 +45,24 @@ function readScoringConfig(configPath) {
     debugDetailed(`Variable Assignment Config: ${JSON.stringify(variableAssignmentConfig)}`);
     debugDetailed(`Formula Config Raw: ${JSON.stringify(formulaConfigRaw)}`);
 
-    let formulas;
-    if (Array.isArray(formulaConfigRaw.formulas)) {
-      // If "formulas" is provided as an array, assume these are annotation-level formulas.
-      formulas = {
-        annotation_level: formulaConfigRaw.formulas,
-        transcript_level: []
-      };
+    let formulas = { annotation_level: [], transcript_level: [] };
+
+    if (formulaConfigRaw.formulas) {
+      if (Array.isArray(formulaConfigRaw.formulas)) {
+        // When formulas is an array, treat it as annotation-level formulas only.
+        formulas = {
+          annotation_level: formulaConfigRaw.formulas,
+          transcript_level: []
+        };
+      } else if (typeof formulaConfigRaw.formulas === 'object') {
+        // When formulas is an object, extract annotation_level and transcript_level.
+        formulas = {
+          annotation_level: formulaConfigRaw.formulas.annotation_level || [],
+          transcript_level: formulaConfigRaw.formulas.transcript_level || []
+        };
+      }
     } else {
-      // Otherwise, expect keys "annotation_level" and "transcript_level"
+      // Fallback: look for top-level keys.
       formulas = {
         annotation_level: formulaConfigRaw.annotation_level || [],
         transcript_level: formulaConfigRaw.transcript_level || []
