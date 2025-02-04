@@ -1,4 +1,11 @@
+'use strict';
 // src/scoring.js
+
+/**
+ * @fileoverview Provides scoring functionality including reading scoring configuration
+ * and applying scoring formulas to VEP annotation data.
+ * @module scoring
+ */
 
 const fs = require('fs');
 const debug = require('debug')('variant-linker:main');
@@ -6,10 +13,20 @@ const debugDetailed = require('debug')('variant-linker:detailed');
 const debugAll = require('debug')('variant-linker:all');
 
 /**
- * Reads and parses the scoring configuration files.
- * 
+ * Reads and parses the scoring configuration files from the specified directory.
+ *
+ * This function expects two files in the given directory:
+ * - variable_assignment_config.json: containing a "variables" object.
+ * - formula_config.json: containing scoring formulas.
+ *
+ * If the formula config file contains a property "formulas" (an array), it is assumed
+ * to represent annotation-level formulas and transcript-level formulas will be set empty.
+ * Otherwise, the function expects an object with keys "annotation_level" and "transcript_level".
+ *
  * @param {string} configPath - The path to the scoring configuration directory.
- * @returns {Object} The parsed scoring configuration.
+ * @returns {{ variables: Object, formulas: { annotation_level: Array, transcript_level: Array } }}
+ *          An object containing the variables and formulas used for scoring.
+ * @throws {Error} If there is an error reading or parsing the configuration files.
  */
 function readScoringConfig(configPath) {
   try {
@@ -18,50 +35,75 @@ function readScoringConfig(configPath) {
 
     debug(`Reading scoring configuration files from: ${configPath}`);
 
-    const variableAssignmentConfig = JSON.parse(fs.readFileSync(variableAssignmentPath, 'utf-8'));
-    const formulaConfig = JSON.parse(fs.readFileSync(formulaPath, 'utf-8'));
+    const variableAssignmentRaw = fs.readFileSync(variableAssignmentPath, 'utf-8');
+    const formulaRaw = fs.readFileSync(formulaPath, 'utf-8');
 
-    debug(`Variable Assignment Config: ${JSON.stringify(variableAssignmentConfig)}`);
-    debug(`Formula Config: ${JSON.stringify(formulaConfig)}`);
+    const variableAssignmentConfig = JSON.parse(variableAssignmentRaw);
+    const formulaConfigRaw = JSON.parse(formulaRaw);
 
-    return { variableAssignmentConfig: variableAssignmentConfig.variables, formulaConfig: formulaConfig.formulas };
+    debugDetailed(`Variable Assignment Config: ${JSON.stringify(variableAssignmentConfig)}`);
+    debugDetailed(`Formula Config Raw: ${JSON.stringify(formulaConfigRaw)}`);
+
+    let formulas;
+    if (Array.isArray(formulaConfigRaw.formulas)) {
+      // If "formulas" is provided as an array, assume these are annotation-level formulas.
+      formulas = {
+        annotation_level: formulaConfigRaw.formulas,
+        transcript_level: []
+      };
+    } else {
+      // Otherwise, expect keys "annotation_level" and "transcript_level"
+      formulas = {
+        annotation_level: formulaConfigRaw.annotation_level || [],
+        transcript_level: formulaConfigRaw.transcript_level || []
+      };
+    }
+
+    return {
+      variables: variableAssignmentConfig.variables,
+      formulas: formulas
+    };
   } catch (error) {
-    debug(`Error reading scoring configuration files: ${error.message}`);
+    debugAll(`Error reading scoring configuration files: ${error.message}`);
     throw error;
   }
 }
 
 /**
- * Applies the scoring algorithm based on the configuration to the annotation data.
- * 
+ * Applies the scoring algorithms to the provided VEP annotation data based on the scoring configuration.
+ *
+ * For each annotation in the annotationData array, annotation-level formulas are applied.
+ * In addition, if transcript-level consequences exist, transcript-level formulas are applied.
+ *
  * @param {Array} annotationData - The VEP annotation data.
- * @param {Object} scoringConfig - The scoring configuration.
- * @returns {Array} The annotation data with added meta scores.
+ * @param {{ variables: Object, formulas: { annotation_level: Array, transcript_level: Array } }} scoringConfig
+ *        The scoring configuration containing variables and formulas.
+ * @returns {Array} The annotation data with additional scoring fields.
  */
 function applyScoring(annotationData, scoringConfig) {
   debug(`Applying scoring with configuration: ${JSON.stringify(scoringConfig)}`);
-  const variablesConfig = scoringConfig.variableAssignmentConfig;
-  const formulasConfig = scoringConfig.formulaConfig;
+  const variablesConfig = scoringConfig.variables;
+  const formulasConfig = scoringConfig.formulas;
   const { annotation_level, transcript_level } = formulasConfig;
-  
-  // Process each annotation in the annotationData array
-  annotationData.forEach(annotation => {
-    // Apply annotation-level formulas
+
+  // Process each annotation in the array.
+  annotationData.forEach((annotation) => {
+    // Apply annotation-level formulas.
     const annotationVariables = extractVariables(annotation, variablesConfig);
 
-    formulasConfig.annotation_level.forEach(formula => {
+    annotation_level.forEach((formula) => {
       const scoreName = Object.keys(formula)[0];
       const formulaStr = formula[scoreName];
       annotation[scoreName] = calculateScore(formulaStr, annotationVariables);
       debugDetailed(`Calculated ${scoreName} for annotation: ${annotation[scoreName]}`);
     });
 
-    // Apply transcript-level formulas if transcript_consequences exist
-    if (annotation.transcript_consequences) {
-      annotation.transcript_consequences.forEach(transcript => {
+    // Apply transcript-level formulas if transcript_consequences exist.
+    if (Array.isArray(annotation.transcript_consequences)) {
+      annotation.transcript_consequences.forEach((transcript) => {
         const transcriptVariables = extractVariables(transcript, variablesConfig, annotation);
 
-        formulasConfig.transcript_level.forEach(formula => {
+        transcript_level.forEach((formula) => {
           const scoreName = Object.keys(formula)[0];
           const formulaStr = formula[scoreName];
           transcript[scoreName] = calculateScore(formulaStr, transcriptVariables);
@@ -75,69 +117,75 @@ function applyScoring(annotationData, scoringConfig) {
 }
 
 /**
- * Extracts variables from the annotation data based on the configuration.
- * 
- * @param {Object} transcript - A single transcript consequence object.
- * @param {Object} variablesConfig - The variables configuration.
- * @param {Object} annotation - The entire annotation object.
- * @returns {Object} The extracted variables.
+ * Extracts variables from an object (such as an annotation or transcript) based on the provided configuration.
+ *
+ * The variablesConfig is an object where keys represent dot-separated paths and values represent the variable names.
+ * A context object may be provided for relative path lookups.
+ *
+ * @param {Object} obj - The object to extract variables from.
+ * @param {Object} variablesConfig - An object mapping dot-separated paths to variable names.
+ * @param {Object} [context] - Optional additional context for extraction.
+ * @returns {Object} An object mapping variable names to their extracted values.
  */
-function extractVariables(transcript, variablesConfig, annotation) {
+function extractVariables(obj, variablesConfig, context) {
   const variables = {};
 
   for (const [path, variableName] of Object.entries(variablesConfig)) {
-    const value = getValueByPath(annotation, path, transcript);
+    const value = getValueByPath(obj, path, context);
     debugDetailed(`Extracted variable: ${variableName} = ${value !== undefined ? value : 0}`);
     variables[variableName] = value !== undefined ? value : 0;
   }
 
-  debug(`Extracted variables: ${JSON.stringify(variables)}`);
+  debugDetailed(`Extracted variables: ${JSON.stringify(variables)}`);
   return variables;
 }
 
 /**
- * Retrieves the value from an object by a dot-separated path.
- * This function supports wildcards (*) to traverse arrays within the object.
- * It can also use a context object for relative paths.
- * 
+ * Retrieves the value from an object using a dot-separated path.
+ * This function supports wildcards (*) in the path to traverse arrays.
+ *
  * @param {Object} obj - The object to retrieve the value from.
- * @param {string} path - The dot-separated path to the value.
- * @param {Object} [context] - The optional context object to use for relative paths.
- * @returns {*} The value at the specified path.
+ * @param {string} path - The dot-separated path (e.g., "a.b.*.c").
+ * @param {Object} [context] - Optional context object for relative lookups.
+ * @returns {*} The value at the specified path, or undefined if not found.
  */
 function getValueByPath(obj, path, context) {
   const parts = path.split('.');
   let value = obj;
 
-  for (const part of parts) {
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i];
     if (part === '*') {
       if (Array.isArray(value)) {
         debugDetailed(`Wildcard found, iterating over array: ${JSON.stringify(value)}`);
-        const results = value.flatMap(item => getValueByPath(item, parts.slice(parts.indexOf(part) + 1).join('.'), context)).filter(v => v !== null && v !== undefined);
-        return results.length === 1 ? results[0] : results; // Return single value if only one result
-      } else if (typeof value === 'object' && value !== null) {
-        debugDetailed(`Wildcard found but value is not an array, continuing traversal: ${JSON.stringify(value)}`);
-        const remainingPath = parts.slice(parts.indexOf(part) + 1).join('.');
-        const result = [];
+        const remainder = parts.slice(i + 1).join('.');
+        const results = value
+          .map(item => getValueByPath(item, remainder, context))
+          .filter(v => v !== null && v !== undefined);
+        return results.length === 1 ? results[0] : results;
+      } else if (value && typeof value === 'object') {
+        debugDetailed(`Wildcard encountered but value is not an array: ${JSON.stringify(value)}`);
+        const remainder = parts.slice(i + 1).join('.');
+        const results = [];
         for (const key in value) {
-          if (Object.hasOwnProperty.call(value, key)) {
-            const nestedValue = getValueByPath(value[key], remainingPath, context);
+          if (Object.prototype.hasOwnProperty.call(value, key)) {
+            const nestedValue = getValueByPath(value[key], remainder, context);
             if (nestedValue !== undefined) {
-              result.push(nestedValue);
+              results.push(nestedValue);
             }
           }
         }
-        return result.length === 1 ? result[0] : result; // Return single value if only one result
+        return results.length === 1 ? results[0] : results;
       } else {
         debugDetailed(`Wildcard found but value is not traversable: ${JSON.stringify(value)}`);
         return [];
       }
-    } else if (value && value[part] !== undefined) {
+    } else if (value && Object.prototype.hasOwnProperty.call(value, part)) {
       value = value[part];
-      debugDetailed(`Navigating to part: ${part}, value: ${JSON.stringify(value)}`);
-    } else if (context && context[part] !== undefined) {
+      debugDetailed(`Navigated to part: ${part}, value: ${JSON.stringify(value)}`);
+    } else if (context && Object.prototype.hasOwnProperty.call(context, part)) {
       value = context[part];
-      debugDetailed(`Part not found in current value, using context: ${part}, value: ${JSON.stringify(value)}`);
+      debugDetailed(`Part not found in current object; using context for ${part}, value: ${JSON.stringify(value)}`);
     } else {
       debugAll(`Part not found: ${part}`);
       return undefined;
@@ -149,13 +197,17 @@ function getValueByPath(obj, path, context) {
 }
 
 /**
- * Calculates the score based on the formula string and variables.
- * 
- * @param {string} formulaStr - The formula string.
- * @param {Object} variables - The variables to use in the formula.
+ * Calculates a score based on a formula string and a set of variables.
+ *
+ * NOTE: This function uses the Function constructor to evaluate the formula.
+ * Ensure that formulas are from trusted sources to avoid potential code injection risks.
+ *
+ * @param {string} formulaStr - The scoring formula as a string (e.g., "cadd_phred * 2 + gnomad").
+ * @param {Object} variables - An object mapping variable names to numeric values.
  * @returns {number} The calculated score.
  */
 function calculateScore(formulaStr, variables) {
+  // eslint-disable-next-line no-new-func
   const formula = new Function(...Object.keys(variables), `return ${formulaStr}`);
   return formula(...Object.values(variables));
 }
