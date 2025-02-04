@@ -41,7 +41,7 @@ function readConfigFile(configFilePath) {
 }
 
 /**
- * Validates configuration parameters.
+ * Validates configuration parameters
  * @param {Object} params - Configuration parameters to validate.
  */
 function validateParams(params) {
