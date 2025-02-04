@@ -19,7 +19,7 @@ const debugAll = require('debug')('variant-linker:all');
 // Import our modules.
 const variantRecoder = require('./variantRecoder');
 const vepRegionsAnnotation = require('./vepRegionsAnnotation');
-const convertVcfToEnsemblFormat = require('./convertVcfToEnsemblFormat');
+const { convertVcfToEnsemblFormat } = require('./convertVcfToEnsemblFormat');
 const {
   processVariantLinking,
   filterAndFormatResults,
