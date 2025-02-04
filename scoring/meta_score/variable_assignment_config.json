@@ -2,8 +2,9 @@
   "@context": "https://schema.org/",
   "@type": "Configuration",
   "variables": {
-    "impact": "impact_variant",
-    "cadd_phred": "cadd_phred_variant",
+    "transcript_consequences.*.consequence_terms": "consequence_terms_variant",
+    "transcript_consequences.*.cadd_phred": "cadd_phred_variant",
+    "transcript_consequences.*.impact": "impact_variant",
     "colocated_variants.*.frequencies.*.gnomade": "gnomade_variant"
   }
 }
