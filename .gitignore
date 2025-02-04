@@ -26,3 +26,4 @@ pnpm-debug.log*
 *test.json
 *TEST.json
 *results.json
+*.txt
