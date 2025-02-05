@@ -109,7 +109,7 @@ function mergeParams(configParams, cliParams) {
   const merged = { ...configParams, ...cliParams };
 
   // Remove short aliases (they duplicate the long names)
-  const shortOptions = ['c', 'v', 'o', 's', 'd', 'vp', 'rp', 'scp', 'lf', 'sv'];
+  const shortOptions = ['c', 'v', 'o', 's', 'd', 'vp', 'rp', 'scp', 'lf', 'sv', 'f'];
   shortOptions.forEach((option) => {
     delete merged[option];
   });
@@ -254,6 +254,13 @@ const argv = yargs
     description: 'Genome assembly build to use (hg38 [default] or hg19)',
     type: 'string',
     default: 'hg38'
+  })
+  // New: filter option for JSON API–compatible filtering criteria.
+  .option('filter', {
+    alias: 'f',
+    description:
+      'JSON API filtering criteria as a JSON string (e.g. \'{"impact":{"eq":"HIGH"},"cadd_phred":{"gt":20}}\')',
+    type: 'string'
   })
   .help()
   .alias('help', 'h')
@@ -441,8 +448,19 @@ async function main() {
       debug('Schema.org output validated successfully.');
     }
 
+    // Process filter parameter if provided.
+    let filterParam = null;
+    if (mergedParams.filter) {
+      try {
+        filterParam = JSON.parse(mergedParams.filter);
+        debugDetailed(`Parsed filter criteria: ${JSON.stringify(filterParam)}`);
+      } catch (err) {
+        throw new Error(`Invalid filter JSON string: ${err.message}`);
+      }
+    }
+
     // Filter and format the final output (currently only JSON formatting is supported).
-    const formattedResults = filterAndFormatResults(outputObject, null, 'JSON');
+    const formattedResults = filterAndFormatResults(outputObject, filterParam, 'JSON');
 
     outputResults(formattedResults, mergedParams.save);
     debug('Variant analysis process completed successfully');
