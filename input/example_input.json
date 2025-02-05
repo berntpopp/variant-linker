@@ -1,8 +1,0 @@
-{
-    "variant": "ENST00000366667:c.803C>T",
-    "output": "JSON",
-    "save": "output/example_output.json",
-    "debug": 3,
-    "scoring_config_path": "scoring/meta_score/"
-  }
-  
