@@ -1,6 +1,8 @@
 // test/variantRecoder.test.js
 
+const { expect } = require('chai');
 const nock = require('nock');
+const variantRecoder = require('../src/variantRecoder');
 
 describe('variantRecoder', () => {
   const apiBaseUrl = 'https://rest.ensembl.org';
@@ -12,11 +14,6 @@ describe('variantRecoder', () => {
     }
   ];
 
-  before(async function() {
-    const chai = await import('chai');
-    global.expect = chai.expect;
-  });
-
   beforeEach(() => {
     nock(apiBaseUrl)
       .get(`/variant_recoder/human/${variant}`)
@@ -25,29 +22,37 @@ describe('variantRecoder', () => {
   });
 
   afterEach(() => {
+    // Ensure that all expected HTTP calls have been made.
+    if (!nock.isDone()) {
+      console.error('Not all nock interceptors were used:', nock.pendingMocks());
+      nock.cleanAll();
+      throw new Error('Not all nock interceptors were used!');
+    }
     nock.cleanAll();
   });
 
   it('should fetch recoded variant information', async () => {
-    const variantRecoder = (await import('../src/variantRecoder.js')).default;
     const options = { vcf_string: '1' };
     const result = await variantRecoder(variant, options);
 
     expect(result).to.be.an('array');
     expect(result[0]).to.have.property('id', 'rs123');
-    expect(result[0]).to.have.property('vcf_string').that.includes('1-1000-A-T');
+    expect(result[0])
+      .to.have.property('vcf_string')
+      .that.includes('1-1000-A-T');
   });
 
   it('should handle API errors gracefully', async () => {
-    nock.cleanAll();
+    nock.cleanAll(); // Remove previous interceptors
     nock(apiBaseUrl)
       .get(`/variant_recoder/human/${variant}`)
       .query(true)
       .reply(500, { error: 'Internal Server Error' });
 
     try {
-      const variantRecoder = (await import('../src/variantRecoder.js')).default;
       await variantRecoder(variant);
+      // If no error is thrown, force test failure.
+      throw new Error('Expected variantRecoder to throw an error for 500 status code');
     } catch (error) {
       expect(error).to.be.an('error');
       expect(error.message).to.include('Request failed with status code 500');
