@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// src/main.js
 'use strict';
+// src/main.js
 
 /**
  * @fileoverview Main entry point for the Variant-Linker CLI tool.
@@ -90,7 +90,7 @@ function mergeParams(configParams, cliParams) {
   const merged = { ...configParams, ...cliParams };
 
   // Remove short aliases (they duplicate the long names)
-  const shortOptions = ['c', 'v', 'o', 's', 'd', 'vp', 'rp', 'scp', 'lf'];
+  const shortOptions = ['c', 'v', 'o', 's', 'd', 'vp', 'rp', 'scp', 'lf', 'sv'];
   shortOptions.forEach((option) => {
     delete merged[option];
   });
@@ -219,17 +219,40 @@ const argv = yargs
     description: 'Path to the log file for saving debug information',
     type: 'string'
   })
-  .option('cache', {          // <-- new option for caching
+  .option('cache', {
     alias: 'C',
     description: 'Enable caching of API responses',
     type: 'boolean',
     default: false
+  })
+  .option('semver', {
+    alias: 'sv',
+    description: 'Show semantic version details and exit',
+    type: 'boolean'
   })
   .help()
   .alias('help', 'h')
   .version(packageJson.version)
   .alias('version', 'V')
   .argv;
+
+// If the user passed the --semver flag, output semantic version details and exit.
+if (argv.semver) {
+  const { getVersionDetails } = require('./version');
+  const details = getVersionDetails();
+  console.log('Semantic Version Details:');
+  console.log(`Version: ${details.version}`);
+  console.log(`Major: ${details.major}`);
+  console.log(`Minor: ${details.minor}`);
+  console.log(`Patch: ${details.patch}`);
+  if (details.prerelease.length > 0) {
+    console.log(`Prerelease: ${details.prerelease.join('.')}`);
+  }
+  if (details.build.length > 0) {
+    console.log(`Build Metadata: ${details.build.join('.')}`);
+  }
+  process.exit(0);
+}
 
 // Merge CLI and configuration file parameters.
 const configParams = readConfigFile(argv.config);
@@ -262,9 +285,7 @@ async function main() {
       mane: '1'
     });
     debugDetailed(
-      `Parsed options: recoderOptions=${JSON.stringify(
-        recoderOptions
-      )}, vepOptions=${JSON.stringify(vepOptions)}`
+      `Parsed options: recoderOptions=${JSON.stringify(recoderOptions)}, vepOptions=${JSON.stringify(vepOptions)}`
     );
 
     const inputFormat = detectInputFormat(mergedParams.variant);
@@ -275,25 +296,15 @@ async function main() {
 
     if (inputFormat === 'VCF') {
       debug('Processing variant as VCF format');
-      debugDetailed(
-        'Skipping Variant Recoder step as the input is already in VCF format'
-      );
-      const { region, allele } = convertVcfToEnsemblFormat(
-        mergedParams.variant
-      );
-      debugDetailed(
-        `Converted VCF to Ensembl format: region=${region}, allele=${allele}`
-      );
+      debugDetailed('Skipping Variant Recoder step as the input is already in VCF format');
+      const { region, allele } = convertVcfToEnsemblFormat(mergedParams.variant);
+      debugDetailed(`Converted VCF to Ensembl format: region=${region}, allele=${allele}`);
       annotationData = await vepRegionsAnnotation(region, allele, vepOptions, mergedParams.cache);
-      debugDetailed(
-        `VEP annotation data received: ${JSON.stringify(annotationData)}`
-      );
+      debugDetailed(`VEP annotation data received: ${JSON.stringify(annotationData)}`);
     } else {
       debug('Processing variant as HGVS format');
       variantData = await variantRecoder(mergedParams.variant, recoderOptions, mergedParams.cache);
-      debugDetailed(
-        `Variant Recoder data received: ${JSON.stringify(variantData)}`
-      );
+      debugDetailed(`Variant Recoder data received: ${JSON.stringify(variantData)}`);
 
       // Assume variantData is an array and use the first object.
       const firstKey = Object.keys(variantData[0])[0];
@@ -304,38 +315,28 @@ async function main() {
         !recoderEntry.vcf_string ||
         !Array.isArray(recoderEntry.vcf_string)
       ) {
-        throw new Error(
-          'Variant Recoder response is missing a valid vcf_string array'
-        );
+        throw new Error('Variant Recoder response is missing a valid vcf_string array');
       }
 
       const vcfString = recoderEntry.vcf_string.find((vcf) =>
         /^[0-9XYM]+-[0-9]+-[ACGT]+-[ACGT]+$/i.test(vcf)
       );
       if (!vcfString) {
-        debugAll(
-          `Available VCF strings: ${JSON.stringify(recoderEntry.vcf_string)}`
-        );
+        debugAll(`Available VCF strings: ${JSON.stringify(recoderEntry.vcf_string)}`);
         throw new Error('No valid VCF string found in Variant Recoder response');
       }
 
       const { region, allele } = convertVcfToEnsemblFormat(vcfString);
-      debugDetailed(
-        `Converted VCF to Ensembl format from Recoder: region=${region}, allele=${allele}`
-      );
+      debugDetailed(`Converted VCF to Ensembl format from Recoder: region=${region}, allele=${allele}`);
       annotationData = await vepRegionsAnnotation(region, allele, vepOptions, mergedParams.cache);
-      debugDetailed(
-        `VEP annotation data received: ${JSON.stringify(annotationData)}`
-      );
+      debugDetailed(`VEP annotation data received: ${JSON.stringify(annotationData)}`);
     }
 
     // Optionally, apply scoring if a scoring configuration is provided.
     if (mergedParams.scoring_config_path) {
       const scoringConfig = readScoringConfig(mergedParams.scoring_config_path);
       annotationData = applyScoring(annotationData, scoringConfig);
-      debugDetailed(
-        `Applied scoring to annotation data: ${JSON.stringify(annotationData)}`
-      );
+      debugDetailed(`Applied scoring to annotation data: ${JSON.stringify(annotationData)}`);
     }
 
     // Filter and format the results (currently no custom filter is applied).
