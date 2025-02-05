@@ -1,9 +1,13 @@
+/**
+ * @fileoverview Main export for Variant-Linker.
+ * Exports the core functionality along with various helper modules.
+ */
+
 'use strict';
 
-// Export modules that you want available to library users.
+const { analyzeVariant, detectInputFormat } = require('./variantLinkerCore');
 const variantRecoder = require('./variantRecoder');
 const vepRegionsAnnotation = require('./vepRegionsAnnotation');
-const vepHgvsAnnotation = require('./vepHgvsAnnotation');
 const { convertVcfToEnsemblFormat } = require('./convertVcfToEnsemblFormat');
 const scoring = require('./scoring');
 const variantLinkerProcessor = require('./variantLinkerProcessor');
@@ -12,11 +16,11 @@ const cache = require('./cache');
 const configHelper = require('./configHelper');
 const schemaMapper = require('./schemaMapper');
 
-// Flatten the exports from variantLinkerProcessor so that its functions are available at the top level.
-module.exports = {
+const exportsObj = {
+  analyzeVariant,
+  detectInputFormat,
   variantRecoder,
   vepRegionsAnnotation,
-  vepHgvsAnnotation,
   convertVcfToEnsemblFormat,
   scoring,
   processVariantLinking: variantLinkerProcessor.processVariantLinking,
@@ -28,3 +32,6 @@ module.exports = {
   configHelper,
   schemaMapper,
 };
+
+module.exports = exportsObj;
+module.exports.default = exportsObj;
