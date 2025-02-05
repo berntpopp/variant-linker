@@ -28,10 +28,29 @@ const {
 const { readScoringConfig, applyScoring } = require('./scoring');
 
 /**
+ * Handles errors by outputting a well-formatted JSON error message and exiting the process.
+ *
+ * @param {Error} error - The error object.
+ */
+function handleError(error) {
+  const errorResponse = {
+    status: 'error',
+    message: error.message,
+  };
+  // Optionally include the stack trace when not in production.
+  if (process.env.NODE_ENV !== 'production') {
+    errorResponse.stack = error.stack;
+  }
+  console.error(JSON.stringify(errorResponse, null, 2));
+  process.exit(1);
+}
+
+/**
  * Reads and parses a JSON configuration file.
  *
  * @param {string} configFilePath - The path to the configuration file.
- * @returns {Object} The parsed configuration object, or an empty object if not provided.
+ * @returns {Object} The parsed configuration object.
+ * @throws {Error} If there is an error reading or parsing the file.
  */
 function readConfigFile(configFilePath) {
   if (!configFilePath) {
@@ -41,8 +60,7 @@ function readConfigFile(configFilePath) {
     const configContent = fs.readFileSync(configFilePath, 'utf8');
     return JSON.parse(configContent);
   } catch (error) {
-    console.error(`Error reading configuration file: ${error.message}`);
-    return {};
+    throw new Error(`Error reading configuration file: ${error.message}`);
   }
 }
 
@@ -253,14 +271,18 @@ if (argv.semver) {
 }
 
 // Merge CLI and configuration file parameters.
-const configParams = readConfigFile(argv.config);
+let configParams;
+try {
+  configParams = readConfigFile(argv.config);
+} catch (error) {
+  handleError(error);
+}
 const mergedParams = mergeParams(configParams, argv);
 
 try {
   validateParams(mergedParams);
 } catch (error) {
-  console.error(`Configuration validation error: ${error.message}`);
-  process.exit(1);
+  handleError(error);
 }
 
 if (mergedParams.debug) {
@@ -354,9 +376,9 @@ async function main() {
       // We assume vcfString is in the form "chrom-pos-ref-alt"
       const vcfParts = vcfString.replace(/^chr/i, '').split('-');
       if (vcfParts.length === 4) {
-        const [c, posStr, , ] = vcfParts;
+        const [c, posStr] = vcfParts;
         const pos = parseInt(posStr, 10);
-        // For HGVS input, we can simulate input info as "chrom pos pos allele strand"
+        // For HGVS input, simulate input info as "chrom pos pos allele strand"
         const { region: r, allele: a } = convertVcfToEnsemblFormat(vcfString);
         const [c2, rest] = r.split(':');
         const [start, endAndStrand] = rest.split('-');
@@ -375,9 +397,7 @@ async function main() {
 
     // Before formatting, ensure each annotation in annotationData has an "input" field.
     if (Array.isArray(annotationData)) {
-      annotationData = annotationData.map((ann) => {
-        return { input: inputInfo, ...ann };
-      });
+      annotationData = annotationData.map((ann) => ({ input: inputInfo, ...ann }));
     } else {
       // In case annotationData is not an array, wrap it in one.
       annotationData = [{ input: inputInfo, ...annotationData }];
@@ -419,9 +439,7 @@ async function main() {
     outputResults(formattedResults, mergedParams.save);
     debug('Variant analysis process completed successfully');
   } catch (error) {
-    debugAll(`Error in main variant analysis process: ${error.message}`);
-    console.error('Error:', error.message);
-    process.exit(1);
+    handleError(error);
   }
 }
 
