@@ -4,6 +4,8 @@
 /**
  * @fileoverview Provides scoring functionality including reading scoring configuration
  * and applying scoring formulas to VEP annotation data.
+ * Supports flexible variable assignments with conditional transformations using
+ * schema.org–style configuration objects.
  * @module scoring
  */
 
@@ -19,14 +21,11 @@ const debugAll = require('debug')('variant-linker:all');
  * - variable_assignment_config.json: containing a "variables" object.
  * - formula_config.json: containing scoring formulas.
  *
- * If the formula config file contains a property "formulas" that is an array, it is assumed
- * to represent annotation-level formulas and transcript-level formulas will be set empty.
- * Otherwise, if "formulas" is an object, the keys "annotation_level" and "transcript_level"
- * are used.
- *
  * @param {string} configPath - The path to the scoring configuration directory.
- * @returns {{ variables: Object, formulas: { annotation_level: Array, transcript_level: Array } }}
- *          An object containing the variables and formulas used for scoring.
+ * @returns {{
+ *   variables: Object,
+ *   formulas: { annotation_level: Array, transcript_level: Array }
+ * }}
  * @throws {Error} If there is an error reading or parsing the configuration files.
  */
 function readScoringConfig(configPath) {
@@ -42,27 +41,28 @@ function readScoringConfig(configPath) {
     const variableAssignmentConfig = JSON.parse(variableAssignmentRaw);
     const formulaConfigRaw = JSON.parse(formulaRaw);
 
-    debugDetailed(`Variable Assignment Config: ${JSON.stringify(variableAssignmentConfig)}`);
-    debugDetailed(`Formula Config Raw: ${JSON.stringify(formulaConfigRaw)}`);
+    debugDetailed(
+      `Variable Assignment Config: ${JSON.stringify(variableAssignmentConfig)}`
+    );
+    debugDetailed(
+      `Formula Config Raw: ${JSON.stringify(formulaConfigRaw)}`
+    );
 
     let formulas = { annotation_level: [], transcript_level: [] };
 
     if (formulaConfigRaw.formulas) {
       if (Array.isArray(formulaConfigRaw.formulas)) {
-        // When formulas is an array, treat it as annotation-level formulas only.
         formulas = {
           annotation_level: formulaConfigRaw.formulas,
           transcript_level: []
         };
       } else if (typeof formulaConfigRaw.formulas === 'object') {
-        // When formulas is an object, extract annotation_level and transcript_level.
         formulas = {
           annotation_level: formulaConfigRaw.formulas.annotation_level || [],
           transcript_level: formulaConfigRaw.formulas.transcript_level || []
         };
       }
     } else {
-      // Fallback: look for top-level keys.
       formulas = {
         annotation_level: formulaConfigRaw.annotation_level || [],
         transcript_level: formulaConfigRaw.transcript_level || []
@@ -80,135 +80,144 @@ function readScoringConfig(configPath) {
 }
 
 /**
- * Applies the scoring algorithms to the provided VEP annotation data based on the scoring configuration.
+ * Parses a legacy mapping string (e.g. "max:cadd_phred_variant|default:25")
+ * into an object with explicit properties.
  *
- * For each annotation in the annotationData array, annotation-level formulas are applied.
- * In addition, if transcript-level consequences exist, transcript-level formulas are applied.
- *
- * @param {Array} annotationData - The VEP annotation data.
- * @param {{ variables: Object, formulas: { annotation_level: Array, transcript_level: Array } }} scoringConfig
- *        The scoring configuration containing variables and formulas.
- * @returns {Array} The annotation data with additional scoring fields.
+ * @param {string} mappingStr - The mapping string.
+ * @returns {{
+ *   target: string,
+ *   aggregator: (string|null),
+ *   defaultValue: number
+ * }}
  */
-function applyScoring(annotationData, scoringConfig) {
-  debug(`Applying scoring with configuration: ${JSON.stringify(scoringConfig)}`);
-  const variablesConfig = scoringConfig.variables;
-  const formulasConfig = scoringConfig.formulas;
-  const { annotation_level, transcript_level } = formulasConfig;
-
-  // Process each annotation in the array.
-  annotationData.forEach((annotation) => {
-    // Apply annotation-level formulas.
-    const annotationVariables = extractVariables(annotation, variablesConfig);
-
-    annotation_level.forEach((formula) => {
-      const scoreName = Object.keys(formula)[0];
-      const formulaStr = formula[scoreName];
-      const scoreValue = calculateScore(formulaStr, annotationVariables);
-      annotation[scoreName] = scoreValue;
-      debugDetailed(`Calculated ${scoreName} for annotation: ${scoreValue}`);
-    });
-
-    // Apply transcript-level formulas if transcript_consequences exist.
-    if (Array.isArray(annotation.transcript_consequences)) {
-      annotation.transcript_consequences.forEach((transcript) => {
-        const transcriptVariables = extractVariables(transcript, variablesConfig, annotation);
-
-        transcript_level.forEach((formula) => {
-          const scoreName = Object.keys(formula)[0];
-          const formulaStr = formula[scoreName];
-          const scoreValue = calculateScore(formulaStr, transcriptVariables);
-          transcript[scoreName] = scoreValue;
-          debugDetailed(`Calculated ${scoreName} for transcript: ${scoreValue}`);
-        });
-      });
+function parseMappingString(mappingStr) {
+  let aggregator = null;
+  let variableName = mappingStr;
+  let defaultValue = 0;
+  if (mappingStr.includes('|')) {
+    const parts = mappingStr.split('|');
+    const leftPart = parts[0].trim();
+    const rightPart = parts[1].trim();
+    if (rightPart.toLowerCase().startsWith('default:')) {
+      defaultValue = Number(rightPart.split(':')[1]);
+      if (isNaN(defaultValue)) {
+        defaultValue = 0;
+      }
     }
-  });
+    variableName = leftPart;
+  }
+  if (variableName.includes(':')) {
+    const parts = variableName.split(':');
+    aggregator = parts[0].toLowerCase();
+    variableName = parts[1];
+  }
+  return {
+    target: variableName,
+    aggregator,
+    defaultValue
+  };
+}
 
-  return annotationData;
+/**
+ * Evaluates an optional condition on the raw value.
+ *
+ * @param {*} rawValue - The raw value extracted.
+ * @param {string} condition - A JavaScript expression where "value" is the raw value.
+ * @param {*} defaultValue - The default value to use if evaluation fails.
+ * @returns {*} The result of the condition, or defaultValue if evaluation fails.
+ */
+function evaluateCondition(rawValue, condition, defaultValue) {
+  try {
+    // For safety, ensure that condition expressions are from trusted sources.
+    const conditionFunc = new Function('value', `return ${condition};`);
+    return conditionFunc(rawValue);
+  } catch (e) {
+    console.warn(`Error evaluating condition "${condition}": ${e.message}`);
+    return defaultValue;
+  }
 }
 
 /**
  * Extracts variables from an object (such as an annotation or transcript) based on the provided configuration.
  *
- * The variablesConfig is an object where keys represent dot-separated paths and values represent the variable name.
- * Optionally, a mapping may be prefixed with an aggregator (e.g. "max:", "min:", "avg:" or "unique:"), which will be applied
- * if the extracted value is an array. Additionally, a default value can be specified using the syntax:
- *     aggregator:variableName|default:defaultValue
- * If the raw value is missing or an empty array, the default value is used.
- *
- * A context object may be provided for relative path lookups.
+ * The variablesConfig can use either a string mapping (legacy) or an object mapping:
+ * For object mapping, the following properties are supported:
+ *   - target: the variable name to assign.
+ *   - aggregator: (optional) one of "max", "min", "avg"/"average", "unique".
+ *   - condition: (optional) a JavaScript expression that will be evaluated with "value" set to the raw value.
+ *   - default: (optional) the default value if the raw value is missing.
  *
  * @param {Object} obj - The object to extract variables from.
- * @param {Object} variablesConfig - An object mapping dot-separated paths to variable names or aggregator mappings.
+ * @param {Object} variablesConfig - The configuration mapping.
  * @param {Object} [context] - Optional additional context for extraction.
- * @returns {Object} An object mapping variable names to their extracted (and possibly aggregated) values.
+ * @returns {Object} An object mapping variable names to their computed values.
  */
 function extractVariables(obj, variablesConfig, context) {
   const variables = {};
 
   for (const [path, mapping] of Object.entries(variablesConfig)) {
-    let aggregator = null;
-    let variableName = mapping;
-    let defaultValue = 0; // fallback default
-
-    // Check for a default value specified using a pipe separator.
-    if (mapping.includes('|')) {
-      const parts = mapping.split('|');
-      const leftPart = parts[0].trim();
-      const rightPart = parts[1].trim();
-      if (rightPart.toLowerCase().startsWith('default:')) {
-        defaultValue = Number(rightPart.split(':')[1]);
-        if (isNaN(defaultValue)) {
-          defaultValue = 0;
-        }
-      }
-      variableName = leftPart;
-    }
-
-    // Check for an aggregator specified with a colon.
-    if (variableName.includes(':')) {
-      const parts = variableName.split(':');
-      aggregator = parts[0].toLowerCase();
-      variableName = parts[1];
+    let config;
+    if (typeof mapping === 'string') {
+      config = parseMappingString(mapping);
+    } else if (typeof mapping === 'object') {
+      config = {
+        target: mapping.target || '',
+        aggregator: mapping.aggregator || null,
+        condition: mapping.condition || null,
+        defaultValue: mapping.default !== undefined ? mapping.default : 0
+      };
+    } else {
+      // Skip if mapping is neither a string nor an object.
+      continue;
     }
 
     let rawValue = getValueByPath(obj, path, context);
-    debugDetailed(`Raw value for mapping "${mapping}" (key: ${variableName}) from path "${path}": ${JSON.stringify(rawValue)}`);
-    
+    debugDetailed(
+      `Raw value for mapping "${mapping}" (target: ${config.target}) from path "${path}": ${JSON.stringify(rawValue)}`
+    );
+
     // If rawValue is an array of arrays, flatten it.
     if (Array.isArray(rawValue) && rawValue.some(item => Array.isArray(item))) {
       rawValue = rawValue.flat(Infinity);
       debugDetailed(`Flattened raw value: ${JSON.stringify(rawValue)}`);
     }
-    
+
     let finalValue;
-    if (aggregator) {
+    if (config.aggregator) {
       if (!Array.isArray(rawValue) || rawValue.length === 0) {
-        finalValue = defaultValue;
-        debugDetailed(`Using default value for aggregator "${aggregator}" for variable "${variableName}": ${finalValue}`);
+        finalValue = config.defaultValue;
+        debugDetailed(`Using default value for aggregator "${config.aggregator}" for target "${config.target}": ${finalValue}`);
       } else {
-        if (aggregator === 'max') {
-          finalValue = Math.max(...rawValue);
-        } else if (aggregator === 'min') {
-          finalValue = Math.min(...rawValue);
-        } else if (aggregator === 'avg' || aggregator === 'average') {
-          finalValue = rawValue.reduce((a, b) => a + b, 0) / rawValue.length;
-        } else if (aggregator === 'unique') {
-          // Remove duplicates and sort the values.
-          const uniqueArray = Array.from(new Set(rawValue));
-          uniqueArray.sort();
-          finalValue = uniqueArray;
-        } else {
-          debugAll(`Unknown aggregator "${aggregator}" for variable "${variableName}". Using raw value.`);
-          finalValue = rawValue;
+        switch (config.aggregator.toLowerCase()) {
+          case 'max':
+            finalValue = Math.max(...rawValue);
+            break;
+          case 'min':
+            finalValue = Math.min(...rawValue);
+            break;
+          case 'avg':
+          case 'average':
+            finalValue = rawValue.reduce((a, b) => a + b, 0) / rawValue.length;
+            break;
+          case 'unique':
+            finalValue = Array.from(new Set(rawValue)).sort();
+            break;
+          default:
+            debugAll(`Unknown aggregator "${config.aggregator}" for target "${config.target}". Using raw value.`);
+            finalValue = rawValue;
         }
-        debugDetailed(`Applied aggregator "${aggregator}" on value: ${JSON.stringify(rawValue)} -> ${finalValue}`);
+        debugDetailed(`Applied aggregator "${config.aggregator}" on value: ${JSON.stringify(rawValue)} -> ${finalValue}`);
       }
     } else {
-      finalValue = rawValue !== undefined ? rawValue : defaultValue;
+      finalValue = rawValue !== undefined ? rawValue : config.defaultValue;
     }
-    variables[variableName] = finalValue;
+
+    // If a condition is specified, evaluate it.
+    if (config.condition) {
+      finalValue = evaluateCondition(rawValue, config.condition, config.defaultValue);
+      debugDetailed(`Condition "${config.condition}" applied for target "${config.target}": ${finalValue}`);
+    }
+    variables[config.target] = finalValue;
   }
 
   debugDetailed(`Extracted variables: ${JSON.stringify(variables)}`);
@@ -277,27 +286,74 @@ function getValueByPath(obj, path, context) {
  * NOTE: This function uses the Function constructor to evaluate the formula.
  * Ensure that formulas are from trusted sources to avoid potential code injection risks.
  *
- * @param {string} formulaStr - The scoring formula as a string (e.g., "cadd_phred * 2 + gnomad").
+ * @param {string} formulaStr - The scoring formula as a string (e.g., "cadd_phred_variant * 2 + gnomade_variant").
  * @param {Object} variables - An object mapping variable names to numeric values.
  * @returns {number} The calculated score.
  */
 function calculateScore(formulaStr, variables) {
   debugDetailed(`Evaluating formula: ${formulaStr}`);
   debugDetailed(`Variables for formula: ${JSON.stringify(variables)}`);
-  
-  // Build a substituted formula string for debugging purposes.
+
+  // Build a substituted formula string for debugging.
   let substitutedFormula = formulaStr;
   for (const [key, value] of Object.entries(variables)) {
-    // Replace whole word occurrences of the variable name with its JSON stringified value.
     substitutedFormula = substitutedFormula.replace(new RegExp(`\\b${key}\\b`, 'g'), JSON.stringify(value));
   }
   debugDetailed(`Substituted formula: ${substitutedFormula}`);
-  
+
   // eslint-disable-next-line no-new-func
   const formula = new Function(...Object.keys(variables), `return ${formulaStr}`);
   const result = formula(...Object.values(variables));
   debugDetailed(`Result of formula: ${result}`);
   return result;
+}
+
+/**
+ * Applies the scoring algorithms to the provided VEP annotation data based on the scoring configuration.
+ *
+ * For each annotation in the annotationData array, annotation-level formulas are applied.
+ * In addition, if transcript-level consequences exist, transcript-level formulas are applied.
+ *
+ * @param {Array} annotationData - The VEP annotation data.
+ * @param {{ variables: Object, formulas: { annotation_level: Array, transcript_level: Array } }} scoringConfig
+ *        The scoring configuration containing variables and formulas.
+ * @returns {Array} The annotation data with additional scoring fields.
+ */
+function applyScoring(annotationData, scoringConfig) {
+  debug(`Applying scoring with configuration: ${JSON.stringify(scoringConfig)}`);
+  const variablesConfig = scoringConfig.variables;
+  const formulasConfig = scoringConfig.formulas;
+  const { annotation_level, transcript_level } = formulasConfig;
+
+  // Process each annotation.
+  annotationData.forEach((annotation) => {
+    // Annotation-level variables.
+    const annotationVariables = extractVariables(annotation, variablesConfig);
+
+    annotation_level.forEach((formula) => {
+      const scoreName = Object.keys(formula)[0];
+      const formulaStr = formula[scoreName];
+      const scoreValue = calculateScore(formulaStr, annotationVariables);
+      annotation[scoreName] = scoreValue;
+      debugDetailed(`Calculated ${scoreName} for annotation: ${scoreValue}`);
+    });
+
+    // Transcript-level formulas.
+    if (Array.isArray(annotation.transcript_consequences)) {
+      annotation.transcript_consequences.forEach((transcript) => {
+        const transcriptVariables = extractVariables(transcript, variablesConfig, annotation);
+        transcript_level.forEach((formula) => {
+          const scoreName = Object.keys(formula)[0];
+          const formulaStr = formula[scoreName];
+          const scoreValue = calculateScore(formulaStr, transcriptVariables);
+          transcript[scoreName] = scoreValue;
+          debugDetailed(`Calculated ${scoreName} for transcript: ${scoreValue}`);
+        });
+      });
+    }
+  });
+
+  return annotationData;
 }
 
 module.exports = {
