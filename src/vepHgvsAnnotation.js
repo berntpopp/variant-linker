@@ -3,27 +3,23 @@
 // src/vepHgvsAnnotation.js
 
 /**
- * @fileoverview Retrieves VEP annotations for a variant given in HGVS notation.
- * @module vepHgvsAnnotation
- */
-
-const axios = require('axios');
-const debug = require('debug')('variant-linker:main');
-const debugDetailed = require('debug')('variant-linker:detailed');
-const debugAll = require('debug')('variant-linker:all');
-
-/**
  * Retrieves VEP (Variant Effect Predictor) annotations for a given HGVS notation.
  *
  * @param {string} hgvs - The HGVS notation of the variant to be annotated.
  * @param {string} transcript - The transcript ID to be used in the annotation request.
  * @param {Object} [options={}] - Optional query parameters for the VEP API request.
+ * @param {boolean} [cacheEnabled=false] - If true, cache the API response.
  * @returns {Promise<Object>} A promise that resolves to the annotation data retrieved from the VEP API.
  * @throws {Error} If the request to the VEP API fails.
  */
-async function vepHgvsAnnotation(hgvs, transcript, options = {}) {
+const axios = require('axios');
+const debug = require('debug')('variant-linker:main');
+const debugDetailed = require('debug')('variant-linker:detailed');
+const debugAll = require('debug')('variant-linker:all');
+const cache = require('./cache'); // <-- new import
+
+async function vepHgvsAnnotation(hgvs, transcript, options = {}, cacheEnabled = false) {
   try {
-    // Remove any header key from options if present.
     if (options['content-type']) {
       delete options['content-type'];
     }
@@ -34,9 +30,21 @@ async function vepHgvsAnnotation(hgvs, transcript, options = {}) {
     debugDetailed(`Request URL: ${url}`);
     debugDetailed(`Query options: ${JSON.stringify(options)}`);
 
+    if (cacheEnabled) {
+      const cached = cache.getCache(url);
+      if (cached) {
+        debugDetailed(`Returning cached result for vepHgvsAnnotation: ${url}`);
+        return cached;
+      }
+    }
+
     const response = await axios.get(url, {
       headers: { 'Content-Type': 'application/json' }
     });
+
+    if (cacheEnabled) {
+      cache.setCache(url, response.data);
+    }
 
     debugDetailed(`Response received: ${JSON.stringify(response.data)}`);
     return response.data;

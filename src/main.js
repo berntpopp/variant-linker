@@ -219,6 +219,12 @@ const argv = yargs
     description: 'Path to the log file for saving debug information',
     type: 'string'
   })
+  .option('cache', {          // <-- new option for caching
+    alias: 'C',
+    description: 'Enable caching of API responses',
+    type: 'boolean',
+    default: false
+  })
   .help()
   .alias('help', 'h')
   .version(packageJson.version)
@@ -278,13 +284,13 @@ async function main() {
       debugDetailed(
         `Converted VCF to Ensembl format: region=${region}, allele=${allele}`
       );
-      annotationData = await vepRegionsAnnotation(region, allele, vepOptions);
+      annotationData = await vepRegionsAnnotation(region, allele, vepOptions, mergedParams.cache);
       debugDetailed(
         `VEP annotation data received: ${JSON.stringify(annotationData)}`
       );
     } else {
       debug('Processing variant as HGVS format');
-      variantData = await variantRecoder(mergedParams.variant, recoderOptions);
+      variantData = await variantRecoder(mergedParams.variant, recoderOptions, mergedParams.cache);
       debugDetailed(
         `Variant Recoder data received: ${JSON.stringify(variantData)}`
       );
@@ -317,7 +323,7 @@ async function main() {
       debugDetailed(
         `Converted VCF to Ensembl format from Recoder: region=${region}, allele=${allele}`
       );
-      annotationData = await vepRegionsAnnotation(region, allele, vepOptions);
+      annotationData = await vepRegionsAnnotation(region, allele, vepOptions, mergedParams.cache);
       debugDetailed(
         `VEP annotation data received: ${JSON.stringify(annotationData)}`
       );
