@@ -1,4 +1,3 @@
-// index.js
 'use strict';
 
 // Export modules that you want available to library users.
@@ -13,13 +12,17 @@ const cache = require('./cache');
 const configHelper = require('./configHelper');
 const schemaMapper = require('./schemaMapper');
 
+// Flatten the exports from variantLinkerProcessor so that its functions are available at the top level.
 module.exports = {
   variantRecoder,
   vepRegionsAnnotation,
   vepHgvsAnnotation,
   convertVcfToEnsemblFormat,
   scoring,
-  variantLinkerProcessor,
+  processVariantLinking: variantLinkerProcessor.processVariantLinking,
+  filterAndFormatResults: variantLinkerProcessor.filterAndFormatResults,
+  outputResults: variantLinkerProcessor.outputResults,
+  jsonApiFilter: variantLinkerProcessor.jsonApiFilter,
   apiHelper,
   cache,
   configHelper,
