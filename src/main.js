@@ -54,7 +54,7 @@ function readConfigFile(configFilePath) {
  */
 function validateParams(params) {
   const requiredParams = ['variant', 'output'];
-  const validOutputs = ['JSON', 'CSV'];
+  const validOutputs = ['JSON', 'CSV', 'SCHEMA'];
 
   requiredParams.forEach((param) => {
     if (!params[param]) {
@@ -402,8 +402,19 @@ async function main() {
       annotationData
     };
 
+    // If the output format is set to SCHEMA (case-insensitive), map the output to Schema.org.
+    let outputObject = finalOutput;
+    if (mergedParams.output.toUpperCase() === 'SCHEMA') {
+      const { mapOutputToSchemaOrg, validateSchemaOrgOutput, addCustomFormats } = require('./schemaMapper');
+      outputObject = mapOutputToSchemaOrg(finalOutput);
+      // Register custom formats (including date-time) so that the validator recognizes them.
+      addCustomFormats();
+      validateSchemaOrgOutput(outputObject, '../schema/variant_annotation.schema.json');
+      debug('Schema.org output validated successfully.');
+    }
+
     // Filter and format the final output (currently only JSON formatting is supported).
-    const formattedResults = filterAndFormatResults(finalOutput, null, mergedParams.output);
+    const formattedResults = filterAndFormatResults(outputObject, null, 'JSON');
 
     outputResults(formattedResults, mergedParams.save);
     debug('Variant analysis process completed successfully');
