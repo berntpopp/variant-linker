@@ -2,16 +2,16 @@
 'use strict';
 
 // Export modules that you want available to library users.
-const variantRecoder = require('./src/variantRecoder');
-const vepRegionsAnnotation = require('./src/vepRegionsAnnotation');
-const vepHgvsAnnotation = require('./src/vepHgvsAnnotation');
-const { convertVcfToEnsemblFormat } = require('./src/convertVcfToEnsemblFormat');
-const scoring = require('./src/scoring');
-const variantLinkerProcessor = require('./src/variantLinkerProcessor');
-const apiHelper = require('./src/apiHelper');
-const cache = require('./src/cache');
-const configHelper = require('./src/configHelper');
-const schemaMapper = require('./src/schemaMapper');
+const variantRecoder = require('./variantRecoder');
+const vepRegionsAnnotation = require('./vepRegionsAnnotation');
+const vepHgvsAnnotation = require('./vepHgvsAnnotation');
+const { convertVcfToEnsemblFormat } = require('./convertVcfToEnsemblFormat');
+const scoring = require('./scoring');
+const variantLinkerProcessor = require('./variantLinkerProcessor');
+const apiHelper = require('./apiHelper');
+const cache = require('./cache');
+const configHelper = require('./configHelper');
+const schemaMapper = require('./schemaMapper');
 
 module.exports = {
   variantRecoder,
