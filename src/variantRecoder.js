@@ -8,11 +8,12 @@
  * @module variantRecoder
  */
 
-const axios = require('axios');
 const debug = require('debug')('variant-linker:main');
 const debugDetailed = require('debug')('variant-linker:detailed');
 const debugAll = require('debug')('variant-linker:all');
-const cache = require('./cache'); // <-- new import for caching
+const cache = require('./cache');
+const { fetchApi } = require('./apiHelper');
+const apiConfig = require('../config/apiConfig.json');
 
 /**
  * Fetches the recoded information of a given genetic variant using the Variant Recoder API.
@@ -32,30 +33,13 @@ async function variantRecoder(variant, options = {}, cacheEnabled = false) {
     if (queryOptions['content-type']) {
       delete queryOptions['content-type'];
     }
-    const params = new URLSearchParams(queryOptions).toString();
-    const url = `https://rest.ensembl.org/variant_recoder/human/${variant}?${params}`;
-
+    // Build the endpoint path using the configuration.
+    const endpoint = `${apiConfig.ensembl.endpoints.variantRecoder}/${variant}`;
     debug(`Requesting Variant Recoder for variant: ${variant}`);
-    debugDetailed(`Request URL: ${url}`);
+    debugDetailed(`Using endpoint: ${endpoint} with query: ${JSON.stringify(queryOptions)}`);
 
-    if (cacheEnabled) {
-      const cached = cache.getCache(url);
-      if (cached) {
-        debugDetailed(`Returning cached result for variantRecoder: ${url}`);
-        return cached;
-      }
-    }
-
-    const response = await axios.get(url, {
-      headers: { 'Content-Type': 'application/json' }
-    });
-
-    if (cacheEnabled) {
-      cache.setCache(url, response.data);
-    }
-
-    debugDetailed(`Response received: ${JSON.stringify(response.data)}`);
-    return response.data;
+    const data = await fetchApi(endpoint, queryOptions, cacheEnabled);
+    return data;
   } catch (error) {
     debugAll(`Error in variantRecoder: ${error.message}`);
     throw error;

@@ -3,9 +3,11 @@
 const { expect } = require('chai');
 const nock = require('nock');
 const variantRecoder = require('../src/variantRecoder');
+const apiConfig = require('../config/apiConfig.json');
 
 describe('variantRecoder', () => {
-  const apiBaseUrl = 'https://rest.ensembl.org';
+  // Use the environment variable override if set, otherwise use the config baseUrl.
+  const apiBaseUrl = process.env.ENSEMBL_BASE_URL || apiConfig.ensembl.baseUrl;
   const variant = 'rs123';
   const responseMock = [
     {
@@ -16,7 +18,7 @@ describe('variantRecoder', () => {
 
   beforeEach(() => {
     nock(apiBaseUrl)
-      .get(`/variant_recoder/human/${variant}`)
+      .get(`${apiConfig.ensembl.endpoints.variantRecoder}/${variant}`)
       .query(true)
       .reply(200, responseMock);
   });
@@ -45,13 +47,12 @@ describe('variantRecoder', () => {
   it('should handle API errors gracefully', async () => {
     nock.cleanAll(); // Remove previous interceptors
     nock(apiBaseUrl)
-      .get(`/variant_recoder/human/${variant}`)
+      .get(`${apiConfig.ensembl.endpoints.variantRecoder}/${variant}`)
       .query(true)
       .reply(500, { error: 'Internal Server Error' });
 
     try {
       await variantRecoder(variant);
-      // If no error is thrown, force test failure.
       throw new Error('Expected variantRecoder to throw an error for 500 status code');
     } catch (error) {
       expect(error).to.be.an('error');
