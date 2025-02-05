@@ -27,6 +27,8 @@ const {
   outputResults
 } = require('./variantLinkerProcessor');
 const { readScoringConfig, applyScoring } = require('./scoring');
+// New: import the configuration helper to select the base URL based on genome build.
+const { getBaseUrl } = require('./configHelper');
 
 /**
  * Handles errors by outputting a well-formatted JSON error message and exiting the process.
@@ -38,6 +40,7 @@ function handleError(error) {
     status: 'error',
     message: error.message,
   };
+  // Optionally include the stack trace when not in production.
   if (process.env.NODE_ENV !== 'production') {
     errorResponse.stack = error.stack;
   }
@@ -104,10 +107,13 @@ function validateParams(params) {
  */
 function mergeParams(configParams, cliParams) {
   const merged = { ...configParams, ...cliParams };
+
+  // Remove short aliases (they duplicate the long names)
   const shortOptions = ['c', 'v', 'o', 's', 'd', 'vp', 'rp', 'scp', 'lf', 'sv'];
   shortOptions.forEach((option) => {
     delete merged[option];
   });
+
   return merged;
 }
 
@@ -174,6 +180,7 @@ function detectInputFormat(variant) {
       'Variant not specified. Please provide a variant using --variant or in the configuration file.'
     );
   }
+  // Remove any "chr" prefix.
   const cleanedVariant = variant.replace(/^chr/i, '');
   const vcfPattern = /^[0-9XYM]+-[0-9]+-[ACGT]+-[ACGT]+$/i;
   return vcfPattern.test(cleanedVariant) ? 'VCF' : 'HGVS';
@@ -242,6 +249,12 @@ const argv = yargs
     description: 'Show semantic version details and exit',
     type: 'boolean'
   })
+  // New: assembly option for genome build.
+  .option('assembly', {
+    description: 'Genome assembly build to use (hg38 [default] or hg19)',
+    type: 'string',
+    default: 'hg38'
+  })
   .help()
   .alias('help', 'h')
   .version(packageJson.version)
@@ -285,6 +298,13 @@ if (mergedParams.debug) {
   enableDebugging(mergedParams.debug, mergedParams.log_file);
 }
 
+// Set the assembly property (default is 'hg38')
+mergedParams.assembly = mergedParams.assembly || 'hg38';
+// Set the Ensembl base URL based on the selected assembly if not already overridden.
+if (!process.env.ENSEMBL_BASE_URL) {
+  process.env.ENSEMBL_BASE_URL = getBaseUrl(mergedParams.assembly);
+}
+
 /**
  * Main function orchestrating the variant analysis process.
  */
@@ -294,6 +314,7 @@ async function main() {
 
   try {
     debug('Starting main variant analysis process');
+    // Parse recoder options and add default vcf_string flag.
     const recoderOptions = parseOptionalParameters(mergedParams.recoder_params, {
       vcf_string: '1'
     });

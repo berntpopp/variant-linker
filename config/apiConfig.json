@@ -1,11 +1,11 @@
 {
-    "ensembl": {
-      "baseUrl": "https://rest.ensembl.org",
-      "endpoints": {
-        "vepRegions": "/vep/homo_sapiens/region",
-        "vepHgvs": "/vep/human/hgvs",
-        "variantRecoder": "/variant_recoder/human"
-      }
+  "ensembl": {
+    "baseUrl": "https://rest.ensembl.org",
+    "legacyBaseUrl": "https://grch37.rest.ensembl.org",
+    "endpoints": {
+      "vepRegions": "/vep/homo_sapiens/region",
+      "vepHgvs": "/vep/human/hgvs",
+      "variantRecoder": "/variant_recoder/human"
     }
   }
-  
+}
