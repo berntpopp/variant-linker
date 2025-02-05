@@ -15,12 +15,11 @@ module.exports = {
   // Tell webpack what to do with Node built-in modules.
   resolve: {
     fallback: {
-      // Disable file system functions because they are not available in the browser.
-      fs: false,
-      // If you need to use "path" in the browser, use a browser-compatible version.
-      path: require.resolve('path-browserify'),
-      // Other Node modules can be added here if needed.
-      // e.g. os: false, crypto: require.resolve('crypto-browserify')
+      // Redirect the Node "fs" module to an empty module so that browser builds do not attempt to include it.
+      fs: require.resolve('./src/empty.js'),
+      // Provide a browser-compatible version of "path".
+      path: require.resolve('path-browserify')
+      // Add other Node modules here if needed.
     }
   },
   module: {
@@ -37,13 +36,13 @@ module.exports = {
         }
       },
       {
-        // JSON files can be loaded natively in webpack 5 (or you may use json-loader if needed).
+        // Load JSON files (webpack 5 can do this natively, but you can also use json-loader).
         test: /\.json$/,
         type: 'javascript/auto',
         use: [ 'json-loader' ]
       }
     ]
   },
-  // Set mode to 'development' (or 'production' when building for release)
+  // Set mode to 'development' (or 'production' when building for release).
   mode: 'development'
 };
