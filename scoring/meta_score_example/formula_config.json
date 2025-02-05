@@ -1,0 +1,11 @@
+{
+  "@context": "https://schema.org/",
+  "@type": "Configuration",
+  "formulas": {
+    "transcript_level": [
+      {
+        "meta_score": "gnomade_variant * 123400"
+      }
+    ]
+  }
+}

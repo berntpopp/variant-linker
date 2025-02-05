@@ -5,11 +5,12 @@
     "annotation_level": [
       {
         "nephro_variant_score_gnomadg_missing": "1 / (1 + Math.exp(-((-36.30791946) + gnomade_variant * (-309.333505) + (consequence_terms_variant.map(val => val === 'missense_variant' ? 1 : 0).includes(1) ? 1 : 0) * (-1.143167) + (consequence_terms_variant.map(val => val === 'synonymous_variant' ? 1 : 0).includes(1) ? 1 : 0) * (-0.964163) + (consequence_terms_variant.map(val => val === 'stop_gained' ? 1 : 0).includes(1) ? 1 : 0) * (-0.405552) + (consequence_terms_variant.map(val => val === 'frameshift_variant' ? 1 : 0).includes(1) ? 1 : 0) * (-0.902098) + cadd_phred_variant * 2.685227 + Math.max(...impact_variant.map(val => ({ 'HIGH': 4, 'MODERATE': 3, 'LOW': 2, 'MODIFIER': 1 }[val] || 0))) * 3.148303)))"
-      }
-    ],
-    "transcript_level": [
+      },
       {
-        "meta_score": "gnomade_variant * 123400"
+        "gene_symbol": "gene_symbol"
+      },
+      {
+        "hgnc_id": "hgnc_id"
       }
     ]
   }
