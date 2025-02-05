@@ -10,7 +10,9 @@ module.exports = {
     // Export as a UMD library so it can be loaded in different module systems.
     library: 'VariantLinker',
     libraryTarget: 'umd',
-    globalObject: 'this'
+    globalObject: 'this',
+    // Export the default export from your module.
+    libraryExport: 'default'
   },
   // Tell webpack what to do with Node built-in modules.
   resolve: {
