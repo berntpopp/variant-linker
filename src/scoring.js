@@ -104,8 +104,9 @@ function applyScoring(annotationData, scoringConfig) {
     annotation_level.forEach((formula) => {
       const scoreName = Object.keys(formula)[0];
       const formulaStr = formula[scoreName];
-      annotation[scoreName] = calculateScore(formulaStr, annotationVariables);
-      debugDetailed(`Calculated ${scoreName} for annotation: ${annotation[scoreName]}`);
+      const scoreValue = calculateScore(formulaStr, annotationVariables);
+      annotation[scoreName] = scoreValue;
+      debugDetailed(`Calculated ${scoreName} for annotation: ${scoreValue}`);
     });
 
     // Apply transcript-level formulas if transcript_consequences exist.
@@ -116,8 +117,9 @@ function applyScoring(annotationData, scoringConfig) {
         transcript_level.forEach((formula) => {
           const scoreName = Object.keys(formula)[0];
           const formulaStr = formula[scoreName];
-          transcript[scoreName] = calculateScore(formulaStr, transcriptVariables);
-          debugDetailed(`Calculated ${scoreName} for transcript: ${transcript[scoreName]}`);
+          const scoreValue = calculateScore(formulaStr, transcriptVariables);
+          transcript[scoreName] = scoreValue;
+          debugDetailed(`Calculated ${scoreName} for transcript: ${scoreValue}`);
         });
       });
     }
@@ -129,21 +131,84 @@ function applyScoring(annotationData, scoringConfig) {
 /**
  * Extracts variables from an object (such as an annotation or transcript) based on the provided configuration.
  *
- * The variablesConfig is an object where keys represent dot-separated paths and values represent the variable names.
+ * The variablesConfig is an object where keys represent dot-separated paths and values represent the variable name.
+ * Optionally, a mapping may be prefixed with an aggregator (e.g. "max:", "min:", "avg:" or "unique:"), which will be applied
+ * if the extracted value is an array. Additionally, a default value can be specified using the syntax:
+ *     aggregator:variableName|default:defaultValue
+ * If the raw value is missing or an empty array, the default value is used.
+ *
  * A context object may be provided for relative path lookups.
  *
  * @param {Object} obj - The object to extract variables from.
- * @param {Object} variablesConfig - An object mapping dot-separated paths to variable names.
+ * @param {Object} variablesConfig - An object mapping dot-separated paths to variable names or aggregator mappings.
  * @param {Object} [context] - Optional additional context for extraction.
- * @returns {Object} An object mapping variable names to their extracted values.
+ * @returns {Object} An object mapping variable names to their extracted (and possibly aggregated) values.
  */
 function extractVariables(obj, variablesConfig, context) {
   const variables = {};
 
-  for (const [path, variableName] of Object.entries(variablesConfig)) {
-    const value = getValueByPath(obj, path, context);
-    debugDetailed(`Extracted variable: ${variableName} = ${value !== undefined ? value : 0}`);
-    variables[variableName] = value !== undefined ? value : 0;
+  for (const [path, mapping] of Object.entries(variablesConfig)) {
+    let aggregator = null;
+    let variableName = mapping;
+    let defaultValue = 0; // fallback default
+
+    // Check for a default value specified using a pipe separator.
+    if (mapping.includes('|')) {
+      const parts = mapping.split('|');
+      const leftPart = parts[0].trim();
+      const rightPart = parts[1].trim();
+      if (rightPart.toLowerCase().startsWith('default:')) {
+        defaultValue = Number(rightPart.split(':')[1]);
+        if (isNaN(defaultValue)) {
+          defaultValue = 0;
+        }
+      }
+      variableName = leftPart;
+    }
+
+    // Check for an aggregator specified with a colon.
+    if (variableName.includes(':')) {
+      const parts = variableName.split(':');
+      aggregator = parts[0].toLowerCase();
+      variableName = parts[1];
+    }
+
+    let rawValue = getValueByPath(obj, path, context);
+    debugDetailed(`Raw value for mapping "${mapping}" (key: ${variableName}) from path "${path}": ${JSON.stringify(rawValue)}`);
+    
+    // If rawValue is an array of arrays, flatten it.
+    if (Array.isArray(rawValue) && rawValue.some(item => Array.isArray(item))) {
+      rawValue = rawValue.flat(Infinity);
+      debugDetailed(`Flattened raw value: ${JSON.stringify(rawValue)}`);
+    }
+    
+    let finalValue;
+    if (aggregator) {
+      if (!Array.isArray(rawValue) || rawValue.length === 0) {
+        finalValue = defaultValue;
+        debugDetailed(`Using default value for aggregator "${aggregator}" for variable "${variableName}": ${finalValue}`);
+      } else {
+        if (aggregator === 'max') {
+          finalValue = Math.max(...rawValue);
+        } else if (aggregator === 'min') {
+          finalValue = Math.min(...rawValue);
+        } else if (aggregator === 'avg' || aggregator === 'average') {
+          finalValue = rawValue.reduce((a, b) => a + b, 0) / rawValue.length;
+        } else if (aggregator === 'unique') {
+          // Remove duplicates and sort the values.
+          const uniqueArray = Array.from(new Set(rawValue));
+          uniqueArray.sort();
+          finalValue = uniqueArray;
+        } else {
+          debugAll(`Unknown aggregator "${aggregator}" for variable "${variableName}". Using raw value.`);
+          finalValue = rawValue;
+        }
+        debugDetailed(`Applied aggregator "${aggregator}" on value: ${JSON.stringify(rawValue)} -> ${finalValue}`);
+      }
+    } else {
+      finalValue = rawValue !== undefined ? rawValue : defaultValue;
+    }
+    variables[variableName] = finalValue;
   }
 
   debugDetailed(`Extracted variables: ${JSON.stringify(variables)}`);
@@ -217,9 +282,22 @@ function getValueByPath(obj, path, context) {
  * @returns {number} The calculated score.
  */
 function calculateScore(formulaStr, variables) {
+  debugDetailed(`Evaluating formula: ${formulaStr}`);
+  debugDetailed(`Variables for formula: ${JSON.stringify(variables)}`);
+  
+  // Build a substituted formula string for debugging purposes.
+  let substitutedFormula = formulaStr;
+  for (const [key, value] of Object.entries(variables)) {
+    // Replace whole word occurrences of the variable name with its JSON stringified value.
+    substitutedFormula = substitutedFormula.replace(new RegExp(`\\b${key}\\b`, 'g'), JSON.stringify(value));
+  }
+  debugDetailed(`Substituted formula: ${substitutedFormula}`);
+  
   // eslint-disable-next-line no-new-func
   const formula = new Function(...Object.keys(variables), `return ${formulaStr}`);
-  return formula(...Object.values(variables));
+  const result = formula(...Object.values(variables));
+  debugDetailed(`Result of formula: ${result}`);
+  return result;
 }
 
 module.exports = {
