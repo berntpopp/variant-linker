@@ -18,6 +18,7 @@ const debugAll = require('debug')('variant-linker:all');
 
 // Import our modules.
 const variantRecoder = require('./variantRecoder');
+// vepRegionsAnnotation now uses the POST endpoint
 const vepRegionsAnnotation = require('./vepRegionsAnnotation');
 const { convertVcfToEnsemblFormat } = require('./convertVcfToEnsemblFormat');
 const {
@@ -37,7 +38,6 @@ function handleError(error) {
     status: 'error',
     message: error.message,
   };
-  // Optionally include the stack trace when not in production.
   if (process.env.NODE_ENV !== 'production') {
     errorResponse.stack = error.stack;
   }
@@ -104,13 +104,10 @@ function validateParams(params) {
  */
 function mergeParams(configParams, cliParams) {
   const merged = { ...configParams, ...cliParams };
-
-  // Remove short aliases (they duplicate the long names)
   const shortOptions = ['c', 'v', 'o', 's', 'd', 'vp', 'rp', 'scp', 'lf', 'sv'];
   shortOptions.forEach((option) => {
     delete merged[option];
   });
-
   return merged;
 }
 
@@ -177,7 +174,6 @@ function detectInputFormat(variant) {
       'Variant not specified. Please provide a variant using --variant or in the configuration file.'
     );
   }
-  // Remove any "chr" prefix
   const cleanedVariant = variant.replace(/^chr/i, '');
   const vcfPattern = /^[0-9XYM]+-[0-9]+-[ACGT]+-[ACGT]+$/i;
   return vcfPattern.test(cleanedVariant) ? 'VCF' : 'HGVS';
@@ -322,24 +318,25 @@ async function main() {
     if (inputFormat === 'VCF') {
       debug('Processing variant as VCF format');
       stepsPerformed.push('Processing VCF input');
-      // Convert the VCF string to Ensembl format.
-      const { region, allele } = convertVcfToEnsemblFormat(mergedParams.variant);
-      stepsPerformed.push(`Converted VCF to Ensembl format (region: ${region}, allele: ${allele})`);
-      debugDetailed(`Converted VCF to Ensembl format: region=${region}, allele=${allele}`);
-      // Retrieve VEP annotations using the region endpoint.
-      annotationData = await vepRegionsAnnotation(region, allele, vepOptions, mergedParams.cache);
-      stepsPerformed.push('Retrieved VEP annotations');
+      // Convert hyphenated VCF input (e.g. "1-230710021-G-A") to the space-separated format expected by POST:
+      // "chromosome start . ref alt . . ."
+      const parts = mergedParams.variant.trim().split('-');
+      if (parts.length !== 4) {
+        throw new Error('Invalid VCF format: expected "chromosome-start-ref-alt"');
+      }
+      const [chrom, pos, ref, alt] = parts;
+      const formattedVariant = `${chrom} ${pos} . ${ref} ${alt} . . .`;
+      stepsPerformed.push(`Converted VCF input to POST format: ${formattedVariant}`);
+      debugDetailed(`Formatted VCF input: ${formattedVariant}`);
+      // Call the POST endpoint with an array of formatted variant strings.
+      annotationData = await vepRegionsAnnotation([formattedVariant], vepOptions, mergedParams.cache);
+      stepsPerformed.push('Retrieved VEP annotations via POST');
       debugDetailed(`VEP annotation data received: ${JSON.stringify(annotationData)}`);
-      // Build an "input" string from the converted region.
-      // Assuming region format is "chrom:start-end:strand"
-      const [chrom, rest] = region.split(':');
-      const [start, endAndStrand] = rest.split('-');
-      const [end, strand] = endAndStrand.split(':');
-      inputInfo = `${chrom} ${start} ${end} ${allele} ${strand}`;
+      inputInfo = formattedVariant;
     } else {
       debug('Processing variant as HGVS format');
       stepsPerformed.push('Processing HGVS input');
-      // Call Variant Recoder first.
+      // For HGVS, call the Variant Recoder to get VCF string(s)
       variantData = await variantRecoder(mergedParams.variant, recoderOptions, mergedParams.cache);
       stepsPerformed.push('Called Variant Recoder');
       debugDetailed(`Variant Recoder data received: ${JSON.stringify(variantData)}`);
@@ -364,27 +361,20 @@ async function main() {
         throw new Error('No valid VCF string found in Variant Recoder response');
       }
       stepsPerformed.push('Extracted VCF string from Variant Recoder response');
-      // Convert the selected VCF string.
-      const { region, allele } = convertVcfToEnsemblFormat(vcfString);
-      stepsPerformed.push(`Converted extracted VCF to Ensembl format (region: ${region}, allele: ${allele})`);
-      debugDetailed(`Converted VCF to Ensembl format from Recoder: region=${region}, allele=${allele}`);
-      // Retrieve VEP annotations.
-      annotationData = await vepRegionsAnnotation(region, allele, vepOptions, mergedParams.cache);
-      stepsPerformed.push('Retrieved VEP annotations');
-      debugDetailed(`VEP annotation data received: ${JSON.stringify(annotationData)}`);
-      // Build input info from the vcfString.
-      // We assume vcfString is in the form "chrom-pos-ref-alt"
-      const vcfParts = vcfString.replace(/^chr/i, '').split('-');
-      if (vcfParts.length === 4) {
-        const [c, posStr] = vcfParts;
-        const pos = parseInt(posStr, 10);
-        // For HGVS input, simulate input info as "chrom pos pos allele strand"
-        const { region: r, allele: a } = convertVcfToEnsemblFormat(vcfString);
-        const [c2, rest] = r.split(':');
-        const [start, endAndStrand] = rest.split('-');
-        const [end, strand] = endAndStrand.split(':');
-        inputInfo = `${c2} ${start} ${end} ${a} ${strand}`;
+      // Convert the extracted VCF string into the required POST format.
+      const parts = vcfString.replace(/^chr/i, '').split('-');
+      if (parts.length !== 4) {
+        throw new Error('Invalid VCF format from Variant Recoder');
       }
+      const [chrom, pos, ref, alt] = parts;
+      const formattedVariant = `${chrom} ${pos} . ${ref} ${alt} . . .`;
+      stepsPerformed.push(`Converted extracted VCF to POST format: ${formattedVariant}`);
+      debugDetailed(`Formatted VCF from Recoder: ${formattedVariant}`);
+      // Retrieve VEP annotations using the POST endpoint.
+      annotationData = await vepRegionsAnnotation([formattedVariant], vepOptions, mergedParams.cache);
+      stepsPerformed.push('Retrieved VEP annotations via POST');
+      debugDetailed(`VEP annotation data received: ${JSON.stringify(annotationData)}`);
+      inputInfo = formattedVariant;
     }
 
     // If scoring is enabled, apply it.
@@ -395,11 +385,10 @@ async function main() {
       debugDetailed(`Applied scoring to annotation data: ${JSON.stringify(annotationData)}`);
     }
 
-    // Before formatting, ensure each annotation in annotationData has an "input" field.
+    // Ensure each annotation in annotationData has an "input" field.
     if (Array.isArray(annotationData)) {
       annotationData = annotationData.map((ann) => ({ input: inputInfo, ...ann }));
     } else {
-      // In case annotationData is not an array, wrap it in one.
       annotationData = [{ input: inputInfo, ...annotationData }];
     }
 
@@ -415,10 +404,9 @@ async function main() {
       recoderCalled: inputFormat === 'HGVS'
     };
 
-    // Final output now includes both variantData and annotationData.
     const finalOutput = {
       meta: metaInfo,
-      variantData, // variantRecoder data; may be null for VCF input.
+      variantData, // For VCF input, this will be null.
       annotationData
     };
 
@@ -427,7 +415,6 @@ async function main() {
     if (mergedParams.output.toUpperCase() === 'SCHEMA') {
       const { mapOutputToSchemaOrg, validateSchemaOrgOutput, addCustomFormats } = require('./schemaMapper');
       outputObject = mapOutputToSchemaOrg(finalOutput);
-      // Register custom formats (including date-time) so that the validator recognizes them.
       addCustomFormats();
       validateSchemaOrgOutput(outputObject, '../schema/variant_annotation.schema.json');
       debug('Schema.org output validated successfully.');
