@@ -64,9 +64,7 @@ function validateParams(params) {
 
   if (!validOutputs.includes(params.output)) {
     throw new Error(
-      `Invalid output format: ${params.output}. Valid formats are ${validOutputs.join(
-        ', '
-      )}`
+      `Invalid output format: ${params.output}. Valid formats are ${validOutputs.join(', ')}`
     );
   }
 
@@ -273,6 +271,9 @@ if (mergedParams.debug) {
  * Main function orchestrating the variant analysis process.
  */
 async function main() {
+  const processStartTime = new Date();
+  const stepsPerformed = [];
+
   try {
     debug('Starting main variant analysis process');
     const recoderOptions = parseOptionalParameters(mergedParams.recoder_params, {
@@ -289,21 +290,36 @@ async function main() {
     );
 
     const inputFormat = detectInputFormat(mergedParams.variant);
+    stepsPerformed.push(`Input format detected: ${inputFormat}`);
     debug(`Detected input format: ${inputFormat}`);
 
-    let variantData;
+    let variantData = null;
     let annotationData;
+    let inputInfo = '';
 
     if (inputFormat === 'VCF') {
       debug('Processing variant as VCF format');
-      debugDetailed('Skipping Variant Recoder step as the input is already in VCF format');
+      stepsPerformed.push('Processing VCF input');
+      // Convert the VCF string to Ensembl format.
       const { region, allele } = convertVcfToEnsemblFormat(mergedParams.variant);
+      stepsPerformed.push(`Converted VCF to Ensembl format (region: ${region}, allele: ${allele})`);
       debugDetailed(`Converted VCF to Ensembl format: region=${region}, allele=${allele}`);
+      // Retrieve VEP annotations using the region endpoint.
       annotationData = await vepRegionsAnnotation(region, allele, vepOptions, mergedParams.cache);
+      stepsPerformed.push('Retrieved VEP annotations');
       debugDetailed(`VEP annotation data received: ${JSON.stringify(annotationData)}`);
+      // Build an "input" string from the converted region.
+      // Assuming region format is "chrom:start-end:strand"
+      const [chrom, rest] = region.split(':');
+      const [start, endAndStrand] = rest.split('-');
+      const [end, strand] = endAndStrand.split(':');
+      inputInfo = `${chrom} ${start} ${end} ${allele} ${strand}`;
     } else {
       debug('Processing variant as HGVS format');
+      stepsPerformed.push('Processing HGVS input');
+      // Call Variant Recoder first.
       variantData = await variantRecoder(mergedParams.variant, recoderOptions, mergedParams.cache);
+      stepsPerformed.push('Called Variant Recoder');
       debugDetailed(`Variant Recoder data received: ${JSON.stringify(variantData)}`);
 
       // Assume variantData is an array and use the first object.
@@ -325,27 +341,69 @@ async function main() {
         debugAll(`Available VCF strings: ${JSON.stringify(recoderEntry.vcf_string)}`);
         throw new Error('No valid VCF string found in Variant Recoder response');
       }
-
+      stepsPerformed.push('Extracted VCF string from Variant Recoder response');
+      // Convert the selected VCF string.
       const { region, allele } = convertVcfToEnsemblFormat(vcfString);
+      stepsPerformed.push(`Converted extracted VCF to Ensembl format (region: ${region}, allele: ${allele})`);
       debugDetailed(`Converted VCF to Ensembl format from Recoder: region=${region}, allele=${allele}`);
+      // Retrieve VEP annotations.
       annotationData = await vepRegionsAnnotation(region, allele, vepOptions, mergedParams.cache);
+      stepsPerformed.push('Retrieved VEP annotations');
       debugDetailed(`VEP annotation data received: ${JSON.stringify(annotationData)}`);
+      // Build input info from the vcfString.
+      // We assume vcfString is in the form "chrom-pos-ref-alt"
+      const vcfParts = vcfString.replace(/^chr/i, '').split('-');
+      if (vcfParts.length === 4) {
+        const [c, posStr, , ] = vcfParts;
+        const pos = parseInt(posStr, 10);
+        // For HGVS input, we can simulate input info as "chrom pos pos allele strand"
+        const { region: r, allele: a } = convertVcfToEnsemblFormat(vcfString);
+        const [c2, rest] = r.split(':');
+        const [start, endAndStrand] = rest.split('-');
+        const [end, strand] = endAndStrand.split(':');
+        inputInfo = `${c2} ${start} ${end} ${a} ${strand}`;
+      }
     }
 
-    // Optionally, apply scoring if a scoring configuration is provided.
+    // If scoring is enabled, apply it.
     if (mergedParams.scoring_config_path) {
       const scoringConfig = readScoringConfig(mergedParams.scoring_config_path);
       annotationData = applyScoring(annotationData, scoringConfig);
+      stepsPerformed.push('Applied scoring to annotation data');
       debugDetailed(`Applied scoring to annotation data: ${JSON.stringify(annotationData)}`);
     }
 
-    // Filter and format the results (currently no custom filter is applied).
-    const filterFunction = null;
-    const formattedResults = filterAndFormatResults(
-      { variantData, annotationData },
-      filterFunction,
-      mergedParams.output
-    );
+    // Before formatting, ensure each annotation in annotationData has an "input" field.
+    if (Array.isArray(annotationData)) {
+      annotationData = annotationData.map((ann) => {
+        return { input: inputInfo, ...ann };
+      });
+    } else {
+      // In case annotationData is not an array, wrap it in one.
+      annotationData = [{ input: inputInfo, ...annotationData }];
+    }
+
+    // Prepare meta information.
+    const processEndTime = new Date();
+    const metaInfo = {
+      input: mergedParams.variant,
+      inputFormat,
+      stepsPerformed,
+      startTime: processStartTime.toISOString(),
+      endTime: processEndTime.toISOString(),
+      durationMs: processEndTime - processStartTime,
+      recoderCalled: inputFormat === 'HGVS'
+    };
+
+    // Final output now includes both variantData and annotationData.
+    const finalOutput = {
+      meta: metaInfo,
+      variantData, // variantRecoder data; may be null for VCF input.
+      annotationData
+    };
+
+    // Filter and format the final output (currently only JSON formatting is supported).
+    const formattedResults = filterAndFormatResults(finalOutput, null, mergedParams.output);
 
     outputResults(formattedResults, mergedParams.save);
     debug('Variant analysis process completed successfully');
