@@ -63,6 +63,11 @@
     "@babel/core": "^7.22.9",
     "@babel/preset-env": "^7.22.9"
   },
+  "browser": {
+    "fs": false,
+    "path": false,
+    "os": false
+  },
   "babel": {
     "presets": [
       "@babel/preset-env"
