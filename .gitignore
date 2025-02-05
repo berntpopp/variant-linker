@@ -27,3 +27,6 @@ pnpm-debug.log*
 *TEST.json
 *results.json
 *.txt
+
+# npm package files
+*.tgz
