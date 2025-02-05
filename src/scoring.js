@@ -1,5 +1,5 @@
-'use strict';
 // src/scoring.js
+'use strict';
 
 /**
  * @fileoverview Provides scoring functionality including reading scoring configuration
@@ -9,7 +9,8 @@
  * @module scoring
  */
 
-const fs = require('fs');
+// Use fs only if in a Node environment.
+const fs = (typeof window === 'undefined') ? require('fs') : null;
 const debug = require('debug')('variant-linker:main');
 const debugDetailed = require('debug')('variant-linker:detailed');
 const debugAll = require('debug')('variant-linker:all');
@@ -29,6 +30,9 @@ const debugAll = require('debug')('variant-linker:all');
  * @throws {Error} If there is an error reading or parsing the configuration files.
  */
 function readScoringConfig(configPath) {
+  if (!fs) {
+    throw new Error("readScoringConfig requires Node's fs module which is not available in the browser.");
+  }
   try {
     const variableAssignmentPath = `${configPath}/variable_assignment_config.json`;
     const formulaPath = `${configPath}/formula_config.json`;
@@ -41,12 +45,8 @@ function readScoringConfig(configPath) {
     const variableAssignmentConfig = JSON.parse(variableAssignmentRaw);
     const formulaConfigRaw = JSON.parse(formulaRaw);
 
-    debugDetailed(
-      `Variable Assignment Config: ${JSON.stringify(variableAssignmentConfig)}`
-    );
-    debugDetailed(
-      `Formula Config Raw: ${JSON.stringify(formulaConfigRaw)}`
-    );
+    debugDetailed(`Variable Assignment Config: ${JSON.stringify(variableAssignmentConfig)}`);
+    debugDetailed(`Formula Config Raw: ${JSON.stringify(formulaConfigRaw)}`);
 
     let formulas = { annotation_level: [], transcript_level: [] };
 
@@ -167,16 +167,12 @@ function extractVariables(obj, variablesConfig, context) {
         defaultValue: mapping.default !== undefined ? mapping.default : 0
       };
     } else {
-      // Skip if mapping is neither a string nor an object.
       continue;
     }
 
     let rawValue = getValueByPath(obj, path, context);
-    debugDetailed(
-      `Raw value for mapping "${mapping}" (target: ${config.target}) from path "${path}": ${JSON.stringify(rawValue)}`
-    );
+    debugDetailed(`Raw value for mapping "${mapping}" (target: ${config.target}) from path "${path}": ${JSON.stringify(rawValue)}`);
 
-    // If rawValue is an array of arrays, flatten it.
     if (Array.isArray(rawValue) && rawValue.some(item => Array.isArray(item))) {
       rawValue = rawValue.flat(Infinity);
       debugDetailed(`Flattened raw value: ${JSON.stringify(rawValue)}`);
@@ -212,7 +208,6 @@ function extractVariables(obj, variablesConfig, context) {
       finalValue = rawValue !== undefined ? rawValue : config.defaultValue;
     }
 
-    // If a condition is specified, evaluate it.
     if (config.condition) {
       finalValue = evaluateCondition(rawValue, config.condition, config.defaultValue);
       debugDetailed(`Condition "${config.condition}" applied for target "${config.target}": ${finalValue}`);

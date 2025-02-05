@@ -17,18 +17,16 @@ module.exports = {
     fallback: {
       // Disable file system functions because they are not available in the browser.
       fs: false,
-      // If you need to use "path" (for example, if any module requires it),
-      // you can supply a browser-compatible version.
+      // If you need to use "path" in the browser, use a browser-compatible version.
       path: require.resolve('path-browserify'),
-      // You may add others as needed (for example, os, crypto, etc.):
-      // os: false,
-      // crypto: require.resolve('crypto-browserify'),
+      // Other Node modules can be added here if needed.
+      // e.g. os: false, crypto: require.resolve('crypto-browserify')
     }
   },
   module: {
     rules: [
       {
-        // Transpile our source code with Babel
+        // Transpile our source code with Babel.
         test: /\.js$/,
         exclude: /node_modules/,
         use: {
@@ -39,13 +37,13 @@ module.exports = {
         }
       },
       {
-        // JSON files can be loaded natively in webpack 5 (or use json-loader if needed)
+        // JSON files can be loaded natively in webpack 5 (or you may use json-loader if needed).
         test: /\.json$/,
         type: 'javascript/auto',
         use: [ 'json-loader' ]
       }
     ]
   },
-  // You may also need to set mode to 'production' or 'development'
+  // Set mode to 'development' (or 'production' when building for release)
   mode: 'development'
 };

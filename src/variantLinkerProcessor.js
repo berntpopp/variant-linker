@@ -1,5 +1,5 @@
-'use strict';
 // src/variantLinkerProcessor.js
+'use strict';
 
 /**
  * @fileoverview Processes variant linking by combining data from Variant Recoder
@@ -10,7 +10,8 @@
  * @module variantLinkerProcessor
  */
 
-const fs = require('fs');
+// Use fs only if in a Node environment.
+const fs = (typeof window === 'undefined') ? require('fs') : null;
 const debug = require('debug')('variant-linker:processor');
 
 /**
@@ -260,7 +261,6 @@ function filterAndFormatResults(results, filterParam, format) {
       for (const key in filterParam) {
         if (Object.prototype.hasOwnProperty.call(filterParam, key)) {
           if (key.startsWith('transcript_consequences')) {
-            // Remove the prefix "transcript_consequences." if present.
             const newKey = key.replace(/^transcript_consequences\./, '');
             transcriptCriteria[newKey] = filterParam[key];
           } else {
@@ -268,7 +268,6 @@ function filterAndFormatResults(results, filterParam, format) {
           }
         }
       }
-      // First, filter the top-level annotationData (if any criteria exist).
       let topLevelOriginalCount = results.annotationData.length;
       let topLevelFiltered = results.annotationData;
       if (Object.keys(topLevelCriteria).length > 0) {
@@ -277,7 +276,6 @@ function filterAndFormatResults(results, filterParam, format) {
           `Top-level filter applied: ${topLevelOriginalCount} annotations before, ${topLevelFiltered.length} after filtering.`
         );
       }
-      // Now, for each annotation, if transcriptCriteria exists, filter its transcript_consequences.
       let totalTCBefore = 0;
       let totalTCAfter = 0;
       topLevelFiltered.forEach(annotation => {
@@ -303,9 +301,7 @@ function filterAndFormatResults(results, filterParam, format) {
       }
       filteredResults.annotationData = topLevelFiltered;
     } else {
-      throw new Error(
-        'Filter parameter must be a function or a filter criteria object.'
-      );
+      throw new Error('Filter parameter must be a function or a filter criteria object.');
     }
     debug(`Filtered results: ${JSON.stringify(filteredResults)}`);
   }
@@ -324,14 +320,20 @@ function filterAndFormatResults(results, filterParam, format) {
 /**
  * Outputs the results either to the console or writes them to a file.
  *
+ * In a browser environment, file writing is not supported.
+ *
  * @param {string} results - The results string to output.
  * @param {string} [filename] - An optional filename; if provided, results are saved to this file.
  */
 function outputResults(results, filename) {
   debug('Starting results output');
   if (filename) {
-    fs.writeFileSync(filename, results);
-    debug(`Results saved to file: ${filename}`);
+    if (!fs) {
+      console.warn('File output is not supported in a browser environment.');
+    } else {
+      fs.writeFileSync(filename, results);
+      debug(`Results saved to file: ${filename}`);
+    }
   } else {
     console.log(results);
   }
