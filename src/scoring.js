@@ -2,7 +2,7 @@
 'use strict';
 
 /**
- * @fileoverview Provides scoring functionality including reading scoring configuration
+ * @fileoverview Provides scoring functionality including reading and parsing scoring configuration
  * and applying scoring formulas to VEP annotation data.
  * Supports flexible variable assignments with conditional transformations using
  * schema.org–style configuration objects.
@@ -16,11 +16,56 @@ const debugDetailed = require('debug')('variant-linker:detailed');
 const debugAll = require('debug')('variant-linker:all');
 
 /**
+ * Parses scoring configuration from the provided JSON objects.
+ *
+ * This function expects two JSON objects:
+ * - variableAssignmentJson: parsed content of variable_assignment_config.json,
+ * - formulaJson: parsed content of formula_config.json.
+ *
+ * @param {Object} variableAssignmentJson - Parsed JSON containing a "variables" object.
+ * @param {Object} formulaJson - Parsed JSON containing scoring formulas.
+ * @returns {{
+ *   variables: Object,
+ *   formulas: { annotation_level: Array, transcript_level: Array }
+ * }}
+ */
+function parseScoringConfig(variableAssignmentJson, formulaJson) {
+  const variables = variableAssignmentJson.variables;
+  let formulas = { annotation_level: [], transcript_level: [] };
+
+  if (formulaJson.formulas) {
+    if (Array.isArray(formulaJson.formulas)) {
+      formulas = {
+        annotation_level: formulaJson.formulas,
+        transcript_level: []
+      };
+    } else if (typeof formulaJson.formulas === 'object') {
+      formulas = {
+        annotation_level: formulaJson.formulas.annotation_level || [],
+        transcript_level: formulaJson.formulas.transcript_level || []
+      };
+    }
+  } else {
+    formulas = {
+      annotation_level: formulaJson.annotation_level || [],
+      transcript_level: formulaJson.transcript_level || []
+    };
+  }
+
+  return {
+    variables,
+    formulas
+  };
+}
+
+/**
  * Reads and parses the scoring configuration files from the specified directory.
  *
  * This function expects two files in the given directory:
  * - variable_assignment_config.json: containing a "variables" object.
  * - formula_config.json: containing scoring formulas.
+ *
+ * This function is intended for use in Node environments.
  *
  * @param {string} configPath - The path to the scoring configuration directory.
  * @returns {{
@@ -29,9 +74,9 @@ const debugAll = require('debug')('variant-linker:all');
  * }}
  * @throws {Error} If there is an error reading or parsing the configuration files.
  */
-function readScoringConfig(configPath) {
+function readScoringConfigFromFiles(configPath) {
   if (!fs) {
-    throw new Error("readScoringConfig requires Node's fs module which is not available in the browser.");
+    throw new Error("readScoringConfigFromFiles requires Node's fs module which is not available in the browser.");
   }
   try {
     const variableAssignmentPath = `${configPath}/variable_assignment_config.json`;
@@ -42,37 +87,13 @@ function readScoringConfig(configPath) {
     const variableAssignmentRaw = fs.readFileSync(variableAssignmentPath, 'utf-8');
     const formulaRaw = fs.readFileSync(formulaPath, 'utf-8');
 
-    const variableAssignmentConfig = JSON.parse(variableAssignmentRaw);
-    const formulaConfigRaw = JSON.parse(formulaRaw);
+    const variableAssignmentJson = JSON.parse(variableAssignmentRaw);
+    const formulaJson = JSON.parse(formulaRaw);
 
-    debugDetailed(`Variable Assignment Config: ${JSON.stringify(variableAssignmentConfig)}`);
-    debugDetailed(`Formula Config Raw: ${JSON.stringify(formulaConfigRaw)}`);
+    debugDetailed(`Variable Assignment JSON: ${JSON.stringify(variableAssignmentJson)}`);
+    debugDetailed(`Formula JSON: ${JSON.stringify(formulaJson)}`);
 
-    let formulas = { annotation_level: [], transcript_level: [] };
-
-    if (formulaConfigRaw.formulas) {
-      if (Array.isArray(formulaConfigRaw.formulas)) {
-        formulas = {
-          annotation_level: formulaConfigRaw.formulas,
-          transcript_level: []
-        };
-      } else if (typeof formulaConfigRaw.formulas === 'object') {
-        formulas = {
-          annotation_level: formulaConfigRaw.formulas.annotation_level || [],
-          transcript_level: formulaConfigRaw.formulas.transcript_level || []
-        };
-      }
-    } else {
-      formulas = {
-        annotation_level: formulaConfigRaw.annotation_level || [],
-        transcript_level: formulaConfigRaw.transcript_level || []
-      };
-    }
-
-    return {
-      variables: variableAssignmentConfig.variables,
-      formulas: formulas
-    };
+    return parseScoringConfig(variableAssignmentJson, formulaJson);
   } catch (error) {
     debugAll(`Error reading scoring configuration files: ${error.message}`);
     throw error;
@@ -352,6 +373,9 @@ function applyScoring(annotationData, scoringConfig) {
 }
 
 module.exports = {
-  readScoringConfig,
+  // Export the new functions:
+  readScoringConfigFromFiles,
+  parseScoringConfig,
+  // Export the rest of the functionality:
   applyScoring
 };

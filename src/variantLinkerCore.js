@@ -1,14 +1,14 @@
+// src/variantLinkerCore.js
 /**
  * @fileoverview Core logic for variant analysis.
  * This module encapsulates the processing steps so that it can be used both in the CLI and via the web bundle.
  * @module variantLinkerCore
  */
-
 'use strict';
 
 const variantRecoder = require('./variantRecoder');
 const vepRegionsAnnotation = require('./vepRegionsAnnotation');
-const { readScoringConfig, applyScoring } = require('./scoring');
+const { readScoringConfigFromFiles, applyScoring } = require('./scoring');
 const { mapOutputToSchemaOrg, validateSchemaOrgOutput, addCustomFormats } = require('./schemaMapper');
 const { filterAndFormatResults } = require('./variantLinkerProcessor');
 
@@ -37,7 +37,8 @@ function detectInputFormat(variant) {
  * @param {Object} params.recoderOptions - Options for the Variant Recoder API.
  * @param {Object} params.vepOptions - Options for the VEP API.
  * @param {boolean} params.cache - Whether to enable caching.
- * @param {string} [params.scoringConfigPath] - Path to the scoring configuration.
+ * @param {string} [params.scoringConfigPath] - Path to the scoring configuration (Node only).
+ * @param {Object} [params.scoringConfig] - Already parsed scoring configuration JSON (for browser usage).
  * @param {string} params.output - Output format ('JSON', 'CSV', or 'SCHEMA').
  * @param {string} [params.filter] - Optional JSON string specifying filtering criteria.
  * @return {Promise<Object>} The result object containing meta, variantData, and annotationData.
@@ -54,7 +55,6 @@ async function analyzeVariant(params) {
   let inputInfo = '';
 
   if (inputFormat === 'VCF') {
-    // Process VCF input (e.g. "1-230710021-G-A")
     const parts = params.variant.trim().split('-');
     if (parts.length !== 4) {
       throw new Error('Invalid VCF format: expected "chromosome-start-ref-alt"');
@@ -66,7 +66,6 @@ async function analyzeVariant(params) {
     annotationData = await vepRegionsAnnotation([formattedVariant], params.vepOptions, params.cache);
     stepsPerformed.push('Retrieved VEP annotations via POST');
   } else {
-    // Process HGVS input: call Variant Recoder, extract VCF, and then annotate.
     variantData = await variantRecoder(params.variant, params.recoderOptions, params.cache);
     stepsPerformed.push('Called Variant Recoder');
     const firstKey = Object.keys(variantData[0])[0];
@@ -94,13 +93,18 @@ async function analyzeVariant(params) {
   }
 
   // Optionally apply scoring.
-  if (params.scoringConfigPath) {
-    const scoringConfig = readScoringConfig(params.scoringConfigPath);
+  if (params.scoringConfig) {
+    // Use the provided JSON configuration.
+    annotationData = applyScoring(annotationData, params.scoringConfig);
+    stepsPerformed.push('Applied scoring to annotation data (using provided scoringConfig).');
+  } else if (params.scoringConfigPath) {
+    const { readScoringConfigFromFiles } = require('./scoring');
+    const scoringConfig = readScoringConfigFromFiles(params.scoringConfigPath);
     annotationData = applyScoring(annotationData, scoringConfig);
-    stepsPerformed.push('Applied scoring to annotation data');
+    stepsPerformed.push('Applied scoring to annotation data (using scoringConfigPath).');
   }
 
-  // Ensure each annotation has an "input" field.
+  // Add input info to each annotation.
   if (Array.isArray(annotationData)) {
     annotationData = annotationData.map((ann) => ({ input: inputInfo, ...ann }));
   } else {
@@ -124,7 +128,6 @@ async function analyzeVariant(params) {
     annotationData
   };
 
-  // If SCHEMA output is requested, transform and validate the output.
   if (params.output && params.output.toUpperCase() === 'SCHEMA') {
     finalOutput = mapOutputToSchemaOrg(finalOutput);
     addCustomFormats();
@@ -132,7 +135,6 @@ async function analyzeVariant(params) {
     stepsPerformed.push('Schema.org output validated successfully.');
   }
 
-  // Apply filtering if provided.
   if (params.filter) {
     let filterParam;
     try {
