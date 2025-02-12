@@ -4,24 +4,6 @@
   "formulas": {
     "annotation_level": [
       {
-        "nephro_variant_score_gnomadg_missing": "1 / (1 + Math.exp(-((-36.30791946) + gnomade_variant * (-309.333505) + (consequence_terms_variant.map(val => val === 'missense_variant' ? 1 : 0).includes(1) ? 1 : 0) * (-1.143167) + (consequence_terms_variant.map(val => val === 'synonymous_variant' ? 1 : 0).includes(1) ? 1 : 0) * (-0.964163) + (consequence_terms_variant.map(val => val === 'stop_gained' ? 1 : 0).includes(1) ? 1 : 0) * (-0.405552) + (consequence_terms_variant.map(val => val === 'frameshift_variant' ? 1 : 0).includes(1) ? 1 : 0) * (-0.902098) + cadd_phred_variant * 2.685227 + Math.max(...impact_variant.map(val => ({ 'HIGH': 4, 'MODERATE': 3, 'LOW': 2, 'MODIFIER': 1 }[val] || 0))) * 3.148303)))"
-      },
-      {
-        "gene_symbol": "gene_symbol"
-      },
-      {
-        "hgnc_id": "hgnc_id"
-      }
-    ]
-  }
-}
-
-{
-  "@context": "https://schema.org/",
-  "@type": "Configuration",
-  "formulas": {
-    "annotation_level": [
-      {
         "nephro_variant_score": "1 / (1 + Math.exp(-((-36.308) + ((gnomade_variant - 0.018) / 0.096) * (-309.334) + ((gnomadg_variant - 0.056) / 0.162) * (-2.546) + ((consequence_terms_variant.map(val => val === 'missense_variant' ? 1 : 0).includes(1) ? 1 : 0) - 0.243) / 0.429 * (-1.143) + ((consequence_terms_variant.map(val => val === 'synonymous_variant' ? 1 : 0).includes(1) ? 1 : 0) - 0.229) / 0.420 * (-0.964) + ((consequence_terms_variant.map(val => val === 'stop_gained' ? 1 : 0).includes(1) ? 1 : 0) - 0.069) / 0.254 * (-0.406) + ((consequence_terms_variant.map(val => val === 'frameshift_variant' ? 1 : 0).includes(1) ? 1 : 0) - 0.136) / 0.343 * (0.902) + ((cadd_phred_variant - 13.425) / 12.573) * 2.685 + ((Math.max(...impact_variant.map(val => ({ 'HIGH': 4, 'MODERATE': 3, 'LOW': 2, 'MODIFIER': 1 }[val] || 0))) - 2.500) / 1.118) * 3.148)))"
       },
       {
