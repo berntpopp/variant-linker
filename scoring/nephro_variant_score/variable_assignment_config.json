@@ -2,12 +2,12 @@
   "@context": "https://schema.org/",
   "@type": "Configuration",
   "variables": {
-    "transcript_consequences.*.consequence_terms": "unique:consequence_terms_variant",
-    "transcript_consequences.*.cadd_phred": "max:cadd_phred_variant|default:25",
-    "transcript_consequences.*.impact": "unique:impact_variant",
+    "transcript_consequences.*.consequence_terms": "unique:consequence_terms_variant|default:0",
+    "transcript_consequences.*.cadd_phred": "max:cadd_phred_variant|default:7.226",
+    "transcript_consequences.*.impact": "unique:impact_variant|default:LOW",
     "transcript_consequences.*.hgnc_id": "unique:hgnc_id",
     "transcript_consequences.*.gene_symbol": "unique:gene_symbol",
-    "colocated_variants.*.frequencies.*.gnomade": "max:gnomade_variant|default:0",
-    "colocated_variants.*.frequencies.*.gnomadg": "max:gnomadg_variant|default:0"
+    "colocated_variants.*.frequencies.*.gnomade": "max:gnomade_variant|default:1.626e-05",
+    "colocated_variants.*.frequencies.*.gnomadg": "max:gnomadg_variant|default:5.256e-05"
   }
 }
