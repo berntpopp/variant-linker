@@ -53,9 +53,9 @@ variant-linker --variant <variant_input> --output <output_format> [--debug]
 - `--output`, `-o`: Define the desired output format (e.g., JSON, CSV). Default is JSON.
 - `--save`, `-s`: Filename to save the results. If not specified, results will be printed to the console.
 - `--debug`, `-d`: Enable debug mode for detailed logging. This is optional and is not enabled by default.
-- `--vep_params`, `-vp`: Optional parameters for VEP annotation in key=value format, separated by commas (default: "CADD=1").
-- `--recoder_params`, `-rp`: Optional parameters for Variant Recoder in key=value format, separated by commas (default: "vcf_string=1").
-- `--scoring_config_path`, `-scp`: Path to the scoring configuration directory.
+- `--vep_params`, `--vp`: Optional parameters for VEP annotation in key=value format, separated by commas (default: "CADD=1").
+- `--recoder_params`, `--rp`: Optional parameters for Variant Recoder in key=value format, separated by commas (default: "vcf_string=1").
+- `--scoring_config_path`, `--scp`: Path to the scoring configuration directory.
 
 #### Configuration File
 
