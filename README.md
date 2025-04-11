@@ -135,6 +135,40 @@ All core functions – such as variant recoding, VEP annotation retrieval, VCF c
 ## Contributing
 Contributions to Variant-Linker are welcome. Please feel free to fork the repository, make your changes, and submit a pull request.
 
+### Automated Releases & Commit Messages
+
+This project uses [semantic-release](https://github.com/semantic-release/semantic-release) to automate the release process, including version bumping, changelog generation, npm publishing, and GitHub release creation.
+
+To make this automation work, **commit messages MUST follow the [Conventional Commits specification](https://www.conventionalcommits.org/)**. When you submit a Pull Request, the title and the commit messages will be analyzed to determine the next version number.
+
+**Common Commit Types:**
+
+*   `feat:` A new feature (results in a **minor** version bump, e.g., `0.1.0` -> `0.2.0`)
+*   `fix:` A bug fix (results in a **patch** version bump, e.g., `0.1.0` -> `0.1.1`)
+*   `docs:` Documentation only changes
+*   `style:` Changes that do not affect the meaning of the code (white-space, formatting, missing semi-colons, etc)
+*   `refactor:` A code change that neither fixes a bug nor adds a feature
+*   `perf:` A code change that improves performance
+*   `test:` Adding missing tests or correcting existing tests
+*   `build:` Changes that affect the build system or external dependencies (example scopes: gulp, broccoli, npm)
+*   `ci:` Changes to our CI configuration files and scripts (example scopes: Travis, Circle, BrowserStack, SauceLabs)
+*   `chore:` Other changes that don't modify `src` or `test` files
+*   `revert:` Reverts a previous commit
+
+Commits with types like `docs`, `style`, `refactor`, `test`, `chore`, etc., will **not** trigger a release.
+
+**Breaking Changes:**
+
+To trigger a **major** version bump (e.g., `1.0.0` -> `2.0.0`), include `BREAKING CHANGE:` in the footer of the commit message or append a `!` after the type/scope (e.g., `feat!: drop support for Node 12`).
+
+```
+feat: allow provided config object to extend other configs
+
+BREAKING CHANGE: `extends` key in config file is now used for extending other config files
+```
+
+Please ensure your commit messages are descriptive and adhere to this format so that releases can be managed automatically.
+
 ## License
 This project is licensed under the [MIT License](LICENSE.md).
 
