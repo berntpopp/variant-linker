@@ -1,6 +1,6 @@
 {
   "name": "variant-linker",
-  "version": "0.15.0",
+  "version": "1.0.0",
   "description": "CLI for Ensembl VEP and Variant Recoder",
   "main": "src/index.js",
   "bin": {
