@@ -5,7 +5,8 @@
     "endpoints": {
       "vepRegions": "/vep/homo_sapiens/region",
       "vepHgvs": "/vep/human/hgvs",
-      "variantRecoder": "/variant_recoder/human"
+      "variantRecoder": "/variant_recoder/human",
+      "variantRecoderBase": "/variant_recoder"
     }
   }
 }

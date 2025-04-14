@@ -26,7 +26,10 @@ pnpm-debug.log*
 *test.json
 *TEST.json
 *results.json
+# Exclude specific .txt files that we want to allow
 *.txt
+!examples/*.txt
+!sample_variants.txt
 
 # npm package files
 *.tgz

@@ -75,8 +75,8 @@ function validateParams(params) {
   
   // Check if at least one variant source is provided
   const hasVariant = Boolean(params.variant);
-  const hasVariantsFile = Boolean(params.variantsFile); // Changed from variants_file to variantsFile (camelCase)
-  const hasVariantsList = Boolean(params.variants && typeof params.variants === 'string');
+  const hasVariantsFile = Boolean(params.variants_file);
+  const hasVariantsList = Boolean(params.variants && params.variants.length > 0);
   
   if (!hasVariant && !hasVariantsFile && !hasVariantsList) {
     throw new Error('At least one variant source is required: --variant, --variants-file, or --variants');
@@ -168,24 +168,10 @@ const argv = yargs
   .option('semver', { alias: 'sv', description: 'Show semantic version details and exit', type: 'boolean' })
   .option('assembly', { description: 'Genome assembly (hg38 [default] or hg19)', type: 'string', default: 'hg38' })
   .option('filter', { alias: 'f', description: 'Filtering criteria as a JSON string', type: 'string' })
-  .usage('Usage: variant-linker [options]\n\nExample: variant-linker --variant "rs123" --output JSON')
-  .example('variant-linker --variant "rs123" --output JSON', 'Process a single variant')
-  .example('variant-linker --variants-file examples/sample_variants.txt --output JSON', 'Process multiple variants from a file')
-  .example('variant-linker --variants "rs123,ENST00000366667:c.803C>T" --output JSON', 'Process multiple variants from a comma-separated list')
-  .epilogue('For more information, see https://github.com/berntpopp/variant-linker')
   .help()
   .alias('help', 'h')
   .version(packageJson.version)
   .alias('version', 'V')
-  .showHelpOnFail(true)
-  .check((argv) => {
-    // Show help if no parameters provided
-    if (process.argv.length <= 2) {
-      yargs.showHelp();
-      process.exit(0);
-    }
-    return true;
-  })
   .argv;
 
 if (argv.semver) {
@@ -251,8 +237,8 @@ async function main() {
     }
     
     // Add variants from file if provided
-    if (mergedParams.variantsFile) {
-      const fileVariants = readVariantsFromFile(mergedParams.variantsFile);
+    if (mergedParams.variants_file) {
+      const fileVariants = readVariantsFromFile(mergedParams.variants_file);
       variants = [...variants, ...fileVariants];
     }
     

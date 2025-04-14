@@ -1,0 +1,18 @@
+# Sample variants for testing batch processing in variant-linker
+# Each line contains one variant in a supported format (rsID, HGVS, or VCF)
+
+# rsIDs
+rs56116432
+rs6025
+rs429358
+
+# HGVS notations
+ENST00000366667:c.803C>T
+ENST00000003084:c.1537C>T
+NM_000546.5:c.215C>G
+
+# VCF format (chromosome-position-reference-alternate)
+1-65568-A-C
+1-69270-A-G
+2-46594241-G-T
+X-153296357-G-A

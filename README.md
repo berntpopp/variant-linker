@@ -44,12 +44,21 @@ To set up Variant-Linker, follow these steps:
 After installation, you can run Variant-Linker using the following command:
 
 ```bash
+# Process a single variant
 variant-linker --variant <variant_input> --output <output_format> [--debug]
+
+# Process multiple variants from a file (one per line)
+variant-linker --variants-file <file_path> --output <output_format> [--debug]
+
+# Process multiple variants as a comma-separated list
+variant-linker --variants <variant1,variant2,variant3> --output <output_format> [--debug]
 ```
 
 #### Command-Line Options
 - `--config`, `-c`: Path to the configuration file.
-- `--variant`, `-v`: Specify the genetic variant to be analyzed. This can be provided via the command line or configuration file.
+- `--variant`, `-v`: Specify a single genetic variant to be analyzed.
+- `--variants-file`, `-vf`: Path to a file containing variants to be analyzed (one per line).
+- `--variants`, `-vs`: Comma-separated list of variants to be analyzed.
 - `--output`, `-o`: Define the desired output format (e.g., JSON, CSV). Default is JSON.
 - `--save`, `-s`: Filename to save the results. If not specified, results will be printed to the console.
 - `--debug`, `-d`: Enable debug mode for detailed logging. This is optional and is not enabled by default.
@@ -103,8 +112,10 @@ Variant-Linker is also designed to be used as a library in your own Node.js proj
 ```js
 // Import the desired functions from variant-linker
 const {
-  variantRecoder,
-  vepRegionsAnnotation,
+  analyzeVariant,        // Core analysis function that supports both single and batch processing
+  variantRecoder,        // Single variant recoding (GET endpoint)
+  variantRecoderPost,    // Batch variant recoding (POST endpoint)
+  vepRegionsAnnotation,  // VEP annotation (supports batch processing)
   vepHgvsAnnotation,
   convertVcfToEnsemblFormat,
   scoring,
@@ -127,7 +138,32 @@ const vcfInput = '1-65568-A-C';
 const ensemblFormat = convertVcfToEnsemblFormat(vcfInput);
 console.log('Ensembl Format:', ensemblFormat);
 
-// Further functions (e.g., vepRegionsAnnotation, scoring) are similarly available for integration.
+// Example: Using batch variant processing
+async function analyzeBatchVariants() {
+  try {
+    // Process multiple variants at once
+    const batchResult = await analyzeVariant({
+      variants: ['rs123', 'ENST00000366667:c.803C>T', '1-65568-A-C'],
+      recoderOptions: { vcf_string: '1' },
+      vepOptions: { CADD: '1', hgvs: '1' },
+      cache: false,
+      output: 'JSON'
+    });
+    console.log('Batch Analysis Results:', batchResult);
+    
+    // Alternatively, use the variantRecoderPost function directly for batch recoding
+    const batchRecoderResult = await variantRecoderPost(
+      ['rs123', 'ENST00000366667:c.803C>T'],
+      { vcf_string: '1' }
+    );
+    console.log('Batch Recoder Results:', batchRecoderResult);
+  } catch (error) {
+    console.error('Error processing batch variants:', error);
+  }
+}
+analyzeBatchVariants();
+
+// Various other functions are similarly available for integration.
 ```
 
 All core functions – such as variant recoding, VEP annotation retrieval, VCF conversion, scoring, and result processing – are exposed via the package’s main module (via the `index.js` file). This modular design allows you to integrate Variant-Linker into larger bioinformatics pipelines or web services.
