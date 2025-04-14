@@ -1,6 +1,8 @@
 // test/variantRecoderPost.test.js
 
-const { expect } = require('chai');
+// Handle ESM modules correctly
+const chai = require('chai');
+const expect = chai.expect;
 const nock = require('nock');
 const variantRecoderPost = require('../src/variantRecoderPost');
 const apiConfig = require('../config/apiConfig.json');
@@ -41,8 +43,16 @@ describe('variantRecoderPost', () => {
     }
   ];
 
-  beforeEach(() => {
-    // Setup nock to intercept the POST request to the variant recoder
+  // We'll only set up nock in the specific test that needs it, not in beforeEach
+  // This avoids issues with tests that don't use the network
+  
+  afterEach(() => {
+    // Clean up any nock interceptors
+    nock.cleanAll();
+  });
+
+  it('should fetch recoded information for multiple variants', async () => {
+    // Setup nock for this specific test
     nock(apiBaseUrl)
       .post(`${apiConfig.ensembl.endpoints.variantRecoderBase}/homo_sapiens`)
       .query(true)
@@ -52,19 +62,7 @@ describe('variantRecoderPost', () => {
         expect(requestBody.ids).to.deep.equal(variants);
         return [200, responseMock];
       });
-  });
 
-  afterEach(() => {
-    // Ensure that all expected HTTP calls have been made
-    if (!nock.isDone()) {
-      console.error('Not all nock interceptors were used:', nock.pendingMocks());
-      nock.cleanAll();
-      throw new Error('Not all nock interceptors were used!');
-    }
-    nock.cleanAll();
-  });
-
-  it('should fetch recoded information for multiple variants', async () => {
     const options = { vcf_string: '1' };
     const result = await variantRecoderPost(variants, options);
 
@@ -106,7 +104,8 @@ describe('variantRecoderPost', () => {
       await variantRecoderPost(variants);
       throw new Error('Expected variantRecoderPost to throw an error for 500 status code');
     } catch (error) {
-      expect(error).to.be.an('error');
+      // AxiosError is an error object but has specific structure
+      expect(error).to.be.an.instanceof(Error);
       expect(error.message).to.include('Request failed with status code 500');
     }
   });

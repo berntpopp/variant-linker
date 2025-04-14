@@ -58,7 +58,7 @@
     "@semantic-release/npm": "^12.0.1",
     "@semantic-release/release-notes-generator": "^14.0.3",
     "babel-loader": "^9.1.2",
-    "chai": "^5.1.1",
+    "chai": "^4.3.4",
     "chai-http": "^5.0.0",
     "json-loader": "^0.5.7",
     "mocha": "^10.4.0",

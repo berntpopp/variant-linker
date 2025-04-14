@@ -1,6 +1,8 @@
 // test/variantRecoder.test.js
 
-const { expect } = require('chai');
+// Handle ESM modules correctly
+const chai = require('chai');
+const expect = chai.expect;
 const nock = require('nock');
 const variantRecoder = require('../src/variantRecoder');
 const apiConfig = require('../config/apiConfig.json');
@@ -55,7 +57,8 @@ describe('variantRecoder', () => {
       await variantRecoder(variant);
       throw new Error('Expected variantRecoder to throw an error for 500 status code');
     } catch (error) {
-      expect(error).to.be.an('error');
+      // AxiosError is an error object but has specific structure
+      expect(error).to.be.an.instanceof(Error);
       expect(error.message).to.include('Request failed with status code 500');
     }
   });
