@@ -171,6 +171,41 @@ All core functions – such as variant recoding, VEP annotation retrieval, VCF c
 ## Contributing
 Contributions to Variant-Linker are welcome. Please feel free to fork the repository, make your changes, and submit a pull request.
 
+## Testing
+
+Variant-Linker includes a comprehensive test suite using Mocha as the test runner and Chai for assertions. The tests cover core functionality including variant format detection, single and batch variant processing, scoring, and API interactions.
+
+### Running Tests
+
+To run the test suite:
+
+```bash
+# Run all tests
+npm test
+
+# Run tests with coverage reporting (if configured)
+npm run test:coverage
+```
+
+### Test Structure
+
+Tests are organized in the `test/` directory with the following structure:
+
+- `helpers.js` - Common test utilities and mock data
+- `scoring.test.js` - Tests for the scoring module
+- `variantLinkerCore.test.js` - Tests for core functionality and batch processing
+- `variantRecoder.test.js` - Tests for variant recoder API interactions
+- `variantRecoderPost.test.js` - Tests for batch variant recoder API interactions
+
+### Adding New Tests
+
+When adding new features, please include appropriate tests following these principles:
+
+- **KISS (Keep It Simple, Stupid)** - Write straightforward, focused tests
+- **DRY (Don't Repeat Yourself)** - Use helpers and shared fixtures
+- **Mock external dependencies** - Don't make actual API calls in tests
+- **Clean up resources** - Use try/finally to ensure proper cleanup
+
 ### Automated Releases & Commit Messages
 
 This project uses [semantic-release](https://github.com/semantic-release/semantic-release) to automate the release process, including version bumping, changelog generation, npm publishing, and GitHub release creation.
