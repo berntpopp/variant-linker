@@ -10,7 +10,7 @@
  */
 
 // Use fs only if in a Node environment.
-const fs = (typeof window === 'undefined') ? require('fs') : null;
+const fs = typeof window === 'undefined' ? require('fs') : null;
 const debug = require('debug')('variant-linker:main');
 const debugDetailed = require('debug')('variant-linker:detailed');
 const debugAll = require('debug')('variant-linker:all');
@@ -37,24 +37,24 @@ function parseScoringConfig(variableAssignmentJson, formulaJson) {
     if (Array.isArray(formulaJson.formulas)) {
       formulas = {
         annotation_level: formulaJson.formulas,
-        transcript_level: []
+        transcript_level: [],
       };
     } else if (typeof formulaJson.formulas === 'object') {
       formulas = {
         annotation_level: formulaJson.formulas.annotation_level || [],
-        transcript_level: formulaJson.formulas.transcript_level || []
+        transcript_level: formulaJson.formulas.transcript_level || [],
       };
     }
   } else {
     formulas = {
       annotation_level: formulaJson.annotation_level || [],
-      transcript_level: formulaJson.transcript_level || []
+      transcript_level: formulaJson.transcript_level || [],
     };
   }
 
   return {
     variables,
-    formulas
+    formulas,
   };
 }
 
@@ -76,7 +76,9 @@ function parseScoringConfig(variableAssignmentJson, formulaJson) {
  */
 function readScoringConfigFromFiles(configPath) {
   if (!fs) {
-    throw new Error("readScoringConfigFromFiles requires Node's fs module which is not available in the browser.");
+    throw new Error(
+      "readScoringConfigFromFiles requires Node's fs module which is not available in the browser."
+    );
   }
   try {
     const variableAssignmentPath = `${configPath}/variable_assignment_config.json`;
@@ -135,7 +137,7 @@ function parseMappingString(mappingStr) {
   return {
     target: variableName,
     aggregator,
-    defaultValue
+    defaultValue,
   };
 }
 
@@ -185,16 +187,18 @@ function extractVariables(obj, variablesConfig, context) {
         target: mapping.target || '',
         aggregator: mapping.aggregator || null,
         condition: mapping.condition || null,
-        defaultValue: mapping.default !== undefined ? mapping.default : 0
+        defaultValue: mapping.default !== undefined ? mapping.default : 0,
       };
     } else {
       continue;
     }
 
     let rawValue = getValueByPath(obj, path, context);
-    debugDetailed(`Raw value for mapping "${mapping}" (target: ${config.target}) from path "${path}": ${JSON.stringify(rawValue)}`);
+    debugDetailed(
+      `Raw value for mapping "${mapping}" (target: ${config.target}) from path "${path}": ${JSON.stringify(rawValue)}`
+    );
 
-    if (Array.isArray(rawValue) && rawValue.some(item => Array.isArray(item))) {
+    if (Array.isArray(rawValue) && rawValue.some((item) => Array.isArray(item))) {
       rawValue = rawValue.flat(Infinity);
       debugDetailed(`Flattened raw value: ${JSON.stringify(rawValue)}`);
     }
@@ -203,7 +207,9 @@ function extractVariables(obj, variablesConfig, context) {
     if (config.aggregator) {
       if (!Array.isArray(rawValue) || rawValue.length === 0) {
         finalValue = config.defaultValue;
-        debugDetailed(`Using default value for aggregator "${config.aggregator}" for target "${config.target}": ${finalValue}`);
+        debugDetailed(
+          `Using default value for aggregator "${config.aggregator}" for target "${config.target}": ${finalValue}`
+        );
       } else {
         switch (config.aggregator.toLowerCase()) {
           case 'max':
@@ -220,10 +226,14 @@ function extractVariables(obj, variablesConfig, context) {
             finalValue = Array.from(new Set(rawValue)).sort();
             break;
           default:
-            debugAll(`Unknown aggregator "${config.aggregator}" for target "${config.target}". Using raw value.`);
+            debugAll(
+              `Unknown aggregator "${config.aggregator}" for target "${config.target}". Using raw value.`
+            );
             finalValue = rawValue;
         }
-        debugDetailed(`Applied aggregator "${config.aggregator}" on value: ${JSON.stringify(rawValue)} -> ${finalValue}`);
+        debugDetailed(
+          `Applied aggregator "${config.aggregator}" on value: ${JSON.stringify(rawValue)} -> ${finalValue}`
+        );
       }
     } else {
       finalValue = rawValue !== undefined ? rawValue : config.defaultValue;
@@ -231,7 +241,9 @@ function extractVariables(obj, variablesConfig, context) {
 
     if (config.condition) {
       finalValue = evaluateCondition(rawValue, config.condition, config.defaultValue);
-      debugDetailed(`Condition "${config.condition}" applied for target "${config.target}": ${finalValue}`);
+      debugDetailed(
+        `Condition "${config.condition}" applied for target "${config.target}": ${finalValue}`
+      );
     }
     variables[config.target] = finalValue;
   }
@@ -260,8 +272,8 @@ function getValueByPath(obj, path, context) {
         debugDetailed(`Wildcard found, iterating over array: ${JSON.stringify(value)}`);
         const remainder = parts.slice(i + 1).join('.');
         const results = value
-          .map(item => getValueByPath(item, remainder, context))
-          .filter(v => v !== null && v !== undefined);
+          .map((item) => getValueByPath(item, remainder, context))
+          .filter((v) => v !== null && v !== undefined);
         return results.length === 1 ? results[0] : results;
       } else if (value && typeof value === 'object') {
         debugDetailed(`Wildcard encountered but value is not an array: ${JSON.stringify(value)}`);
@@ -285,7 +297,9 @@ function getValueByPath(obj, path, context) {
       debugDetailed(`Navigated to part: ${part}, value: ${JSON.stringify(value)}`);
     } else if (context && Object.prototype.hasOwnProperty.call(context, part)) {
       value = context[part];
-      debugDetailed(`Part not found in current object; using context for ${part}, value: ${JSON.stringify(value)}`);
+      debugDetailed(
+        `Part not found in current object; using context for ${part}, value: ${JSON.stringify(value)}`
+      );
     } else {
       debugAll(`Part not found: ${part}`);
       return undefined;
@@ -313,7 +327,10 @@ function calculateScore(formulaStr, variables) {
   // Build a substituted formula string for debugging.
   let substitutedFormula = formulaStr;
   for (const [key, value] of Object.entries(variables)) {
-    substitutedFormula = substitutedFormula.replace(new RegExp(`\\b${key}\\b`, 'g'), JSON.stringify(value));
+    substitutedFormula = substitutedFormula.replace(
+      new RegExp(`\\b${key}\\b`, 'g'),
+      JSON.stringify(value)
+    );
   }
   debugDetailed(`Substituted formula: ${substitutedFormula}`);
 
@@ -377,5 +394,5 @@ module.exports = {
   readScoringConfigFromFiles,
   parseScoringConfig,
   // Export the rest of the functionality:
-  applyScoring
+  applyScoring,
 };

@@ -206,6 +206,38 @@ When adding new features, please include appropriate tests following these princ
 - **Mock external dependencies** - Don't make actual API calls in tests
 - **Clean up resources** - Use try/finally to ensure proper cleanup
 
+## Code Style & Linting
+
+Variant-Linker uses ESLint and Prettier to enforce consistent code style following the Google JavaScript Style Guide with some customizations for Node.js development.
+
+### Running Linting
+
+```bash
+# Check for linting issues
+npm run lint
+
+# Fix automatically fixable linting issues
+npm run lint:fix
+```
+
+### Linting Configuration
+
+Linting is configured through the following files:
+
+- `.eslintrc.js` - ESLint configuration based on Google's style guide
+- `.prettierrc.js` - Prettier formatting configuration
+- `.eslintignore` - Files and directories to exclude from linting
+
+### Style Guidelines
+
+When contributing to the project, please follow these guidelines:
+
+- Use camelCase for variable and function names
+- Maintain clear JSDoc comments for all functions
+- Keep line length under 100 characters
+- Follow the KISS principle - avoid unnecessary complexity
+- Follow the DRY principle - don't repeat code
+
 ### Automated Releases & Commit Messages
 
 This project uses [semantic-release](https://github.com/semantic-release/semantic-release) to automate the release process, including version bumping, changelog generation, npm publishing, and GitHub release creation.

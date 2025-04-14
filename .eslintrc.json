@@ -1,0 +1,53 @@
+{
+  "extends": [
+    "google",
+    "plugin:node/recommended",
+    "prettier"
+  ],
+  "plugins": [
+    "prettier",
+    "node"
+  ],
+  "env": {
+    "node": true,
+    "es6": true,
+    "mocha": true
+  },
+  "parserOptions": {
+    "ecmaVersion": 2020,
+    "sourceType": "module"
+  },
+  "rules": {
+    "prettier/prettier": "error",
+    "no-console": "off",
+    "max-len": ["error", { "code": 100, "ignoreUrls": true, "ignoreStrings": true }],
+    "require-jsdoc": ["warn", {
+      "require": {
+        "FunctionDeclaration": true,
+        "MethodDefinition": false,
+        "ClassDeclaration": true,
+        "ArrowFunctionExpression": false,
+        "FunctionExpression": false
+      }
+    }],
+    "valid-jsdoc": ["warn", {
+      "requireReturn": false,
+      "requireReturnType": false,
+      "requireParamType": false,
+      "requireParamDescription": true
+    }],
+    "node/no-unpublished-require": ["error", {
+      "allowModules": ["chai", "sinon", "nock", "proxyquire", "mocha"]
+    }]
+  },
+  "overrides": [
+    {
+      "files": ["test/**/*.js"],
+      "rules": {
+        "no-unused-expressions": "off",
+        "require-jsdoc": "off",
+        "valid-jsdoc": "off"
+      }
+    }
+  ]
+}

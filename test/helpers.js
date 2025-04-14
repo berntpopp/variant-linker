@@ -22,102 +22,102 @@ const mockResponses = {
     vcfVariant,
     hgvsVariant,
     rsVariant,
-    mixedVariants
+    mixedVariants,
   },
-  
+
   // Common Variant Recoder GET response (single variant)
   variantRecoderGet: {
-    "rs123": {
-      "id": "rs123",
-      "A": {
-        "hgvsg": ["NC_000001.11:g.1000A>T"],
-        "vcf_string": ["1-1000-A-T"]
+    rs123: {
+      id: 'rs123',
+      A: {
+        hgvsg: ['NC_000001.11:g.1000A>T'],
+        vcf_string: ['1-1000-A-T'],
       },
-      "T": {
-        "hgvsg": ["NC_000001.11:g.1000A>G"],
-        "vcf_string": ["1-1000-A-G"]
-      }
-    }
+      T: {
+        hgvsg: ['NC_000001.11:g.1000A>G'],
+        vcf_string: ['1-1000-A-G'],
+      },
+    },
   },
-  
+
   // Common Variant Recoder POST response (multiple variants)
   variantRecoderPost: [
     {
-      "input": "rs123",
-      "id": "rs123",
-      "A": {
-        "hgvsg": ["NC_000001.11:g.1000A>T"],
-        "vcf_string": ["1-1000-A-T"]
+      input: 'rs123',
+      id: 'rs123',
+      A: {
+        hgvsg: ['NC_000001.11:g.1000A>T'],
+        vcf_string: ['1-1000-A-T'],
       },
-      "T": {
-        "hgvsg": ["NC_000001.11:g.1000A>G"],
-        "vcf_string": ["1-1000-A-G"]
-      }
+      T: {
+        hgvsg: ['NC_000001.11:g.1000A>G'],
+        vcf_string: ['1-1000-A-G'],
+      },
     },
     {
-      "input": "rs456",
-      "id": "rs456",
-      "C": {
-        "hgvsg": ["NC_000002.12:g.2000G>C"],
-        "vcf_string": ["2-2000-G-C"]
-      }
+      input: 'rs456',
+      id: 'rs456',
+      C: {
+        hgvsg: ['NC_000002.12:g.2000G>C'],
+        vcf_string: ['2-2000-G-C'],
+      },
     },
     {
-      "input": "ENST00000366667:c.803C>T",
-      "T": {
-        "hgvsg": ["NC_000010.11:g.52389C>T"],
-        "vcf_string": ["10-52389-C-T"]
-      }
-    }
+      input: 'ENST00000366667:c.803C>T',
+      T: {
+        hgvsg: ['NC_000010.11:g.52389C>T'],
+        vcf_string: ['10-52389-C-T'],
+      },
+    },
   ],
-  
+
   // VEP response for VCF variant
   vepVcfResponse: [
     {
-      "input": "1 65568 . A C . . .",
-      "id": "variant1_1_65568_A_C",
-      "most_severe_consequence": "missense_variant",
-      "transcript_consequences": [
+      input: '1 65568 . A C . . .',
+      id: 'variant1_1_65568_A_C',
+      most_severe_consequence: 'missense_variant',
+      transcript_consequences: [
         {
-          "transcript_id": "ENST00000001",
-          "gene_id": "ENSG00000001",
-          "gene_symbol": "GENE1",
-          "consequence_terms": ["missense_variant"],
-          "impact": "MODERATE",
-          "polyphen_score": 0.85,
-          "sift_score": 0.1
+          transcript_id: 'ENST00000001',
+          gene_id: 'ENSG00000001',
+          gene_symbol: 'GENE1',
+          consequence_terms: ['missense_variant'],
+          impact: 'MODERATE',
+          polyphen_score: 0.85,
+          sift_score: 0.1,
         },
         {
-          "transcript_id": "ENST00000002",
-          "gene_id": "ENSG00000001",
-          "gene_symbol": "GENE1",
-          "consequence_terms": ["5_prime_UTR_variant"],
-          "impact": "MODIFIER"
-        }
-      ]
-    }
+          transcript_id: 'ENST00000002',
+          gene_id: 'ENSG00000001',
+          gene_symbol: 'GENE1',
+          consequence_terms: ['5_prime_UTR_variant'],
+          impact: 'MODIFIER',
+        },
+      ],
+    },
   ],
-  
+
   // VEP response for HGVS variant
   vepHgvsResponse: [
     {
-      "input": "10 52389 . C T . . .",
-      "id": "variant2_10_52389_C_T",
-      "most_severe_consequence": "missense_variant",
-      "transcript_consequences": [
+      input: '10 52389 . C T . . .',
+      id: 'variant2_10_52389_C_T',
+      most_severe_consequence: 'missense_variant',
+      transcript_consequences: [
         {
-          "transcript_id": "ENST00000366667",
-          "gene_id": "ENSG00000002",
-          "gene_symbol": "GENE2",
-          "consequence_terms": ["missense_variant"],
-          "impact": "MODERATE",
-          "polyphen_score": 0.92,
-          "sift_score": 0.05,
-          "cadd_phred": 25.1
-        }
-      ]
-    }
-  ]
+          transcript_id: 'ENST00000366667',
+          gene_id: 'ENSG00000002',
+          gene_symbol: 'GENE2',
+          consequence_terms: ['missense_variant'],
+          impact: 'MODERATE',
+          polyphen_score: 0.92,
+          sift_score: 0.05,
+          cadd_phred: 25.1,
+        },
+      ],
+    },
+  ],
 };
 
 /**
@@ -131,19 +131,18 @@ const mockResponses = {
  * @param {Function} options.requestValidator Optional function to validate the request
  * @returns {Object} Nock interceptor
  */
-function setupMock({ 
-  baseUrl, 
-  endpoint, 
-  response, 
-  statusCode = 200, 
+function setupMock({
+  baseUrl,
+  endpoint,
+  response,
+  statusCode = 200,
   method = 'GET',
-  requestValidator = null
+  requestValidator = null,
 }) {
-  const mock = nock(baseUrl)[method.toLowerCase()](endpoint)
-    .query(true); // Accept any query params
-  
+  const mock = nock(baseUrl)[method.toLowerCase()](endpoint).query(true); // Accept any query params
+
   if (requestValidator) {
-    return mock.reply(function(uri, requestBody) {
+    return mock.reply(function (uri, requestBody) {
       try {
         requestValidator(uri, requestBody);
         return [statusCode, response];
@@ -153,7 +152,7 @@ function setupMock({
       }
     });
   }
-  
+
   return mock.reply(statusCode, response);
 }
 
@@ -169,29 +168,29 @@ function setupMock({
  * @returns {Object} A realistic VEP annotation object
  */
 function createVepAnnotation({
-  input = "1 65568 . A C . . .",
-  consequence = "missense_variant",
-  impact = "MODERATE",
+  input = '1 65568 . A C . . .',
+  consequence = 'missense_variant',
+  impact = 'MODERATE',
   polyphen = 0.85,
   sift = 0.1,
-  cadd = 20.5
+  cadd = 20.5,
 }) {
   return {
-    "input": input,
-    "id": `variant_${input.replace(/\s+/g, '_').substr(0, 20)}`,
-    "most_severe_consequence": consequence,
-    "transcript_consequences": [
+    input: input,
+    id: `variant_${input.replace(/\s+/g, '_').substr(0, 20)}`,
+    most_severe_consequence: consequence,
+    transcript_consequences: [
       {
-        "transcript_id": "ENST00000001",
-        "gene_id": "ENSG00000001",
-        "gene_symbol": "GENE1",
-        "consequence_terms": [consequence],
-        "impact": impact,
-        "polyphen_score": polyphen,
-        "sift_score": sift,
-        "cadd_phred": cadd
-      }
-    ]
+        transcript_id: 'ENST00000001',
+        gene_id: 'ENSG00000001',
+        gene_symbol: 'GENE1',
+        consequence_terms: [consequence],
+        impact: impact,
+        polyphen_score: polyphen,
+        sift_score: sift,
+        cadd_phred: cadd,
+      },
+    ],
   };
 }
 
@@ -214,5 +213,5 @@ module.exports = {
   vcfVariant,
   hgvsVariant,
   rsVariant,
-  mixedVariants
+  mixedVariants,
 };

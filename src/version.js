@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 'use strict';
 // src/version.js
 
@@ -29,7 +28,7 @@ function getVersionDetails() {
     minor: parsed.minor,
     patch: parsed.patch,
     prerelease: parsed.prerelease,
-    build: parsed.build
+    build: parsed.build,
   };
 }
 

@@ -11,7 +11,7 @@
  */
 
 // Use fs only if in a Node environment.
-const fs = (typeof window === 'undefined') ? require('fs') : null;
+const fs = typeof window === 'undefined' ? require('fs') : null;
 const debug = require('debug')('variant-linker:processor');
 
 /**
@@ -128,15 +128,14 @@ function jsonApiFilter(data, criteria) {
       if (!criteria.hasOwnProperty(field)) continue;
       const conditions = criteria[field];
       // Use getValueByPath if the field contains a dot or wildcard.
-      let fieldValue = (field.includes('.') || field.includes('*'))
-        ? getValueByPath(obj, field)
-        : obj[field];
+      const fieldValue =
+        field.includes('.') || field.includes('*') ? getValueByPath(obj, field) : obj[field];
       // If the resolved value is an array, require that at least one element satisfies each condition.
       for (const operator in conditions) {
         if (!conditions.hasOwnProperty(operator)) continue;
         const target = conditions[operator];
         if (Array.isArray(fieldValue)) {
-          if (!fieldValue.some(val => applyOperator(val, operator, target))) {
+          if (!fieldValue.some((val) => applyOperator(val, operator, target))) {
             return false;
           }
         } else {
@@ -190,21 +189,13 @@ async function processVariantLinking(
         : undefined;
 
     if (!selectedHgvs) {
-      throw new Error(
-        'No valid HGVS notation found in Variant Recoder response'
-      );
+      throw new Error('No valid HGVS notation found in Variant Recoder response');
     }
 
     const selectedTranscript = selectedHgvs.split(':')[0];
-    debug(
-      `Selected HGVS: ${selectedHgvs}, Selected Transcript: ${selectedTranscript}`
-    );
+    debug(`Selected HGVS: ${selectedHgvs}, Selected Transcript: ${selectedTranscript}`);
 
-    const annotationData = await vepHgvsAnnotation(
-      selectedHgvs,
-      selectedTranscript,
-      vepOptions
-    );
+    const annotationData = await vepHgvsAnnotation(selectedHgvs, selectedTranscript, vepOptions);
     debug(`VEP annotation data received: ${JSON.stringify(annotationData)}`);
 
     if (!annotationData || annotationData.length === 0) {
@@ -268,7 +259,7 @@ function filterAndFormatResults(results, filterParam, format) {
           }
         }
       }
-      let topLevelOriginalCount = results.annotationData.length;
+      const topLevelOriginalCount = results.annotationData.length;
       let topLevelFiltered = results.annotationData;
       if (Object.keys(topLevelCriteria).length > 0) {
         topLevelFiltered = jsonApiFilter(results.annotationData, topLevelCriteria);
@@ -278,7 +269,7 @@ function filterAndFormatResults(results, filterParam, format) {
       }
       let totalTCBefore = 0;
       let totalTCAfter = 0;
-      topLevelFiltered.forEach(annotation => {
+      topLevelFiltered.forEach((annotation) => {
         if (
           annotation.transcript_consequences &&
           Array.isArray(annotation.transcript_consequences) &&
@@ -343,5 +334,5 @@ module.exports = {
   processVariantLinking,
   filterAndFormatResults,
   outputResults,
-  jsonApiFilter // Exported in case standalone use is desired.
+  jsonApiFilter, // Exported in case standalone use is desired.
 };

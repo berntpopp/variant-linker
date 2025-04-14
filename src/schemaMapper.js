@@ -45,7 +45,7 @@ function addCustomFormats() {
       // Simple validation: try to parse as Date and ensure it's valid.
       const d = new Date(dateTimeString);
       return !isNaN(d.valueOf());
-    }
+    },
   });
 }
 

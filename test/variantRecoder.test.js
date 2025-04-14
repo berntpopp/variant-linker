@@ -14,8 +14,8 @@ describe('variantRecoder', () => {
   const responseMock = [
     {
       id: 'rs123',
-      vcf_string: ['1-1000-A-T', '1-1000-A-G']
-    }
+      vcf_string: ['1-1000-A-T', '1-1000-A-G'],
+    },
   ];
 
   beforeEach(() => {
@@ -41,9 +41,7 @@ describe('variantRecoder', () => {
 
     expect(result).to.be.an('array');
     expect(result[0]).to.have.property('id', 'rs123');
-    expect(result[0])
-      .to.have.property('vcf_string')
-      .that.includes('1-1000-A-T');
+    expect(result[0]).to.have.property('vcf_string').that.includes('1-1000-A-T');
   });
 
   it('should handle API errors gracefully', async () => {

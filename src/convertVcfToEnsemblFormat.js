@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 'use strict';
 
 /**
@@ -104,8 +103,8 @@ function convertVcfToEnsemblFormat(vcf) {
       // Trim common suffix.
       let suffixLength = 0;
       while (
-        suffixLength < (ref.length - prefixLength) &&
-        suffixLength < (alt.length - prefixLength) &&
+        suffixLength < ref.length - prefixLength &&
+        suffixLength < alt.length - prefixLength &&
         ref[ref.length - 1 - suffixLength] === alt[alt.length - 1 - suffixLength]
       ) {
         suffixLength++;
@@ -148,10 +147,12 @@ function convertVcfToEnsemblFormat(vcf) {
  * @throws {Error} Always throws an error indicating that conversion to VCF is not supported.
  */
 function convertEnsemblToVcfFormat(ensemblInput) {
-  throw new Error('Conversion from Ensembl format to VCF format is not supported without reference sequence information.');
+  throw new Error(
+    'Conversion from Ensembl format to VCF format is not supported without reference sequence information.'
+  );
 }
 
 module.exports = {
   convertVcfToEnsemblFormat,
-  convertEnsemblToVcfFormat
+  convertEnsemblToVcfFormat,
 };

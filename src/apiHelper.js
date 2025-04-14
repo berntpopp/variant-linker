@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 'use strict';
 // src/apiHelper.js
 
@@ -25,7 +24,13 @@ const apiConfig = require('../config/apiConfig.json');
  * @returns {Promise<Object>} The API response data.
  * @throws {Error} If the request fails.
  */
-async function fetchApi(endpointPath, queryOptions = {}, cacheEnabled = false, method = 'GET', requestBody = null) {
+async function fetchApi(
+  endpointPath,
+  queryOptions = {},
+  cacheEnabled = false,
+  method = 'GET',
+  requestBody = null
+) {
   try {
     // Remove any content-type header from queryOptions.
     if (queryOptions['content-type']) {
@@ -48,11 +53,11 @@ async function fetchApi(endpointPath, queryOptions = {}, cacheEnabled = false, m
     let response;
     if (method.toUpperCase() === 'POST') {
       response = await axios.post(url, requestBody, {
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
       });
     } else {
       response = await axios.get(url, {
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
       });
     }
 

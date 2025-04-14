@@ -10,7 +10,11 @@ const variantRecoder = require('./variantRecoder');
 const variantRecoderPost = require('./variantRecoderPost');
 const vepRegionsAnnotation = require('./vepRegionsAnnotation');
 const { readScoringConfigFromFiles, applyScoring } = require('./scoring');
-const { mapOutputToSchemaOrg, validateSchemaOrgOutput, addCustomFormats } = require('./schemaMapper');
+const {
+  mapOutputToSchemaOrg,
+  validateSchemaOrgOutput,
+  addCustomFormats,
+} = require('./schemaMapper');
 const { filterAndFormatResults } = require('./variantLinkerProcessor');
 
 /**
@@ -31,7 +35,7 @@ function detectInputFormat(variant) {
 
 /**
  * Processes a single variant through the annotation pipeline.
- * 
+ *
  * @param {string} variant - The single variant to process.
  * @param {Object} params - Processing parameters.
  * @param {Object} params.recoderOptions - Options for the Variant Recoder API.
@@ -48,24 +52,34 @@ async function processSingleVariant(variant, params) {
   if (inputFormat === 'VCF') {
     const parts = variant.trim().split('-');
     if (parts.length !== 4) {
-      throw new Error(`Invalid VCF format for variant "${variant}": expected "chromosome-start-ref-alt"`);
+      throw new Error(
+        `Invalid VCF format for variant "${variant}": expected "chromosome-start-ref-alt"`
+      );
     }
     const [chrom, pos, ref, alt] = parts;
     const formattedVariant = `${chrom} ${pos} . ${ref} ${alt} . . .`;
     inputInfo = formattedVariant;
-    annotationData = await vepRegionsAnnotation([formattedVariant], params.vepOptions, params.cache);
+    annotationData = await vepRegionsAnnotation(
+      [formattedVariant],
+      params.vepOptions,
+      params.cache
+    );
   } else {
     variantData = await variantRecoder(variant, params.recoderOptions, params.cache);
     const firstKey = Object.keys(variantData[0])[0];
     const recoderEntry = variantData[0][firstKey];
     if (!recoderEntry || !recoderEntry.vcf_string || !Array.isArray(recoderEntry.vcf_string)) {
-      throw new Error(`Variant Recoder response is missing a valid vcf_string array for variant "${variant}"`);
+      throw new Error(
+        `Variant Recoder response is missing a valid vcf_string array for variant "${variant}"`
+      );
     }
     const vcfString = recoderEntry.vcf_string.find((vcf) =>
       /^[0-9XYM]+-[0-9]+-[ACGT]+-[ACGT]+$/i.test(vcf)
     );
     if (!vcfString) {
-      throw new Error(`No valid VCF string found in Variant Recoder response for variant "${variant}"`);
+      throw new Error(
+        `No valid VCF string found in Variant Recoder response for variant "${variant}"`
+      );
     }
     const parts = vcfString.replace(/^chr/i, '').split('-');
     if (parts.length !== 4) {
@@ -74,36 +88,42 @@ async function processSingleVariant(variant, params) {
     const [chrom, pos, ref, alt] = parts;
     const formattedVariant = `${chrom} ${pos} . ${ref} ${alt} . . .`;
     inputInfo = formattedVariant;
-    annotationData = await vepRegionsAnnotation([formattedVariant], params.vepOptions, params.cache);
+    annotationData = await vepRegionsAnnotation(
+      [formattedVariant],
+      params.vepOptions,
+      params.cache
+    );
   }
 
   // Add input info to each annotation
   if (Array.isArray(annotationData)) {
-    annotationData = annotationData.map((ann) => ({ 
+    annotationData = annotationData.map((ann) => ({
       originalInput: variant,
       inputFormat,
-      input: inputInfo, 
-      ...ann 
+      input: inputInfo,
+      ...ann,
     }));
   } else {
-    annotationData = [{ 
-      originalInput: variant,
-      inputFormat,
-      input: inputInfo, 
-      ...annotationData 
-    }];
+    annotationData = [
+      {
+        originalInput: variant,
+        inputFormat,
+        input: inputInfo,
+        ...annotationData,
+      },
+    ];
   }
 
-  return { 
-    inputFormat, 
-    variantData, 
-    annotationData
+  return {
+    inputFormat,
+    variantData,
+    annotationData,
   };
 }
 
 /**
  * Processes a batch of variants using the Variant Recoder POST API and VEP annotation.
- * 
+ *
  * @param {Array<string>} variants - Array of variants to process.
  * @param {Object} params - Processing parameters.
  * @param {Object} params.recoderOptions - Options for the Variant Recoder API.
@@ -113,25 +133,27 @@ async function processSingleVariant(variant, params) {
  */
 async function processBatchVariants(variants, params) {
   // Detect input formats for all variants
-  const inputFormats = variants.map(variant => ({ 
-    variant, 
-    format: detectInputFormat(variant)
+  const inputFormats = variants.map((variant) => ({
+    variant,
+    format: detectInputFormat(variant),
   }));
 
   // Process variants by format (separate VCF and HGVS)
-  const vcfVariants = inputFormats.filter(v => v.format === 'VCF').map(v => v.variant);
-  const hgvsVariants = inputFormats.filter(v => v.format === 'HGVS').map(v => v.variant);
+  const vcfVariants = inputFormats.filter((v) => v.format === 'VCF').map((v) => v.variant);
+  const hgvsVariants = inputFormats.filter((v) => v.format === 'HGVS').map((v) => v.variant);
 
   // Store mapping from original input to results
   const variantMapping = {};
-  let annotationData = [];
+  const annotationData = [];
 
   // Process VCF variants directly (they don't need recoding)
   if (vcfVariants.length > 0) {
-    const formattedVcfVariants = vcfVariants.map(variant => {
+    const formattedVcfVariants = vcfVariants.map((variant) => {
       const parts = variant.trim().split('-');
       if (parts.length !== 4) {
-        throw new Error(`Invalid VCF format for variant "${variant}": expected "chromosome-start-ref-alt"`);
+        throw new Error(
+          `Invalid VCF format for variant "${variant}": expected "chromosome-start-ref-alt"`
+        );
       }
       const [chrom, pos, ref, alt] = parts;
       return `${chrom} ${pos} . ${ref} ${alt} . . .`;
@@ -142,24 +164,28 @@ async function processBatchVariants(variants, params) {
       variantMapping[vcfVariants[index]] = {
         originalInput: vcfVariants[index],
         inputFormat: 'VCF',
-        formattedVariant: formatted
+        formattedVariant: formatted,
       };
     });
 
     // Call VEP with all formatted VCF variants at once
-    const vcfAnnotations = await vepRegionsAnnotation(formattedVcfVariants, params.vepOptions, params.cache);
-    
+    const vcfAnnotations = await vepRegionsAnnotation(
+      formattedVcfVariants,
+      params.vepOptions,
+      params.cache
+    );
+
     // Associate VEP results with original variants
     if (Array.isArray(vcfAnnotations)) {
       vcfAnnotations.forEach((annotation, index) => {
         const originalVariant = vcfVariants[index];
         const mappingInfo = variantMapping[originalVariant];
-        
+
         annotationData.push({
           originalInput: originalVariant,
           inputFormat: 'VCF',
           input: mappingInfo.formattedVariant,
-          ...annotation
+          ...annotation,
         });
       });
     }
@@ -168,24 +194,28 @@ async function processBatchVariants(variants, params) {
   // Process HGVS variants through the recoder POST API
   if (hgvsVariants.length > 0) {
     // Call the recoder POST API with all HGVS variants
-    const recoderResults = await variantRecoderPost(hgvsVariants, params.recoderOptions, params.cache);
-    
+    const recoderResults = await variantRecoderPost(
+      hgvsVariants,
+      params.recoderOptions,
+      params.cache
+    );
+
     // Extract VCF strings from recoder results
     const uniqueVcfStrings = [];
     const vcfToOriginalMapping = {};
-    
+
     // Process recoder results and build mappings
     for (let i = 0; i < recoderResults.length; i++) {
       const result = recoderResults[i];
       const originalVariant = hgvsVariants[i];
-      
+
       // Get all allele keys from the recoder result
-      const alleleKeys = Object.keys(result).filter(key => 
-        key !== 'id' && key !== 'seq_region_name' && key !== 'input'
+      const alleleKeys = Object.keys(result).filter(
+        (key) => key !== 'id' && key !== 'seq_region_name' && key !== 'input'
       );
-      
+
       let foundValidVcf = false;
-      
+
       // Extract VCF strings from each allele
       for (const alleleKey of alleleKeys) {
         const allele = result[alleleKey];
@@ -197,7 +227,7 @@ async function processBatchVariants(variants, params) {
               if (parts.length === 4) {
                 const [chrom, pos, ref, alt] = parts;
                 const formattedVariant = `${chrom} ${pos} . ${ref} ${alt} . . .`;
-                
+
                 // Store mapping information
                 uniqueVcfStrings.push(formattedVariant);
                 if (!vcfToOriginalMapping[formattedVariant]) {
@@ -208,33 +238,39 @@ async function processBatchVariants(variants, params) {
                   inputFormat: 'HGVS',
                   recoderData: result,
                   alleleKey: alleleKey,
-                  vcfString: vcfString
+                  vcfString: vcfString,
                 });
-                
+
                 foundValidVcf = true;
               }
             }
           }
         }
       }
-      
+
       if (!foundValidVcf) {
-        throw new Error(`No valid VCF string found in Variant Recoder response for variant "${originalVariant}"`);
+        throw new Error(
+          `No valid VCF string found in Variant Recoder response for variant "${originalVariant}"`
+        );
       }
     }
-    
+
     // Remove duplicates from uniqueVcfStrings while preserving order
     const uniqueVcfSet = [...new Set(uniqueVcfStrings)];
-    
+
     // Call VEP with unique formatted VCF strings
-    const hgvsAnnotations = await vepRegionsAnnotation(uniqueVcfSet, params.vepOptions, params.cache);
-    
+    const hgvsAnnotations = await vepRegionsAnnotation(
+      uniqueVcfSet,
+      params.vepOptions,
+      params.cache
+    );
+
     // Associate VEP results with original variants through the mapping
     if (Array.isArray(hgvsAnnotations)) {
       hgvsAnnotations.forEach((annotation, index) => {
         const formattedVariant = uniqueVcfSet[index];
         const mappings = vcfToOriginalMapping[formattedVariant];
-        
+
         // For each original variant mapped to this VCF string
         for (const mapping of mappings) {
           annotationData.push({
@@ -244,7 +280,7 @@ async function processBatchVariants(variants, params) {
             recoderData: mapping.recoderData,
             allele: mapping.alleleKey,
             vcfString: mapping.vcfString,
-            ...annotation
+            ...annotation,
           });
         }
       });
@@ -276,13 +312,13 @@ async function analyzeVariant(params) {
 
   // Handle both single variant and batch variants for backwards compatibility
   const variants = params.variants || (params.variant ? [params.variant] : []);
-  
+
   if (variants.length === 0) {
     throw new Error('No variants provided. Use either params.variant or params.variants.');
   }
 
   let result;
-  let batchProcessing = variants.length > 1;
+  const batchProcessing = variants.length > 1;
 
   if (batchProcessing) {
     stepsPerformed.push(`Processing ${variants.length} variants in batch mode`);
@@ -313,13 +349,13 @@ async function analyzeVariant(params) {
     startTime: processStartTime.toISOString(),
     endTime: processEndTime.toISOString(),
     durationMs: processEndTime - processStartTime,
-    batchProcessing
+    batchProcessing,
   };
 
   let finalOutput = {
     meta: metaInfo,
     variantData: result.variantData,
-    annotationData: result.annotationData
+    annotationData: result.annotationData,
   };
 
   if (params.output && params.output.toUpperCase() === 'SCHEMA') {
