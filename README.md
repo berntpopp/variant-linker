@@ -23,7 +23,7 @@ To set up Variant-Linker, follow these steps:
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/your-github-username/variant-linker.git
+   git clone https://github.com/berntpopp/variant-linker.git
    cd variant-linker
    ```
 

@@ -30,3 +30,6 @@ pnpm-debug.log*
 
 # npm package files
 *.tgz
+
+# Windsurf rules
+.windsurfrules
