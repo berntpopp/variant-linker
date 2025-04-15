@@ -26,29 +26,29 @@ const debugAll = require('debug')('variant-linker:all');
  * @param {Object} formulaJson - Parsed JSON containing scoring formulas.
  * @returns {{
  *   variables: Object,
- *   formulas: { annotation_level: Array, transcript_level: Array }
- * }}
+ *   formulas: { annotationLevel: Array, transcriptLevel: Array }
+ * }} A structured configuration object with variables and formulas for scoring
  */
 function parseScoringConfig(variableAssignmentJson, formulaJson) {
   const variables = variableAssignmentJson.variables;
-  let formulas = { annotation_level: [], transcript_level: [] };
+  let formulas = { annotationLevel: [], transcriptLevel: [] };
 
   if (formulaJson.formulas) {
     if (Array.isArray(formulaJson.formulas)) {
       formulas = {
-        annotation_level: formulaJson.formulas,
-        transcript_level: [],
+        annotationLevel: formulaJson.formulas,
+        transcriptLevel: [],
       };
     } else if (typeof formulaJson.formulas === 'object') {
       formulas = {
-        annotation_level: formulaJson.formulas.annotation_level || [],
-        transcript_level: formulaJson.formulas.transcript_level || [],
+        annotationLevel: formulaJson.formulas.annotationLevel || [],
+        transcriptLevel: formulaJson.formulas.transcriptLevel || [],
       };
     }
   } else {
     formulas = {
-      annotation_level: formulaJson.annotation_level || [],
-      transcript_level: formulaJson.transcript_level || [],
+      annotationLevel: formulaJson.annotationLevel || [],
+      transcriptLevel: formulaJson.transcriptLevel || [],
     };
   }
 
@@ -70,8 +70,8 @@ function parseScoringConfig(variableAssignmentJson, formulaJson) {
  * @param {string} configPath - The path to the scoring configuration directory.
  * @returns {{
  *   variables: Object,
- *   formulas: { annotation_level: Array, transcript_level: Array }
- * }}
+ *   formulas: { annotationLevel: Array, transcriptLevel: Array }
+ * }} A structured configuration object containing the parsed scoring variables and formulas
  * @throws {Error} If there is an error reading or parsing the configuration files.
  */
 function readScoringConfigFromFiles(configPath) {
@@ -111,7 +111,7 @@ function readScoringConfigFromFiles(configPath) {
  *   target: string,
  *   aggregator: (string|null),
  *   defaultValue: number
- * }}
+ * }} An object containing the parsed target field, optional aggregator function, and default value
  */
 function parseMappingString(mappingStr) {
   let aggregator = null;
@@ -161,13 +161,16 @@ function evaluateCondition(rawValue, condition, defaultValue) {
 }
 
 /**
- * Extracts variables from an object (such as an annotation or transcript) based on the provided configuration.
+ * Extracts variables from an object (annotation or transcript) based on the
+ * provided configuration.
  *
- * The variablesConfig can use either a string mapping (legacy) or an object mapping:
+ * The variablesConfig can use either a string mapping (legacy) or
+ * an object mapping:
  * For object mapping, the following properties are supported:
  *   - target: the variable name to assign.
  *   - aggregator: (optional) one of "max", "min", "avg"/"average", "unique".
- *   - condition: (optional) a JavaScript expression that will be evaluated with "value" set to the raw value.
+ *   - condition: (optional) a JavaScript expression evaluated with "value"
+ *     set to the raw value.
  *   - default: (optional) the default value if the raw value is missing.
  *
  * @param {Object} obj - The object to extract variables from.
@@ -195,7 +198,8 @@ function extractVariables(obj, variablesConfig, context) {
 
     let rawValue = getValueByPath(obj, path, context);
     debugDetailed(
-      `Raw value for mapping "${mapping}" (target: ${config.target}) from path "${path}": ${JSON.stringify(rawValue)}`
+      `Raw value for mapping "${mapping}" (target: ${config.target})` +
+        ` from path "${path}": ${JSON.stringify(rawValue)}`
     );
 
     if (Array.isArray(rawValue) && rawValue.some((item) => Array.isArray(item))) {
@@ -208,7 +212,8 @@ function extractVariables(obj, variablesConfig, context) {
       if (!Array.isArray(rawValue) || rawValue.length === 0) {
         finalValue = config.defaultValue;
         debugDetailed(
-          `Using default value for aggregator "${config.aggregator}" for target "${config.target}": ${finalValue}`
+          `Using default value for aggregator "${config.aggregator}"` +
+            ` for target "${config.target}": ${finalValue}`
         );
       } else {
         switch (config.aggregator.toLowerCase()) {
@@ -227,12 +232,14 @@ function extractVariables(obj, variablesConfig, context) {
             break;
           default:
             debugAll(
-              `Unknown aggregator "${config.aggregator}" for target "${config.target}". Using raw value.`
+              `Unknown aggregator "${config.aggregator}"` +
+                ` for target "${config.target}". Using raw value.`
             );
             finalValue = rawValue;
         }
         debugDetailed(
-          `Applied aggregator "${config.aggregator}" on value: ${JSON.stringify(rawValue)} -> ${finalValue}`
+          `Applied aggregator "${config.aggregator}"` +
+            ` on value: ${JSON.stringify(rawValue)} -> ${finalValue}`
         );
       }
     } else {
@@ -297,10 +304,9 @@ function getValueByPath(obj, path, context) {
       debugDetailed(`Navigated to part: ${part}, value: ${JSON.stringify(value)}`);
     } else if (context && Object.prototype.hasOwnProperty.call(context, part)) {
       value = context[part];
-      debugDetailed(
-        `Part not found in current object; using context for ${part}, value: ${JSON.stringify(value)}`
-      );
+      debugDetailed(`Using context for part ${part}; value: ${JSON.stringify(value)}`);
     } else {
+      // Log part not found in debug mode
       debugAll(`Part not found: ${part}`);
       return undefined;
     }
@@ -316,7 +322,8 @@ function getValueByPath(obj, path, context) {
  * NOTE: This function uses the Function constructor to evaluate the formula.
  * Ensure that formulas are from trusted sources to avoid potential code injection risks.
  *
- * @param {string} formulaStr - The scoring formula as a string (e.g., "cadd_phred_variant * 2 + gnomade_variant").
+ * @param {string} formulaStr - The scoring formula as a string
+ * (e.g., "cadd_phred_variant * 2 + gnomade_variant").
  * @param {Object} variables - An object mapping variable names to numeric values.
  * @returns {number} The calculated score.
  */
@@ -327,10 +334,8 @@ function calculateScore(formulaStr, variables) {
   // Build a substituted formula string for debugging.
   let substitutedFormula = formulaStr;
   for (const [key, value] of Object.entries(variables)) {
-    substitutedFormula = substitutedFormula.replace(
-      new RegExp(`\\b${key}\\b`, 'g'),
-      JSON.stringify(value)
-    );
+    const pattern = new RegExp(`\\b${key}\\b`, 'g');
+    substitutedFormula = substitutedFormula.replace(pattern, JSON.stringify(value));
   }
   debugDetailed(`Substituted formula: ${substitutedFormula}`);
 
@@ -342,28 +347,30 @@ function calculateScore(formulaStr, variables) {
 }
 
 /**
- * Applies the scoring algorithms to the provided VEP annotation data based on the scoring configuration.
+ * Applies scoring algorithms to the provided VEP annotation data.
  *
  * For each annotation in the annotationData array, annotation-level formulas are applied.
  * In addition, if transcript-level consequences exist, transcript-level formulas are applied.
  *
  * @param {Array} annotationData - The VEP annotation data.
- * @param {{ variables: Object, formulas: { annotation_level: Array, transcript_level: Array } }} scoringConfig
+ * @param {{ variables: Object, formulas: Object }} scoringConfig
  *        The scoring configuration containing variables and formulas.
- * @returns {Array} The annotation data with additional scoring fields.
+ * @returns {Array} The original annotation data enhanced with calculated score fields at both
+ *          annotation and transcript levels based on the provided scoring configuration
  */
 function applyScoring(annotationData, scoringConfig) {
-  debug(`Applying scoring with configuration: ${JSON.stringify(scoringConfig)}`);
+  // Log scoring configuration in debug mode
+  debug(`Applying scoring: ${JSON.stringify(scoringConfig)}`);
   const variablesConfig = scoringConfig.variables;
   const formulasConfig = scoringConfig.formulas;
-  const { annotation_level, transcript_level } = formulasConfig;
+  const { annotationLevel, transcriptLevel } = formulasConfig;
 
   // Process each annotation.
   annotationData.forEach((annotation) => {
     // Annotation-level variables.
     const annotationVariables = extractVariables(annotation, variablesConfig);
 
-    annotation_level.forEach((formula) => {
+    annotationLevel.forEach((formula) => {
       const scoreName = Object.keys(formula)[0];
       const formulaStr = formula[scoreName];
       const scoreValue = calculateScore(formulaStr, annotationVariables);
@@ -375,7 +382,7 @@ function applyScoring(annotationData, scoringConfig) {
     if (Array.isArray(annotation.transcript_consequences)) {
       annotation.transcript_consequences.forEach((transcript) => {
         const transcriptVariables = extractVariables(transcript, variablesConfig, annotation);
-        transcript_level.forEach((formula) => {
+        transcriptLevel.forEach((formula) => {
           const scoreName = Object.keys(formula)[0];
           const formulaStr = formula[scoreName];
           const scoreValue = calculateScore(formulaStr, transcriptVariables);

@@ -2,31 +2,16 @@
 // Comprehensive tests for the variant-linker core functionality
 
 const sinon = require('sinon');
-const path = require('path');
 const { expect, mockResponses } = require('./helpers');
 const { analyzeVariant, detectInputFormat } = require('../src/variantLinkerCore');
-const variantRecoder = require('../src/variantRecoder');
-const variantRecoderPost = require('../src/variantRecoderPost');
-const vepRegionsAnnotation = require('../src/vepRegionsAnnotation');
-const { applyScoring } = require('../src/scoring');
 
 // Test doubles for mocking dependencies
 const mockVepResponse = mockResponses.vepVcfResponse;
-const mockHgvsVepResponse = mockResponses.vepHgvsResponse;
-const mockRecoderResponse = mockResponses.variantRecoderGet;
-const mockRecoderPostResponse = mockResponses.variantRecoderPost;
 
 describe('variantLinkerCore.js', () => {
   // Sample variants for testing
   const vcfVariant = '1-65568-A-C';
   const hgvsVariant = 'ENST00000366667:c.803C>T';
-  const rsVariant = 'rs123';
-  const mixedVariants = [vcfVariant, hgvsVariant, rsVariant];
-
-  let variantRecoderStub;
-  let variantRecoderPostStub;
-  let vepRegionsAnnotationStub;
-  let applyScoringStub;
 
   // Use a simpler approach to test the core functionality
   // Following KISS principle for tests

@@ -7,7 +7,6 @@
  */
 
 const axios = require('axios');
-const debug = require('debug')('variant-linker:main');
 const debugDetailed = require('debug')('variant-linker:detailed');
 const debugAll = require('debug')('variant-linker:all');
 const cache = require('./cache');

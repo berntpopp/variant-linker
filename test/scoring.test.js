@@ -1,10 +1,9 @@
 // test/scoring.test.js
 // Comprehensive tests for the scoring module
 
-const path = require('path');
 const fs = require('fs');
 const sinon = require('sinon');
-const { expect, mockResponses } = require('./helpers');
+const { expect } = require('./helpers');
 const scoring = require('../src/scoring');
 
 describe('scoring.js', () => {
@@ -39,10 +38,8 @@ describe('scoring.js', () => {
     '@context': 'https://schema.org/',
     '@type': 'Configuration',
     formulas: {
-      annotation_level: [
-        { variant_score: 'cadd_phred_variant * 0.1 + (1 - gnomade_variant) * 50' },
-      ],
-      transcript_level: [
+      annotationLevel: [{ variant_score: 'cadd_phred_variant * 0.1 + (1 - gnomade_variant) * 50' }],
+      transcriptLevel: [
         {
           transcript_score:
             "polyphen_harmful === 'probably_damaging' ? 10 : (polyphen_harmful === 'possibly_damaging' ? 5 : 0)",
@@ -109,10 +106,10 @@ describe('scoring.js', () => {
       );
 
       // Check formulas
-      expect(result.formulas).to.have.property('annotation_level').that.is.an('array');
-      expect(result.formulas).to.have.property('transcript_level').that.is.an('array');
-      expect(result.formulas.annotation_level[0]).to.have.property('variant_score');
-      expect(result.formulas.transcript_level[0]).to.have.property('transcript_score');
+      expect(result.formulas).to.have.property('annotationLevel').that.is.an('array');
+      expect(result.formulas).to.have.property('transcriptLevel').that.is.an('array');
+      expect(result.formulas.annotationLevel[0]).to.have.property('variant_score');
+      expect(result.formulas.transcriptLevel[0]).to.have.property('transcript_score');
     });
 
     it('should handle legacy formula configuration format', () => {
@@ -122,9 +119,9 @@ describe('scoring.js', () => {
 
       const result = scoring.parseScoringConfig(mockVariableAssignmentConfig, legacyFormulaConfig);
 
-      expect(result.formulas.annotation_level).to.be.an('array');
-      expect(result.formulas.annotation_level[0]).to.have.property('legacy_score');
-      expect(result.formulas.transcript_level).to.be.an('array').that.is.empty;
+      expect(result.formulas.annotationLevel).to.be.an('array');
+      expect(result.formulas.annotationLevel[0]).to.have.property('legacy_score');
+      expect(result.formulas.transcriptLevel).to.be.an('array').that.is.empty;
     });
 
     it('should handle missing formula sections gracefully', () => {
@@ -134,8 +131,8 @@ describe('scoring.js', () => {
 
       const result = scoring.parseScoringConfig(mockVariableAssignmentConfig, emptyFormulaConfig);
 
-      expect(result.formulas.annotation_level).to.be.an('array').that.is.empty;
-      expect(result.formulas.transcript_level).to.be.an('array').that.is.empty;
+      expect(result.formulas.annotationLevel).to.be.an('array').that.is.empty;
+      expect(result.formulas.transcriptLevel).to.be.an('array').that.is.empty;
     });
   });
 
@@ -167,8 +164,8 @@ describe('scoring.js', () => {
       // Verify the result has the expected structure
       expect(result).to.have.property('variables').that.is.an('object');
       expect(result).to.have.property('formulas').that.is.an('object');
-      expect(result.formulas).to.have.property('annotation_level').that.is.an('array');
-      expect(result.formulas).to.have.property('transcript_level').that.is.an('array');
+      expect(result.formulas).to.have.property('annotationLevel').that.is.an('array');
+      expect(result.formulas).to.have.property('transcriptLevel').that.is.an('array');
 
       // Verify that the filesystem was called with the expected paths
       expect(
@@ -211,10 +208,10 @@ describe('scoring.js', () => {
           'colocated_variants.*.frequencies.*.gnomade': 'max:gnomade_variant|default:0',
         },
         formulas: {
-          annotation_level: [
+          annotationLevel: [
             { variant_score: 'cadd_phred_variant * 0.1 + (1 - gnomade_variant) * 50' },
           ],
-          transcript_level: [],
+          transcriptLevel: [],
         },
       };
 
@@ -237,8 +234,8 @@ describe('scoring.js', () => {
           },
         },
         formulas: {
-          annotation_level: [],
-          transcript_level: [
+          annotationLevel: [],
+          transcriptLevel: [
             {
               transcript_score:
                 "polyphen_harmful === 'probably_damaging' ? 10 : (polyphen_harmful === 'possibly_damaging' ? 5 : 0)",
@@ -266,8 +263,8 @@ describe('scoring.js', () => {
           'frequencies.gnomade': 'gnomade_value',
         },
         formulas: {
-          annotation_level: [],
-          transcript_level: [
+          annotationLevel: [],
+          transcriptLevel: [
             {
               meta_score: 'gnomade_value * 123400',
             },
@@ -307,12 +304,12 @@ describe('scoring.js', () => {
           gnomade: 'frequency',
         },
         formulas: {
-          annotation_level: [
+          annotationLevel: [
             {
               basic_score: 'cadd_score * 2 - (frequency * 1000)',
             },
           ],
-          transcript_level: [],
+          transcriptLevel: [],
         },
       };
 

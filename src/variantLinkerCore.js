@@ -1,7 +1,8 @@
 // src/variantLinkerCore.js
 /**
  * @fileoverview Core logic for variant analysis.
- * This module encapsulates the processing steps so that it can be used both in the CLI and via the web bundle.
+ * This module encapsulates the processing steps so that it can be used both in the CLI
+ * and via the web bundle.
  * @module variantLinkerCore
  */
 'use strict';
@@ -9,7 +10,7 @@
 const variantRecoder = require('./variantRecoder');
 const variantRecoderPost = require('./variantRecoderPost');
 const vepRegionsAnnotation = require('./vepRegionsAnnotation');
-const { readScoringConfigFromFiles, applyScoring } = require('./scoring');
+const { applyScoring } = require('./scoring');
 const {
   mapOutputToSchemaOrg,
   validateSchemaOrgOutput,
@@ -295,16 +296,19 @@ async function processBatchVariants(variants, params) {
  * calling the appropriate APIs, and optionally applying scoring and filtering.
  *
  * @param {Object} params - The analysis parameters.
- * @param {string} [params.variant] - A single variant input (VCF or HGVS) - for backwards compatibility.
- * @param {Array<string>} [params.variants] - An array of variant inputs (VCF or HGVS).
+ * @param {string} [params.variant] - Single variant input (VCF/HGVS) - for backwards compatibility.
+ * @param {Array<string>} [params.variants] - An array of variant inputs
+ * (VCF or HGVS formats).
  * @param {Object} params.recoderOptions - Options for the Variant Recoder API.
  * @param {Object} params.vepOptions - Options for the VEP API.
  * @param {boolean} params.cache - Whether to enable caching.
  * @param {string} [params.scoringConfigPath] - Path to the scoring configuration (Node only).
- * @param {Object} [params.scoringConfig] - Already parsed scoring configuration JSON (for browser usage).
- * @param {string} params.output - Output format ('JSON', 'CSV', or 'SCHEMA').
+ * @param {Object} [params.scoringConfig] - Parsed scoring config JSON (browser usage).
+ * @param {string} params.output - Output format
+ * ('JSON', 'CSV', or 'SCHEMA' are supported formats).
  * @param {string} [params.filter] - Optional JSON string specifying filtering criteria.
- * @return {Promise<Object>} The result object containing meta, variantData, and annotationData.
+ * @return {Promise<Object>} Result object with meta, variantData, and
+ * annotationData properties.
  */
 async function analyzeVariant(params) {
   const processStartTime = new Date();

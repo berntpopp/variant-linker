@@ -2,7 +2,8 @@
 // src/variantRecoderPost.js
 
 /**
- * @fileoverview Provides functionality to fetch recoded information for a batch of genetic variants
+ * @fileoverview Provides functionality to fetch recoded information for a batch of genetic
+ * variants
  * using the Ensembl Variant Recoder POST API.
  * @module variantRecoderPost
  */
@@ -16,11 +17,13 @@ const apiConfig = require('../config/apiConfig.json');
 /**
  * Fetches the recoded information for multiple genetic variants using the Variant Recoder POST API.
  *
- * @param {Array<string>} variants - An array of genetic variants to be recoded (can be rsIDs, HGVS notations, or VCF strings)
+ * @param {Array<string>} variants - An array of genetic variants to be recoded (can be rsIDs,
+ * HGVS notations, or VCF strings)
  * @param {Object} [options={}] - Optional parameters for the Variant Recoder API request.
  *                                (Example: { vcf_string: '1' } )
  * @param {boolean} [cacheEnabled=false] - If true, cache the API response.
- * @returns {Promise<Array<Object>>} A promise that resolves to an array of recoded variant information.
+ * @returns {Promise<Array<Object>>} A promise that resolves to an array of recoded variant
+ * information.
  * @throws {Error} If the request to the Variant Recoder API fails.
  */
 async function variantRecoderPost(variants, options = {}, cacheEnabled = false) {

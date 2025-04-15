@@ -5,8 +5,8 @@
  * @fileoverview Processes variant linking by combining data from Variant Recoder
  * and VEP annotation calls, filters and formats the results, and outputs them.
  * Additionally, a JSON API–compatible filter function is provided for flexible filtering.
- * Filtering statistics (before and after) for both annotation objects and nested transcript_consequences
- * are added to meta.stepsPerformed.
+ * Filtering statistics (before/after) for annotations and transcript_consequences
+ * are tracked in meta.stepsPerformed.
  * @module variantLinkerProcessor
  */
 
@@ -123,14 +123,21 @@ function jsonApiFilter(data, criteria) {
     throw new Error('Data to be filtered must be an array.');
   }
 
+  /**
+   * Helper function to determine if an object matches all the specified filter criteria
+   * @param {Object} obj - The object to check against criteria
+   * @returns {boolean} True if the object matches all criteria, false otherwise
+   */
   function matchesCriteria(obj) {
     for (const field in criteria) {
       if (!criteria.hasOwnProperty(field)) continue;
       const conditions = criteria[field];
       // Use getValueByPath if the field contains a dot or wildcard.
+      // Get field value with dot notation or wildcard support
       const fieldValue =
         field.includes('.') || field.includes('*') ? getValueByPath(obj, field) : obj[field];
-      // If the resolved value is an array, require that at least one element satisfies each condition.
+      // Check if one element in array satisfies conditions
+      // Check each operator in the conditions
       for (const operator in conditions) {
         if (!conditions.hasOwnProperty(operator)) continue;
         const target = conditions[operator];
@@ -162,7 +169,8 @@ function jsonApiFilter(data, criteria) {
  * @param {function} vepHgvsAnnotation - A function that retrieves VEP annotations for a given HGVS.
  * @param {Object} recoderOptions - Optional parameters for the Variant Recoder API.
  * @param {Object} vepOptions - Optional parameters for the VEP API.
- * @returns {Promise<{variantData: Object, annotationData: Object}>} A promise that resolves with an object containing the variant recoder data and annotation data.
+ * @returns {Promise<{variantData: Object, annotationData: Object}>} A promise that resolves
+ * with an object containing variant recoder data and annotation data.
  * @throws {Error} If no data is returned from either API call.
  */
 async function processVariantLinking(
@@ -217,10 +225,10 @@ async function processVariantLinking(
  * The filter parameter can be either a function or a JSON API–compatible filter criteria object.
  * When a criteria object is provided, filtering is applied to:
  *   1. The top-level annotationData array.
- *   2. And, if criteria keys start with "transcript_consequences", the nested transcript_consequences arrays
- *      are filtered accordingly.
- * Additionally, statistics on the number of annotations (and transcript consequences) before and after filtering
- * are added to meta.stepsPerformed.
+ *   2. And, if criteria keys start with "transcript_consequences", the nested
+ *      transcript_consequences arrays are filtered accordingly.
+ * Additionally, statistics on the number of annotations (and transcript consequences)
+ * before and after filtering are added to meta.stepsPerformed.
  *
  * @param {Object} results - The results object from variant processing.
  * @param {(function|Object)} [filterParam] - An optional filter function or filter criteria object.
@@ -242,7 +250,8 @@ function filterAndFormatResults(results, filterParam, format) {
           ? filteredResults.annotationData.length
           : 'N/A';
         filteredResults.meta.stepsPerformed.push(
-          `Top-level filter (function) applied: ${originalCount} annotations before, ${newCount} after filtering.`
+          `Top-level filter applied: ${originalCount} annotations before,` +
+            ` ${newCount} after filtering.`
         );
       }
     } else if (typeof filterParam === 'object') {
@@ -264,7 +273,8 @@ function filterAndFormatResults(results, filterParam, format) {
       if (Object.keys(topLevelCriteria).length > 0) {
         topLevelFiltered = jsonApiFilter(results.annotationData, topLevelCriteria);
         filteredResults.meta.stepsPerformed.push(
-          `Top-level filter applied: ${topLevelOriginalCount} annotations before, ${topLevelFiltered.length} after filtering.`
+          `Top-level filter applied: ${topLevelOriginalCount} before,` +
+            ` ${topLevelFiltered.length} after filtering.`
         );
       }
       let totalTCBefore = 0;
@@ -285,15 +295,18 @@ function filterAndFormatResults(results, filterParam, format) {
           totalTCAfter += newTC;
         }
       });
+      // Only add transcript filtering statistics if we applied transcript criteria
       if (Object.keys(transcriptCriteria).length > 0) {
         filteredResults.meta.stepsPerformed.push(
-          `Transcript consequences filter applied: ${totalTCBefore} consequences before filtering, ${totalTCAfter} after filtering.`
+          `Transcript consequences filter applied: ${totalTCBefore} consequences` +
+            ` before filtering, ${totalTCAfter} after filtering.`
         );
       }
       filteredResults.annotationData = topLevelFiltered;
     } else {
       throw new Error('Filter parameter must be a function or a filter criteria object.');
     }
+    // Log filtered results with detailed information
     debug(`Filtered results: ${JSON.stringify(filteredResults)}`);
   }
 

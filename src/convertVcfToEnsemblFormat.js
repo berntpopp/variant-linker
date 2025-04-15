@@ -8,7 +8,6 @@
  * @module convertVcfToEnsemblFormat
  */
 
-const debug = require('debug')('variant-linker:main');
 const debugDetailed = require('debug')('variant-linker:detailed');
 const debugAll = require('debug')('variant-linker:all');
 
@@ -19,14 +18,19 @@ const debugAll = require('debug')('variant-linker:all');
  * This function supports several variant types:
  *
  * - **SNV:** Both REF and ALT are a single nucleotide.
- *   - *Example:* `"chr1-12345-A-T"` → `{ region: "1:12345-12345:1", allele: "T" }`
+ *   - *Example:* `"chr1-12345-A-T"` →
+ *     `{ region: "1:12345-12345:1", allele: "T" }`
  *
- * - **Deletion:** In VCF, deletions include the base immediately preceding the deletion.
- *   The deletion is detected if REF is longer than one base and ALT equals the first base of REF.
- *   - *Example:* `"chr20-2-TC-T"` (where REF = "TC", ALT = "T") → `{ region: "20:3-3:1", allele: "-" }`
+ * - **Deletion:** In VCF, deletions include the base immediately preceding the
+ *   deletion. The deletion is detected if REF is longer than one base and ALT equals
+ *   the first base of REF.
+ *   - *Example:* `"chr20-2-TC-T"` (where REF = "TC", ALT = "T") →
+ *     `{ region: "20:3-3:1", allele: "-" }`
  *
- * - **Insertion:** In VCF, insertions are represented with REF of length 1 and ALT starting with that same base.
- *   - *Example:* `"chr8-12600-C-CA"` (insertion of "A") → `{ region: "8:12601-12600:1", allele: "A" }`
+ * - **Insertion:** In VCF, insertions are represented with REF of length 1 and ALT
+ *   starting with that same base.
+ *   - *Example:* `"chr8-12600-C-CA"` (insertion of "A") →
+ *     `{ region: "8:12601-12600:1", allele: "A" }`
  *
  * - **Multi-nucleotide substitution (MNP):** REF and ALT have the same length (>1).
  *   - *Example:* `"chr1-100-AT-GC"` → `{ region: "1:100-101:1", allele: "GC" }`
@@ -36,9 +40,12 @@ const debugAll = require('debug')('variant-linker:all');
  *   If after trimming the REF portion is empty then it is treated as an insertion,
  *   and if the ALT portion is empty then it is treated as a deletion.
  *
- * @param {string} vcf - The VCF string (e.g. "chr1-12345-A-T", "20-2-TC-T", "8-12600-C-CA").
- * @returns {{ region: string, allele: string }} An object with the Ensembl region and the variant allele.
- * @throws {Error} If the VCF string does not have exactly four fields or if the position is invalid.
+ * @param {string} vcf - The VCF string (e.g. "chr1-12345-A-T", "20-2-TC-T",
+ * "8-12600-C-CA").
+ * @returns {{ region: string, allele: string }} An object with the Ensembl region notation
+ * and the variant allele.
+ * @throws {Error} If the VCF string does not have exactly four fields or if the position
+ * is invalid.
  */
 function convertVcfToEnsemblFormat(vcf) {
   try {
@@ -72,13 +79,17 @@ function convertVcfToEnsemblFormat(vcf) {
       region = `${chrom}:${pos}-${pos}:${strand}`;
       allele = alt;
     }
-    // Deletion: VCF deletion is represented with ref length > 1 and alt equal to the first base of ref.
+    // Deletion: VCF deletion is represented with ref length > 1 and alt
+    // equal to the first base of ref.
     else if (ref.length > 1 && alt === ref[0]) {
       // The deleted sequence spans from pos+1 to pos + ref.length - 1.
-      region = `${chrom}:${pos + 1}-${pos + ref.length - 1}:${strand}`;
+      const startPos = pos + 1;
+      const endPos = pos + ref.length - 1;
+      region = `${chrom}:${startPos}-${endPos}:${strand}`;
       allele = '-';
     }
-    // Insertion: VCF insertion is represented with a one-base ref and an alt that starts with that base.
+    // Insertion: VCF format with one-base ref and alt starting with that base.
+    // Check for insertion condition
     else if (ref.length === 1 && alt.length > 1 && alt.startsWith(ref)) {
       // For insertion, the region is a zero-length interval: start = pos+1, end = pos.
       region = `${chrom}:${pos + 1}-${pos}:${strand}`;

@@ -19,8 +19,8 @@ const debugDetailed = require('debug')('variant-linker:detailed');
 const debugAll = require('debug')('variant-linker:all');
 
 /**
- * Outputs error information as JSON and exits.
- * @param {Error} error
+ * Outputs error information as JSON and throws an enhanced error.
+ * @param {Error} error - The original error that occurred
  */
 function handleError(error) {
   const errorResponse = {
@@ -31,13 +31,17 @@ function handleError(error) {
     errorResponse.stack = error.stack;
   }
   console.error(JSON.stringify(errorResponse, null, 2));
-  process.exit(1);
+  // Instead of exiting, throw an enhanced error with status code for the caller to handle
+  const enhancedError = new Error(`Fatal error: ${error.message}`);
+  enhancedError.originalError = error;
+  enhancedError.statusCode = 1;
+  throw enhancedError;
 }
 
 /**
  * Reads and parses a JSON configuration file.
- * @param {string} configFilePath
- * @return {Object}
+ * @param {string} configFilePath - Path to the configuration file to read
+ * @return {Object} The parsed configuration object
  */
 function readConfigFile(configFilePath) {
   if (!configFilePath) return {};
@@ -69,15 +73,19 @@ function readVariantsFromFile(filePath) {
 
 /**
  * Validates required parameters.
- * @param {Object} params
+ * @param {Object} params - The parameters to validate
+ * @throws {Error} If required parameters are missing or invalid
  */
 function validateParams(params) {
   const validOutputs = ['JSON', 'CSV', 'SCHEMA'];
 
   // Check if at least one variant source is provided
   const hasVariant = Boolean(params.variant);
-  const hasVariantsFile = Boolean(params.variantsFile); // Changed from variants_file to variantsFile (camelCase)
-  const hasVariantsList = Boolean(params.variants && typeof params.variants === 'string');
+  const hasVariantsFile = Boolean(params.variantsFile); // Using camelCase
+  // Check variants parameter format
+  const hasVariantsParam = Boolean(params.variants);
+  const isStringType = hasVariantsParam && typeof params.variants === 'string';
+  const hasVariantsList = Boolean(isStringType);
 
   if (!hasVariant && !hasVariantsFile && !hasVariantsList) {
     throw new Error(
@@ -103,9 +111,9 @@ function validateParams(params) {
 /**
  * Merges configuration file parameters with CLI parameters.
  * CLI parameters override configuration file parameters.
- * @param {Object} configParams
- * @param {Object} cliParams
- * @return {Object}
+ * @param {Object} configParams - Parameters from the configuration file
+ * @param {Object} cliParams - Parameters from the command line
+ * @return {Object} The merged parameters with CLI parameters taking precedence
  */
 function mergeParams(configParams, cliParams) {
   const merged = { ...configParams, ...cliParams };
@@ -118,8 +126,8 @@ function mergeParams(configParams, cliParams) {
 
 /**
  * Enables debug logging according to the specified debug level.
- * @param {number} debugLevel
- * @param {string} [logFilePath]
+ * @param {number} debugLevel - Level of debugging (1-3): 1=main, 2=detailed, 3=all
+ * @param {string} [logFilePath] - Optional path to write debug logs to a file
  */
 function enableDebugging(debugLevel, logFilePath) {
   let namespaces = 'variant-linker:main';
@@ -140,9 +148,9 @@ function enableDebugging(debugLevel, logFilePath) {
 
 /**
  * Parses optional parameters from a comma-delimited string.
- * @param {string} paramString
- * @param {Object} defaultParams
- * @return {Object}
+ * @param {string} paramString - Comma-delimited string of parameters in key=value format
+ * @param {Object} defaultParams - Default parameters to use if not specified in paramString
+ * @return {Object} The parsed parameters object with defaults applied
  */
 function parseOptionalParameters(paramString, defaultParams) {
   const options = { ...defaultParams };
@@ -250,7 +258,8 @@ const argv = yargs
     // Show help if no parameters provided
     if (process.argv.length <= 2) {
       yargs.showHelp();
-      process.exit(0);
+      // Instead of exit, return false to indicate no further processing needed
+      return false;
     }
     return true;
   }).argv;
@@ -265,7 +274,8 @@ if (argv.semver) {
   console.log(`Patch: ${details.patch}`);
   if (details.prerelease.length > 0) console.log(`Prerelease: ${details.prerelease.join('.')}`);
   if (details.build.length > 0) console.log(`Build Metadata: ${details.build.join('.')}`);
-  process.exit(0);
+  // Return instead of exit to allow proper cleanup
+  return true;
 }
 
 let configParams;
@@ -291,6 +301,11 @@ if (!process.env.ENSEMBL_BASE_URL) {
   process.env.ENSEMBL_BASE_URL = getBaseUrl(mergedParams.assembly);
 }
 
+/**
+ * Main function that processes variant analysis based on merged parameters.
+ * It handles the entire workflow from parsing options to returning results.
+ * @returns {Promise<void>} Resolves when processing is complete
+ */
 async function main() {
   try {
     debug('Starting variant analysis process');
@@ -303,8 +318,10 @@ async function main() {
       merged: '1',
       mane: '1',
     });
+    // Log detailed options for debugging
     debugDetailed(
-      `Parsed options: recoderOptions=${JSON.stringify(recoderOptions)}, vepOptions=${JSON.stringify(vepOptions)}`
+      `Parsed options: recoderOptions=${JSON.stringify(recoderOptions)},` +
+        ` vepOptions=${JSON.stringify(vepOptions)}`
     );
 
     // Collect variants from all possible sources

@@ -2,13 +2,14 @@
 // src/vepRegionsAnnotation.js
 
 /**
- * Retrieves VEP (Variant Effect Predictor) annotations for given variant(s) using the POST endpoint.
+ * Retrieves VEP annotations for given variant(s) using the POST endpoint.
  *
  * @param {Array<string>} variants - An array of variant strings in the required POST format.
  *   For example, a VCF string "1-230710021-G-A" should be converted to "1 230710021 . G A . . ."
  * @param {Object} [options={}] - Optional query parameters for the VEP API request.
  * @param {boolean} [cacheEnabled=false] - If true, cache the API response.
- * @returns {Promise<Object>} A promise that resolves to the annotation data retrieved from the VEP API.
+ * @returns {Promise<Object>} A promise that resolves to the annotation data
+ * retrieved from the VEP API.
  * @throws {Error} If the request to the VEP API fails.
  */
 
@@ -18,6 +19,15 @@ const debugAll = require('debug')('variant-linker:all');
 const { fetchApi } = require('./apiHelper');
 const apiConfig = require('../config/apiConfig.json');
 
+/**
+ * Retrieves VEP annotations for given variant(s) using the POST endpoint.
+ *
+ * @param {Array<string>} variants - An array of variant strings in the required POST format.
+ * @param {Object} [options={}] - Optional query parameters for the VEP API request.
+ * @param {boolean} [cacheEnabled=false] - If true, cache the API response.
+ * @returns {Promise<Object>} A promise that resolves to the annotation data.
+ * @throws {Error} If the request to the VEP API fails.
+ */
 async function vepRegionsAnnotation(variants, options = {}, cacheEnabled = false) {
   try {
     // For the POST endpoint we simply use the base endpoint defined in our config.

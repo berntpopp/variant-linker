@@ -9,7 +9,8 @@ addFormats(ajv);
 
 /**
  * Maps the tool's output to a Schema.org compliant JSON structure.
- * (Your implementation here)
+ * @param {Object} output - The variant annotation output to transform
+ * @returns {Object} A Schema.org compliant JSON structure for variant annotations
  */
 function mapOutputToSchemaOrg(output) {
   // ... transform output as needed ...
