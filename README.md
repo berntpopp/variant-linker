@@ -98,14 +98,62 @@ Variant-Linker automatically retries failed API requests when encountering trans
 }
 ```
 
-With the default configuration, the tool will:
+### Benchmarking
+
+Variant-Linker includes a benchmarking suite to measure performance metrics when processing variants under different conditions. Benchmarks are useful for:
+
+- Performance testing across different variant types and batch sizes
+- Identifying bottlenecks in the processing pipeline
+- Comparing API performance across different scenarios
+- Testing changes to ensure they don't negatively impact performance
+
+#### Running Benchmarks
+
+Benchmarks can be run using npm:
+
+```bash
+# Run all benchmarks
+npm run benchmark
+
+# Run with verbose output
+npm run benchmark -- --verbose
+
+# Run specific benchmark file
+npm run benchmark -- --input examples/benchmark_data/tiny_batch.txt
+
+# Save results to a file
+npm run benchmark -- --format csv --output benchmark_results.csv
+```
+
+#### Benchmark Options
+
+- `--verbose`, `-v`: Run with detailed output showing each step of the process
+- `--input`, `-i`: Specify a specific input file to benchmark
+- `--assembly`, `-a`: Genome assembly to use (GRCh37 or GRCh38, default: GRCh38)
+- `--repeat`, `-r`: Number of times to repeat each benchmark for averaging (default: 1)
+- `--format`, `-f`: Output format for results (table, csv, tsv, default: table)
+- `--output`, `-o`: File to write results to (if not specified, results are printed to console)
+- `--variant-type`, `-t`: Variant types to benchmark (vcf, hgvs, rsid, all, default: all) 
+- `--variant-count`, `-c`: Variant counts to benchmark (1, 10, 50, 500, all, default: all)
+
+#### Benchmark Data
+
+The repository includes sample benchmark data files in the `examples/benchmark_data` directory:
+
+- Single variants (`single_variant.txt`, `single_variant.vcf`)
+- Small batches (`tiny_batch.txt`, `tiny_batch.vcf`, `small_batch.txt`, `small_batch.vcf`)
+- Large batches (`large_batch.txt`, `large_batch.vcf`)
+
+See `examples/benchmark_data/README.md` for details on these files and how to generate custom benchmark data.
+
+With the default configuration:
 - Retry up to 4 times (5 total attempts including the initial request)
 - Use exponential backoff starting at 1 second (approximately 1s, 2s, 4s, 8s for retries)
 - Add jitter to prevent thundering herd issues
 - Respect `Retry-After` headers for rate-limiting (HTTP 429) responses
 - Only retry on server errors (5xx) and network issues, not on client errors (4xx)
 
-##### Batch Processing and Chunking
+### Batch Processing and Chunking
 
 When processing large numbers of variants, Variant-Linker automatically splits them into smaller batches ("chunks") to avoid overwhelming the Ensembl APIs, which typically have limits around 200 variants per request. This chunking behavior can be configured in the `config/apiConfig.json` file:
 
@@ -268,6 +316,56 @@ Contributions to Variant-Linker are welcome. Please feel free to fork the reposi
 ## Testing
 
 Variant-Linker includes a comprehensive test suite using Mocha as the test runner and Chai for assertions. The tests cover core functionality including variant format detection, single and batch variant processing, scoring, and API interactions.
+
+### Benchmark Suite
+
+Variant-Linker includes a benchmark suite for measuring and tracking performance metrics under various conditions. This helps identify bottlenecks, track performance improvements or regressions, and provide expected performance characteristics.
+
+#### Running Benchmarks
+
+To run the benchmark suite:
+
+```bash
+# Run all benchmarks
+npm run benchmark
+```
+
+The benchmark suite executes the variant-linker CLI against predefined test datasets and reports key performance metrics including:
+
+- **Total Runtime**: How long the entire process takes for each scenario
+- **Variants Processed**: The number of variants processed in each scenario
+- **Average Time per Variant**: Runtime divided by number of variants processed
+- **API Retries**: Number of API retry attempts encountered during processing
+- **Chunks Processed**: Number of chunks processed for batch requests when request chunking is triggered
+
+#### Benchmark Scenarios
+
+The benchmark suite tests the following scenarios:
+
+1. **Single Variant VCF**: Processing a single VCF variant (no recoding needed)
+2. **Single Variant rsID**: Processing a single rsID variant (requires recoding)
+3. **Tiny Batch VCF**: Processing 10 VCF variants (no recoding needed)
+4. **Tiny Batch HGVS/rsID**: Processing 10 rsID variants (requires recoding)
+5. **Small Batch VCF**: Processing ~50 VCF variants (no recoding needed)
+6. **Small Batch HGVS/rsID**: Processing ~50 HGVS/rsID variants (requires recoding)
+7. **Large Batch VCF**: Processing ~500 VCF variants (no recoding, triggers chunking)
+8. **Large Batch HGVS/rsID**: Processing ~500 HGVS/rsID variants (requires recoding, triggers chunking)
+
+These scenarios test different input types and batch sizes to provide a comprehensive view of the tool's performance under various conditions.
+
+#### Benchmark Results Example
+
+```
+📊 BENCHMARK RESULTS
+=================================================================================
+| Scenario              | Runtime (s) | Variants | Time/Variant (s) | Retries | Chunks |
+---------------------------------------------------------------------------------
+| Small Batch VCF       |       1.25 |       50 |           0.0250 |       0 |      0 |
+| Small Batch HGVS/rsID |       2.75 |       50 |           0.0550 |       0 |      0 |
+| Large Batch VCF       |       8.50 |      500 |           0.0170 |       1 |      3 |
+| Large Batch HGVS/rsID |      12.75 |      500 |           0.0255 |       2 |      3 |
+=================================================================================
+```
 
 ### Running Tests
 

@@ -29,6 +29,7 @@ pnpm-debug.log*
 # Exclude specific .txt files that we want to allow
 *.txt
 !examples/*.txt
+!examples/benchmark_data/*.txt
 !sample_variants.txt
 
 # npm package files
@@ -36,3 +37,11 @@ pnpm-debug.log*
 
 # Windsurf rules
 .windsurfrules
+
+# ClinVar data files
+*.vcf
+*.vcf.gz
+*.vcf.tbi
+variant_summary.txt*
+clinvar_*.txt
+!examples/benchmark_data/*.vcf
