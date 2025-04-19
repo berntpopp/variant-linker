@@ -18,17 +18,54 @@ const VARIANT_LINKER_PATH = path.join(__dirname, '..', 'src', 'main.js');
 const BENCHMARK_DATA_PATH = path.resolve(path.join(__dirname, '..', 'examples', 'benchmark_data'));
 
 // Pattern matchers for logs
-const RETRY_PATTERN = /Retrying request attempt|retry|retrying/i;
-// Multiple possible chunk patterns to match different output formats
-const CHUNK_PATTERNS = [
-  /Processing chunk \d+ of \d+/i,
-  /Processing batch \d+/i,
-  /Chunk \d+/i,
-  /Batch \d+/i,
-  /Processing variant \d+/i,
-  /Processing variants/i,
-  /Processed \d+ variants/i,
-];
+const RETRY_PATTERN = /Retry attempt \d+\/\d+ for retryable error/gi;
+const RETRY_EXHAUSTED_PATTERN = /Exhausted all \d+ retries for URL/gi;
+
+// Chunk patterns for processing batches
+const CHUNK_PATTERN = /Processing chunk \d+ with \d+ variants/gi;
+const CHUNKING_STARTED_PATTERN = /Chunking (\d+) variants into batches/i;
+
+// Default chunk size from config
+const DEFAULT_CHUNK_SIZE = 200; // This matches the default in the config
+
+// Max length for truncated output
+const MAX_LOG_PREVIEW_LENGTH = 1000;
+const MAX_DETAILED_LOG_LENGTH = 200; // Maximum length for detailed API responses
+
+/**
+ * Helper function to truncate long strings for console output
+ * @param {string} str - The string to truncate
+ * @param {number} maxLength - Maximum length before truncation
+ * @returns {string} - Truncated string with indicator if truncated
+ */
+function truncateLog(str, maxLength = MAX_LOG_PREVIEW_LENGTH) {
+  if (!str) return '';
+  if (str.length <= maxLength) return str;
+  return `${str.substring(0, maxLength)}... (truncated ${str.length - maxLength} characters)`;
+}
+
+/**
+ * Helper function to truncate API response data and other verbose logs
+ * Keeps a shorter max length to make logs easier to analyze
+ * @param {string} str - The string to truncate
+ * @returns {string} - Truncated string with indicator if truncated
+ */
+function truncateDetailedLog(str) {
+  if (!str) return '';
+  if (str.length <= MAX_DETAILED_LOG_LENGTH) return str;
+  // For JSON objects, try to shorten while keeping structure
+  if (str.startsWith('{') || str.startsWith('[')) {
+    try {
+      return `${str.substring(0, MAX_DETAILED_LOG_LENGTH)}... (truncated JSON, ${str.length} chars)`;
+    } catch (e) {
+      // Fall back to simple truncation if JSON parsing fails
+      const truncatedChars = str.length - MAX_DETAILED_LOG_LENGTH;
+      return `${str.substring(0, MAX_DETAILED_LOG_LENGTH)}... (truncated ${truncatedChars} chars)`;
+    }
+  }
+  const truncatedChars = str.length - MAX_DETAILED_LOG_LENGTH;
+  return `${str.substring(0, MAX_DETAILED_LOG_LENGTH)}... (truncated ${truncatedChars} chars)`;
+}
 
 // Parse command-line arguments
 const argv = yargs(hideBin(process.argv))
@@ -343,6 +380,8 @@ function formatResults(results, format = 'table') {
   }
 }
 
+// This function declaration was moved to the top of the file
+
 /**
  * Runs a single benchmark scenario and collects performance metrics
  * @param {Object} scenario - The benchmark scenario configuration
@@ -350,303 +389,275 @@ function formatResults(results, format = 'table') {
  * @returns {Object} - Benchmark results
  */
 async function runBenchmarkScenario(scenario, options = {}) {
-  const { repeat = 1, verbose = false, log = null } = options;
+  const { repeat = 1, verbose = false, log: logFile = null } = options;
+
   const debugLog = (message) => {
     if (verbose) {
       console.log(message);
     }
-    if (log) {
-      fs.appendFileSync(log, `${message}\n`);
+    if (logFile) {
+      // Check if this might be a detailed API response or JSON data line
+      let logMessage = message;
+
+      // Case 1: Check for API response pattern with a prefix
+      const responsePatterns = [
+        /Response data:\s*(.+)$/,
+        /Chunk request body:\s*(.+)$/,
+        /API response:\s*(.+)$/,
+        /Request body:\s*(.+)$/,
+        /Constructed API URL:\s*(.+)$/,
+      ];
+
+      // Try each pattern
+      for (const pattern of responsePatterns) {
+        const match = message.match(pattern);
+        if (match && match[1] && match[1].length > MAX_DETAILED_LOG_LENGTH) {
+          // Found a match with the pattern, truncate the data portion
+          const prefix = message.substring(0, message.indexOf(match[1]));
+          logMessage = prefix + truncateDetailedLog(match[1]);
+          break;
+        }
+      }
+
+      // Case 2: Check for JSON content without a clear prefix
+      if (
+        logMessage === message &&
+        (message.includes('{') || message.includes('[')) &&
+        message.length > MAX_DETAILED_LOG_LENGTH
+      ) {
+        // Look for the first { or [ character
+        const jsonStartIndex = Math.min(
+          message.indexOf('{') >= 0 ? message.indexOf('{') : Infinity,
+          message.indexOf('[') >= 0 ? message.indexOf('[') : Infinity
+        );
+
+        if (jsonStartIndex < Infinity && jsonStartIndex >= 0) {
+          const prefix = message.substring(0, jsonStartIndex);
+          const jsonContent = message.substring(jsonStartIndex);
+          logMessage = prefix + truncateDetailedLog(jsonContent);
+        }
+      }
+      
+      fs.appendFileSync(logFile, logMessage + '\n', 'utf8');
     }
   };
 
-  console.log(`🔍 Running benchmark: ${scenario.name}`);
+  console.log(`\n🔬 Running benchmark: ${scenario.name}`);
   console.log(`   ${scenario.description}`);
-  console.log(`   Input file: ${path.basename(scenario.inputFile)}`);
-  console.log(`   Repeating: ${repeat} time(s)`);
+  console.log(`   Input: ${scenario.inputFile}`);
+  console.log(`   Assembly: ${scenario.assembly}`);
+  console.log(`   Repeating ${repeat} time(s)...`);
 
   const results = [];
-  let successCount = 0;
 
-  // Run the benchmark multiple times if requested
   for (let i = 0; i < repeat; i++) {
     if (repeat > 1) {
-      debugLog(`   Run ${i + 1} of ${repeat}...`);
+      console.log(`   Run ${i + 1}/${repeat}...`);
     }
+
+    // Initialize all variables at the top of the loop scope
+    // to avoid ReferenceError issues in any code path
+    let stdout = '';
+    let stderr = '';
+    let variantsProcessed = 0;
+    let retryCount = 0;
+    let chunkCount = 0;
+    let avgTimePerVariant = 0;
+    let result;
 
     try {
       const startTime = performance.now();
 
-      // Build command to run variant-linker
+      // Construct command based on variant type
       const command = [
         VARIANT_LINKER_PATH,
         scenario.variantType === 'vcf' ? '--vcf-input' : '--variants-file',
         scenario.inputFile,
         '--assembly',
         scenario.assembly,
-        '--output',
-        'JSON',
+        '--format',
+        'json',
       ];
 
-      // Add --debug if verbose mode is enabled
-      if (!options.verbose) {
+      if (options.silent) {
         command.push('--silent');
       }
 
       if (options.verbose) {
         console.log(`   Executing command: node ${command.join(' ')}`);
+        debugLog(`   Command: node ${command.join(' ')}`);
       }
 
-      const result = spawnSync('node', command, {
-        cwd: process.cwd(),
+      // Run the command with debug logging enabled
+      result = spawnSync('node', command, {
+        env: { ...process.env, DEBUG: 'variant-linker:detailed,variant-linker:all' },
         encoding: 'utf8',
-        shell: true,
+        stdio: 'pipe',
       });
+
+      // Assign stdout/stderr values as soon as we have them
+      stdout = result.stdout || '';
+      stderr = result.stderr || '';
 
       // Add delay to prevent overwhelming the API
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
-      if (result.status !== 0) {
-        throw new Error(`Process exited with code ${result.status}: ${result.stderr}`);
+      const endTime = performance.now();
+      const executionTime = (endTime - startTime) / 1000; // Convert to seconds
+
+      // If log file is specified, write full stdout/stderr to dedicated run log file
+      if (logFile) {
+        // Sanitize filename by replacing spaces, slashes, colons, and other invalid chars
+        const runLogFile = `${logFile}.${scenario.name.replace(/[\s\/:*?"<>|]+/g, '_')}.run${i + 1}.log`;
+        // Process stdout/stderr to truncate large API responses
+        const processedStdout = stdout.replace(
+          /([\[{].{1,})$/gm,
+          (match) => truncateDetailedLog(match)
+        );
+        const processedStderr = stderr.replace(
+          /(Response data:|Chunk request body:|API response:)(.+)$/gm,
+          (match, prefix, data) => `${prefix} ${truncateDetailedLog(data)}`
+        );
+        
+        const fullOutput = [
+          `=== COMMAND ===\n${command.join(' ')}\n`,
+          `=== STDOUT ===\n${processedStdout}\n`,
+          `=== STDERR ===\n${processedStderr}\n`,
+          `=== EXIT CODE: ${result.status} ===\n`,
+          `=== EXECUTION TIME: ${executionTime.toFixed(2)}s ===\n`,
+        ].join('\n');
+        fs.writeFileSync(runLogFile, fullOutput, 'utf8');
+        debugLog(`   💾 Full command output saved to: ${runLogFile}`);
       }
 
-      const executionTime = (performance.now() - startTime) / 1000;
+      // Check if the command succeeded
+      if (result.status !== 0) {
+        const errorMessage = result.stderr || result.error?.message || 'Unknown error';
+        debugLog(`   ❌ Command failed with status ${result.status}`);
+        debugLog(`   Error: ${truncateLog(errorMessage)}`);
+        throw new Error(`Command failed: ${errorMessage}`);
+      }
 
-      // Parse output to get metrics
-      const stdout = result.stdout || '';
-      const stderr = result.stderr || '';
-      const allOutput = stdout + stderr;
-
+      if (verbose) {
+        debugLog(`   --- STDOUT PREVIEW ---`);
+        debugLog(`   ${truncateLog(stdout)}`);
+        debugLog(`   --- STDERR PREVIEW ---`);
+        debugLog(`   ${truncateLog(stderr)}`);
+      }
       debugLog(`   Execution time: ${executionTime.toFixed(2)}s`);
 
-      // Count retries
-      const retryMatches = allOutput.match(new RegExp(RETRY_PATTERN, 'g'));
-      const retryCount = retryMatches ? retryMatches.length : 0;
+      // Count retries from debug output
+      const retryAttempts = (stderr.match(RETRY_PATTERN) || []).length;
+      const retriesExhausted = (stderr.match(RETRY_EXHAUSTED_PATTERN) || []).length;
+      retryCount = retryAttempts + retriesExhausted;
+
+      // Count chunks with fallback logic
+      chunkCount = (stderr.match(CHUNK_PATTERN) || []).length;
+
+      // If no specific chunk messages, try to estimate from chunking started message
+      if (chunkCount === 0) {
+        const chunkingMatch = stderr.match(CHUNKING_STARTED_PATTERN);
+        if (chunkingMatch) {
+          const totalVariants = parseInt(chunkingMatch[1], 10);
+          if (!isNaN(totalVariants) && totalVariants > DEFAULT_CHUNK_SIZE) {
+            chunkCount = Math.ceil(totalVariants / DEFAULT_CHUNK_SIZE);
+          }
+        }
+      }
+
+      // Parse output to get variant count
+      try {
+        const output = JSON.parse(stdout);
+        variantsProcessed = output?.annotationData?.length || 0;
+      } catch (error) {
+        debugLog(`Failed to parse output JSON: ${error.message}`);
+        // If JSON parsing failed but process succeeded, use expected count
+        if (result.status === 0 && scenario.expectedVariantCount) {
+          variantsProcessed = scenario.expectedVariantCount;
+          debugLog(`Using expected variant count: ${variantsProcessed}`);
+        }
+      }
+
+      // If still no chunks but we processed variants, assume 1 chunk
+      if (chunkCount === 0 && variantsProcessed > 0) {
+        chunkCount = 1;
+      }
+
       debugLog(`   API retries: ${retryCount}`);
-
-      // Count chunks with multiple patterns
-      let chunkCount = 0;
-      for (const pattern of CHUNK_PATTERNS) {
-        const matches = allOutput.match(new RegExp(pattern, 'g'));
-        if (matches && matches.length > 0) {
-          chunkCount = matches.length;
-          debugLog(`   Found ${chunkCount} chunks using pattern: ${pattern}`);
-          break;
-        }
-      }
-
-      // If no chunks detected but we have variants, infer chunks from variant count or type
-      if (chunkCount === 0 && stdout.trim()) {
-        try {
-          const output = JSON.parse(stdout.trim());
-          // For rsID/HGVS variants processing, assume chunks based on variant count
-          if (scenario.variantType === 'rsid' || scenario.variantType === 'hgvs') {
-            // Check variant count to determine chunks
-            let variantCount = 0;
-            if (Array.isArray(output)) {
-              variantCount = output.length;
-            } else if (output && typeof output === 'object' && Array.isArray(output.results)) {
-              variantCount = output.results.length;
-            }
-
-            if (variantCount > 0) {
-              // For batched variants, determine chunks based on batch size
-              // Assuming default batch size of 10 for rsID/HGVS
-              chunkCount = Math.ceil(variantCount / 10);
-              if (chunkCount < 1) chunkCount = 1;
-              debugLog(
-                `   Inferred ${chunkCount} chunks (${variantCount} variants, assumed batch size)`
-              );
-            } else {
-              chunkCount = 1; // At least one chunk if we have output
-              debugLog('   No explicit chunk info found, but output exists. Setting to 1 chunk.');
-            }
-          } else {
-            // For VCF or other formats, just assume one chunk if we have output
-            if (
-              (Array.isArray(output) && output.length > 0) ||
-              (output &&
-                typeof output === 'object' &&
-                Array.isArray(output.results) &&
-                output.results.length > 0)
-            ) {
-              chunkCount = 1; // At least one chunk was processed if we have output
-              debugLog('   No explicit chunk info found, but output exists. Setting to 1 chunk.');
-            }
-          }
-        } catch (e) {
-          // If stdout has content but we can't parse it, still assume one chunk
-          if (stdout.trim()) {
-            chunkCount = 1;
-            debugLog('   No explicit chunk info found, but output exists. Setting to 1 chunk.');
-          }
-        }
-      }
-
       debugLog(`   Chunks processed: ${chunkCount}`);
 
-      // Verify variants processed
-      let variantsProcessed = 0;
-      try {
-        // Add debugging for stdout content
-        if (verbose) {
-          debugLog('   Output content preview:');
-          if (stdout.trim()) {
-            // Only show first 500 chars to avoid overwhelming the log
-            debugLog(
-              `   ${stdout.substring(0, 500)}${stdout.length > 500 ? '...(truncated)' : ''}`
-            );
-          } else {
-            debugLog('   (empty or whitespace only)');
-          }
-        }
-
-        // Try to parse JSON from stdout
-        if (stdout.trim()) {
-          const output = JSON.parse(stdout.trim());
-          // Check if output is an array
-          if (Array.isArray(output)) {
-            variantsProcessed = output.length;
-            debugLog(`   Counted ${variantsProcessed} variants from JSON output array`);
-          }
-          // Check if output is an object with results property
-          else if (output && typeof output === 'object' && Array.isArray(output.results)) {
-            variantsProcessed = output.results.length;
-            debugLog(`   Counted ${variantsProcessed} variants from JSON output.results property`);
-          }
-          // If no variants found, try to count based on input file
-          else {
-            // Count lines in the input file for rsID format
-            if (scenario.variantType === 'rsid' && scenario.inputFile.endsWith('.txt')) {
-              try {
-                const fileContent = fs.readFileSync(scenario.inputFile, 'utf8');
-                const variants = fileContent.split('\n').filter((line) => line.trim());
-                variantsProcessed = variants.length;
-                debugLog(`   Counted ${variantsProcessed} variants from input file lines`);
-              } catch (fileErr) {
-                debugLog(`   Error counting variants from file: ${fileErr.message}`);
-              }
-            }
-          }
-        }
-
-        // If still 0, use expected count
-        if (variantsProcessed === 0) {
-          variantsProcessed = scenario.expectedVariantCount;
-          debugLog(`   Using expected count from scenario definition: ${variantsProcessed}`);
-        }
-      } catch (e) {
-        debugLog(`   Could not parse output JSON to count variants: ${e.message}`);
-
-        // Try to count based on input file as fallback
-        if (scenario.variantType === 'rsid' && scenario.inputFile.endsWith('.txt')) {
-          try {
-            const fileContent = fs.readFileSync(scenario.inputFile, 'utf8');
-            const variants = fileContent.split('\n').filter((line) => line.trim());
-            variantsProcessed = variants.length;
-            debugLog(`   Counted ${variantsProcessed} variants from input file lines`);
-          } catch (fileErr) {
-            debugLog(`   Error counting variants from file: ${fileErr.message}`);
-            variantsProcessed = scenario.expectedVariantCount;
-            debugLog(`   Using expected count from scenario definition: ${variantsProcessed}`);
-          }
-        } else {
-          variantsProcessed = scenario.expectedVariantCount;
-          debugLog(`   Using expected count from scenario definition: ${variantsProcessed}`);
-        }
-      }
-
       // Calculate average time per variant, avoid division by zero
-      const avgTimePerVariant = variantsProcessed > 0 ? executionTime / variantsProcessed : 0;
+      avgTimePerVariant = variantsProcessed > 0 ? executionTime / variantsProcessed : 0;
       debugLog(
         `   Average time per variant: ${variantsProcessed > 0 ? avgTimePerVariant.toFixed(4) : 'N/A'}s`
       );
 
-      const runResult = {
+      // Add successful run to results
+      results.push({
         status: 'success',
         name: scenario.name,
         executionTime,
         variantsProcessed,
-        avgTimePerVariant,
         retryCount,
         chunkCount,
-      };
+        avgTimePerVariant,
+        repeatIndex: i,
+      });
 
-      results.push(runResult);
-      successCount++;
-    } catch (error) {
-      const errorMessage = `❌ Error in run ${i + 1}: ${error.message}`;
-      debugLog(errorMessage);
-
-      // For single runs, add the failed result to show in the table
-      if (repeat === 1) {
-        results.push({
-          status: 'error',
-          name: scenario.name,
-          error: error.message,
-        });
+      if (verbose) {
+        debugLog(`   ✅ Run completed successfully`);
       }
+    } catch (error) {
+      // Use stderr if available or a generic message if not
+      const errorDetails = stderr ? `\nStderr: ${truncateLog(stderr)}` : '';
+      debugLog(`   ❌ Error: ${error.message}${errorDetails}`);
+
+      // Add failed run to results
+      results.push({
+        status: 'error',
+        name: scenario.name,
+        error: error.message,
+        stderr: truncateLog(stderr), // Include stderr in result for reporting
+        repeatIndex: i,
+      });
     }
   }
 
-  // Aggregate results if we did multiple runs
-  if (repeat > 1 && successCount > 0) {
-    // Only use successful runs for averaging
-    const successfulRuns = results.filter((r) => r.status === 'success');
+  // Calculate average metrics across all successful runs
+  const successfulRuns = results.filter((run) => run.status === 'success');
 
-    // Calculate average metrics
-    const executionTimes = successfulRuns.map((r) => r.executionTime);
-    const avgExecutionTime =
-      executionTimes.reduce((acc, time) => acc + time, 0) / executionTimes.length;
-    const minExecutionTime = Math.min(...executionTimes);
-    const maxExecutionTime = Math.max(...executionTimes);
+  const avgExecutionTime =
+    successfulRuns.reduce((acc, r) => acc + r.executionTime, 0) / successfulRuns.length;
+  const avgVariantsProcessed = Math.round(
+    successfulRuns.reduce((acc, r) => acc + r.variantsProcessed, 0) / successfulRuns.length
+  );
+  const avgRetryCount = Math.round(
+    successfulRuns.reduce((acc, r) => acc + r.retryCount, 0) / successfulRuns.length
+  );
+  const avgChunkCount = Math.round(
+    successfulRuns.reduce((acc, r) => acc + r.chunkCount, 0) / successfulRuns.length
+  );
+  const avgTimePerVariant =
+    successfulRuns.reduce((acc, r) => acc + r.avgTimePerVariant, 0) / successfulRuns.length;
 
-    // Calculate standard deviation
-    const variance =
-      executionTimes.reduce((acc, time) => {
-        const diff = time - avgExecutionTime;
-        return acc + diff * diff;
-      }, 0) / executionTimes.length;
-    const stdDeviation = Math.sqrt(variance);
-
-    const avgVariantsProcessed = Math.round(
-      successfulRuns.reduce((acc, r) => acc + r.variantsProcessed, 0) / successfulRuns.length
-    );
-
-    const avgTimePerVariant =
-      successfulRuns.reduce((acc, r) => acc + r.avgTimePerVariant, 0) / successfulRuns.length;
-
-    const avgRetryCount = Math.round(
-      successfulRuns.reduce((acc, r) => acc + r.retryCount, 0) / successfulRuns.length
-    );
-
-    const avgChunkCount = Math.round(
-      successfulRuns.reduce((acc, r) => acc + r.chunkCount, 0) / successfulRuns.length
-    );
-
+  // Return the result with averages if we had multiple runs, or just the single run result
+  if (repeat > 1) {
     return {
-      status: successCount === repeat ? 'success' : 'partial',
       name: scenario.name,
-      executionTime: avgExecutionTime,
-      minExecutionTime,
-      maxExecutionTime,
-      stdDeviation,
-      variantsProcessed: avgVariantsProcessed,
-      avgTimePerVariant,
-      retryCount: avgRetryCount,
-      chunkCount: avgChunkCount,
-      successRatio: `${successCount}/${repeat}`,
-      repeatCount: repeat,
-    };
-  }
-
-  // If all runs failed, return error
-  if (successCount === 0) {
-    console.error(`❌ All ${repeat} runs failed for ${scenario.name}`);
-    return {
-      status: 'error',
-      name: scenario.name,
-      error: 'All benchmark runs failed',
+      status: successfulRuns.length > 0 ? 'success' : 'error',
+      averages: successfulRuns.length > 0
+        ? {
+              executionTime: avgExecutionTime,
+              variantsProcessed: avgVariantsProcessed,
+              retryCount: avgRetryCount,
+              chunkCount: avgChunkCount,
+              avgTimePerVariant: avgTimePerVariant,
+              runsCompleted: successfulRuns.length,
+              totalRuns: repeat,
+            }
+          : null,
+      // Return individual run data as well
+      runs: results,
     };
   }
 

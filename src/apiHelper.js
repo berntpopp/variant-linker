@@ -124,14 +124,16 @@ async function fetchApi(
 
         if (isRetryable && attempt < MAX_RETRIES) {
           debugDetailed(
-            `Retryable error encountered (${statusCode || error.code}): ${error.message}`
+            `Retry attempt ${attempt + 1}/${MAX_RETRIES} for retryable error ` +
+              `(${statusCode || error.code}): ${error.message}`
           );
           continue; // Try again
         }
 
         // Non-retryable error or max retries reached
         debugAll(
-          `Error in fetchApi (${attempt > 0 ? `after ${attempt} retries` : 'no retry'}): ${error.message}`
+          `Exhausted all ${MAX_RETRIES} retries for URL: ${url}. ` +
+            `Last error (${statusCode || error.code}): ${error.message}`
         );
         throw error;
       }
