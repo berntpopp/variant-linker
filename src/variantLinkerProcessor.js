@@ -343,7 +343,8 @@ function filterAndFormatResults(results, filterParam, format) {
       break;
     case 'VCF':
       debug(
-        `Processing VCF output format. Has vcfRecordMap: ${Boolean(results.vcfRecordMap)}, Has vcfHeaderLines: ${Boolean(results.vcfHeaderLines)}`
+        `Processing VCF output format. Has vcfRecordMap: ${Boolean(results.vcfRecordMap)},
+        Has vcfHeaderLines: ${Boolean(results.vcfHeaderLines)}`
       );
       debug(`Input variant type: ${results.meta?.variantType || 'unknown'}`);
       debug(`Number of results to format as VCF: ${filteredResults.results?.length || 0}`);
@@ -363,7 +364,8 @@ function filterAndFormatResults(results, filterParam, format) {
         }
         if (firstResult.most_severe_consequence) {
           debug(
-            `First result has most_severe_consequence: ${JSON.stringify(firstResult.most_severe_consequence)}`
+            `First result has most_severe_consequence:
+              ${JSON.stringify(firstResult.most_severe_consequence)}`
           );
         }
       }
@@ -425,15 +427,19 @@ function outputResults(results, filename) {
  * Handles both VCF and non-VCF original inputs.
  * For non-VCF inputs, it prioritizes parsing the `vcfString` from annotation results.
  *
- * @param {Object} results - The filtered annotation results object, containing an `annotationData` array.
- * @param {Map} [vcfRecordMap] - Optional map of variant keys to original VCF record data (used if input was VCF).
- * @param {Array<string>} [vcfHeaderLines] - Optional original VCF header lines (used if input was VCF).
- * @returns {string} Formatted VCF content.
+ * @param {Object} results - The filtered annotation results object, containing an
+ *   `annotationData` array.
+ * @param {Map} [vcfRecordMap] - Optional map of variant keys to original VCF record data
+ *   (used if input was VCF).
+ * @param {Array<string>} [vcfHeaderLines] - Optional original VCF header lines
+ *   (used if input was VCF).
+ * @returns {string} The VCF formatted content.
  * @private
  */
 function _formatResultsToVcf(results, vcfRecordMap, vcfHeaderLines) {
   const debugOutput = require('debug')('variant-linker:vcf-output'); // Use a specific debug namespace
 
+  // ... rest of the code remains the same ...
   // Use results.annotationData directly as passed from analyzeVariant
   const annotationData = results?.annotationData;
   if (!annotationData || !Array.isArray(annotationData) || annotationData.length === 0) {
@@ -503,7 +509,10 @@ function _formatResultsToVcf(results, vcfRecordMap, vcfHeaderLines) {
   const outputLines = [...finalVcfHeaderLines];
 
   // Group records by position for multi-allelic handling
-  // Structure: Map<posKey, { chrom, pos, ref, id, alts: Map<altAllele, { annotation, originalInfo?, originalQual?, originalFilter? }> } >
+  // Structure: Map<posKey, {
+  //   chrom, pos, ref, id,
+  //   alts: Map<altAllele, { annotation, originalInfo?, originalQual?, originalFilter? }>
+  // }>
   const positionGroups = new Map();
 
   // Logic depends on whether original input was VCF
@@ -513,7 +522,8 @@ function _formatResultsToVcf(results, vcfRecordMap, vcfHeaderLines) {
     const annotationsByKey = {};
     for (const annotation of annotationData) {
       // Use the input identifier that links back to the VCF record
-      const key = annotation.originalInput || annotation.input; // Prioritize originalInput if available
+      // Prioritize originalInput if available
+      const key = annotation.originalInput || annotation.input;
       if (key) {
         // If multiple annotations map to the same key (e.g., split multi-allelic), store as array
         if (!annotationsByKey[key]) {
@@ -526,7 +536,7 @@ function _formatResultsToVcf(results, vcfRecordMap, vcfHeaderLines) {
 
     // Process based on the original VCF structure preserved in vcfRecordMap
     for (const [key, entry] of vcfRecordMap.entries()) {
-      const { originalRecord, alt } = entry; // alt here is the specific ALT allele from the original VCF line
+      const { originalRecord, alt } = entry; // the specific ALT allele from the original VCF line
       if (!originalRecord) {
         debugOutput(`Warning: No original record found for VCF entry key: ${key}`);
         continue;
@@ -544,7 +554,8 @@ function _formatResultsToVcf(results, vcfRecordMap, vcfHeaderLines) {
           pos,
           ref,
           id, // Use ID from the first VCF record for this position
-          alts: new Map(), // Map<altAllele, { annotations: [], originalInfo?, originalQual?, originalFilter? }>
+          // Map<altAllele, { annotations[], info?, qual?, filter? }>
+          alts: new Map(),
         });
       }
 
@@ -594,7 +605,7 @@ function _formatResultsToVcf(results, vcfRecordMap, vcfHeaderLines) {
             originalFilter: originalRecord.FILTER,
           });
         } else {
-          // If this ALT allele already exists (e.g. duplicate line in original VCF? unlikely), add annotation
+          // Add annotation if ALT allele exists (e.g. duplicate line in VCF)
           group.alts.get(alt).annotations.push(annotationForAlt);
         }
       }
@@ -605,7 +616,8 @@ function _formatResultsToVcf(results, vcfRecordMap, vcfHeaderLines) {
     for (const annotation of annotationData) {
       if (!annotation || !annotation.vcfString) {
         debugOutput(
-          `Warning: Skipping annotation due to missing 'vcfString'. Input: ${annotation?.originalInput || annotation?.input}`
+          `Warning: Skipping annotation due to missing 'vcfString'.
+           Input: ${annotation?.originalInput || annotation?.input}`
         );
         continue;
       }
@@ -614,7 +626,8 @@ function _formatResultsToVcf(results, vcfRecordMap, vcfHeaderLines) {
       const parts = annotation.vcfString.split('-');
       if (parts.length !== 4) {
         debugOutput(
-          `Warning: Skipping annotation due to unexpected vcfString format: '${annotation.vcfString}'. Expected CHROM-POS-REF-ALT. Input: ${annotation?.originalInput}`
+          `Warning: Skipping due to unexpected vcfString format: '${annotation.vcfString}'.
+           Expected CHROM-POS-REF-ALT. Input: ${annotation?.originalInput}`
         );
         continue;
       }
@@ -623,14 +636,16 @@ function _formatResultsToVcf(results, vcfRecordMap, vcfHeaderLines) {
 
       if (isNaN(pos)) {
         debugOutput(
-          `Warning: Skipping annotation due to invalid POS in vcfString: '${posStr}'. Input: ${annotation?.originalInput}`
+          `Invalid POS in vcfString: '${posStr}'.
+           Input: ${annotation?.originalInput}`
         );
         continue;
       }
 
       if (!chrom || !ref || !alt) {
         debugOutput(
-          `Warning: Skipping annotation due to missing CHROM, REF, or ALT in vcfString: '${annotation.vcfString}'. Input: ${annotation?.originalInput}`
+          `Warning: Missing CHROM/REF/ALT in vcfString: '${annotation.vcfString}'.
+           Input: ${annotation?.originalInput}`
         );
         continue;
       }
@@ -674,7 +689,8 @@ function _formatResultsToVcf(results, vcfRecordMap, vcfHeaderLines) {
   for (const [, group] of positionGroups.entries()) {
     if (!group.alts || group.alts.size === 0) {
       debugOutput(
-        `Skipping position ${group.chrom}:${group.pos}:${group.ref} as it has no ALT alleles with annotations.`
+        `Skipping position ${group.chrom}:${group.pos}:${group.ref}
+         as it has no ALT alleles with annotations.`
       );
       continue;
     }
@@ -767,8 +783,8 @@ function _formatResultsToVcf(results, vcfRecordMap, vcfHeaderLines) {
   } else if (outputLines.length === finalVcfHeaderLines.length && annotationData.length === 0) {
     debugOutput('VCF output contains only header lines because no annotations were provided.');
   } else if (positionGroups.size === 0 && annotationData.length > 0) {
-    // This case indicates annotations existed but none could be grouped (e.g., all had invalid vcfString)
-    debugOutput('Warning: No valid VCF positions could be derived from the annotations provided.');
+    // This case indicates annotations existed but none could be grouped
+    debugOutput('No valid VCF positions could be derived from the annotations.');
   }
 
   // Join lines and add a trailing newline for valid VCF format
