@@ -25,7 +25,7 @@ describe('apiHelper', () => {
   });
 
   // Use real timers for this test to allow the retry mechanism to work naturally
-  it('should retry on 500 error and succeed on second attempt', async function() {
+  it('should retry on 500 error and succeed on second attempt', async function () {
     this.timeout(5000); // Increase timeout to allow for retries
 
     // First request fails with 500, second succeeds
@@ -36,13 +36,15 @@ describe('apiHelper', () => {
     expect(result).to.deep.equal(mockResponse);
   });
 
-  it('should retry on network error and succeed on third attempt', async function() {
+  it('should retry on network error and succeed on third attempt', async function () {
     this.timeout(10000); // Increase timeout to allow for multiple retries
 
     // First two requests fail with network errors, third succeeds
-    nock(apiBaseUrl).get(testEndpoint)
+    nock(apiBaseUrl)
+      .get(testEndpoint)
       .replyWithError({ code: 'ECONNRESET', message: 'Connection reset' });
-    nock(apiBaseUrl).get(testEndpoint)
+    nock(apiBaseUrl)
+      .get(testEndpoint)
       .replyWithError({ code: 'ETIMEDOUT', message: 'Connection timed out' });
     nock(apiBaseUrl).get(testEndpoint).reply(200, mockResponse);
 
@@ -50,11 +52,12 @@ describe('apiHelper', () => {
     expect(result).to.deep.equal(mockResponse);
   });
 
-  it('should retry on 429 with Retry-After header', async function() {
+  it('should retry on 429 with Retry-After header', async function () {
     this.timeout(5000); // Increase timeout
 
     // Mock 429 response with Retry-After header, then success
-    nock(apiBaseUrl).get(testEndpoint)
+    nock(apiBaseUrl)
+      .get(testEndpoint)
       .reply(429, { error: 'Too Many Requests' }, { 'Retry-After': '1' });
     nock(apiBaseUrl).get(testEndpoint).reply(200, mockResponse);
 
@@ -74,7 +77,7 @@ describe('apiHelper', () => {
     }
   });
 
-  it('should fail after exhausting all retries', async function() {
+  it('should fail after exhausting all retries', async function () {
     this.timeout(20000); // Increase timeout for all retries
 
     // Get retry configuration values for testing
@@ -102,7 +105,8 @@ describe('apiHelper', () => {
     // Verify that the right number of requests were made
     // (allowing for a tiny bit of flexibility)
     const pendingMocks = nock.pendingMocks();
-    expect(pendingMocks.length).to.be.at.most(1, 
+    expect(pendingMocks.length).to.be.at.most(
+      1,
       'Expected all or all but one mocks to be consumed (showing all requests were made)'
     );
   });
@@ -133,14 +137,13 @@ describe('apiHelper', () => {
     expect(result).to.deep.equal(mockResponse);
   });
 
-  it('should handle POST requests with retries', async function() {
+  it('should handle POST requests with retries', async function () {
     this.timeout(5000); // Increase timeout
 
     const requestBody = { test: 'data' };
 
     // First attempt fails
-    nock(apiBaseUrl).post(testEndpoint, requestBody)
-      .reply(502, { error: 'Bad Gateway' });
+    nock(apiBaseUrl).post(testEndpoint, requestBody).reply(502, { error: 'Bad Gateway' });
 
     // Second attempt succeeds
     nock(apiBaseUrl).post(testEndpoint, requestBody).reply(200, mockResponse);

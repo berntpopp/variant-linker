@@ -102,11 +102,19 @@ describe('variantRecoderPost', () => {
     }
   });
 
-  it('should handle API errors gracefully', async () => {
+  it('should handle API errors gracefully', async function () {
+    this.timeout(15000); // Increase timeout for retries
+
     nock.cleanAll(); // Remove previous interceptors
+
+    // Get retry configuration values
+    const maxRetries = apiConfig.requests?.retry?.maxRetries ?? 4;
+
+    // Set up mock to respond with 500 error enough times to exhaust all retries
     nock(apiBaseUrl)
       .post(`${apiConfig.ensembl.endpoints.variantRecoderBase}/homo_sapiens`)
       .query(true)
+      .times(maxRetries + 1) // Original request + retries
       .reply(500, { error: 'Internal Server Error' });
 
     try {
@@ -115,7 +123,7 @@ describe('variantRecoderPost', () => {
     } catch (error) {
       // AxiosError is an error object but has specific structure
       expect(error).to.be.an.instanceof(Error);
-      expect(error.message).to.include('Request failed with status code 500');
+      expect(error.response.status).to.equal(500);
     }
   });
 });
