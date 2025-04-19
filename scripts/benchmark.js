@@ -8,6 +8,7 @@
 const { spawnSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const { performance } = require('perf_hooks');
 const yargs = require('yargs/yargs');
 const { hideBin } = require('yargs/helpers');
@@ -98,6 +99,12 @@ const argv = yargs(hideBin(process.argv))
     alias: 'o',
     type: 'string',
     description: 'File to write results to (if not specified, results are printed to console)',
+  })
+  .option('readme', {
+    alias: 'md',
+    type: 'boolean',
+    description: 'Generate a README.md with benchmark results in the same folder',
+    default: false,
   })
   .option('log', {
     alias: 'l',
@@ -278,9 +285,22 @@ function getFilteredScenarios() {
  * @returns {string} - Formatted results
  */
 function formatResults(results, format = 'table') {
-  // Filter out error results and handle error rows separately
-  const validResults = results.filter((r) => r.status !== 'error');
-  const errorResults = results.filter((r) => r.status === 'error');
+  // Filter out error results  // Process the results for each scenario
+  const validResults = results
+    .filter((r) => r.status !== 'error')
+    .map((result) => {
+      // Handle the case where we have runs and averages (multi-run scenario)
+      if (result.averages) {
+        // Make sure to preserve the scenario name
+        return {
+          ...result.averages,
+          name: result.name,
+        };
+      }
+      // Handle the case where we just have a single run
+      return result;
+    });
+  const failedResults = results.filter((r) => r.status === 'error');
 
   // Determine if we have partial results
   const hasPartials = validResults.some((r) => r.status === 'partial');
@@ -316,6 +336,24 @@ function formatResults(results, format = 'table') {
   const data = validResults.map((result) => {
     let row;
 
+    // Safety check: Make sure all required properties exist
+    const hasRequired =
+      result &&
+      typeof result.executionTime === 'number' &&
+      typeof result.variantsProcessed === 'number' &&
+      typeof result.avgTimePerVariant === 'number' &&
+      typeof result.retryCount === 'number' &&
+      typeof result.chunkCount === 'number';
+
+    if (!hasRequired) {
+      // Return a row with N/A values if data is incomplete
+      if (hasDetailedStats) {
+        return [result.name || 'Unknown', 'N/A', 'N/A', 'N/A', 'N/A', 'N/A', 'N/A', 'N/A', 'N/A'];
+      } else {
+        return [result.name || 'Unknown', 'N/A', 'N/A', 'N/A', 'N/A', 'N/A'];
+      }
+    }
+
     if (hasDetailedStats && 'minExecutionTime' in result) {
       row = [
         result.name,
@@ -347,7 +385,7 @@ function formatResults(results, format = 'table') {
   });
 
   // Add error rows if any
-  const errorRows = errorResults.map((result) => {
+  const errorRows = failedResults.map((result) => {
     const errorRow = [result.name, 'ERROR', '-', '-', '-', '-'];
     if (hasDetailedStats) {
       return [result.name, 'ERROR', '-', '-', '-', '-', '-', '-', '-'];
@@ -657,6 +695,23 @@ async function runBenchmarkScenario(scenario, options = {}) {
   const avgTimePerVariant =
     successfulRuns.reduce((acc, r) => acc + r.avgTimePerVariant, 0) / successfulRuns.length;
 
+  // Calculate min/max/std-dev statistics when we have multiple runs
+  let minExecutionTime;
+  let maxExecutionTime;
+  let stdDeviation;
+
+  if (successfulRuns.length > 1) {
+    // Find minimum and maximum execution times
+    minExecutionTime = Math.min(...successfulRuns.map((r) => r.executionTime));
+    maxExecutionTime = Math.max(...successfulRuns.map((r) => r.executionTime));
+
+    // Calculate standard deviation of execution times
+    const mean = avgExecutionTime;
+    const squaredDifferences = successfulRuns.map((r) => Math.pow(r.executionTime - mean, 2));
+    const variance = squaredDifferences.reduce((acc, val) => acc + val, 0) / successfulRuns.length;
+    stdDeviation = Math.sqrt(variance);
+  }
+
   // Return the result with averages if we had multiple runs, or just the single run result
   if (repeat > 1) {
     return {
@@ -670,8 +725,14 @@ async function runBenchmarkScenario(scenario, options = {}) {
               retryCount: avgRetryCount,
               chunkCount: avgChunkCount,
               avgTimePerVariant: avgTimePerVariant,
+              // Include detailed statistics for multiple runs
+              minExecutionTime: minExecutionTime,
+              maxExecutionTime: maxExecutionTime,
+              stdDeviation: stdDeviation,
               runsCompleted: successfulRuns.length,
               totalRuns: repeat,
+              // Make sure name is preserved
+              name: scenario.name,
             }
           : null,
       // Return individual run data as well
@@ -765,6 +826,12 @@ async function runBenchmarks() {
     console.log(formattedResults);
   }
 
+  // Generate README.md if requested
+  if (argv.readme) {
+    const readmePath = generateReadme(results, argv);
+    console.log(`\n✅ Benchmark README generated: ${readmePath}`);
+  }
+
   console.log('\n✅ Benchmark completed');
 
   if (failureCount > 0) {
@@ -773,6 +840,168 @@ async function runBenchmarks() {
   }
 
   return results;
+}
+
+/**
+ * Generate a README.md file with benchmark results
+ * @param {Array} results - Benchmark results
+ * @param {Object} options - Command line options used for the benchmark
+ * @returns {string} - Path to the generated README file
+ */
+function generateReadme(results, options) {
+  const timestamp = new Date().toISOString();
+  const readmePath = path.join(__dirname, 'BENCHMARK_RESULTS.md');
+
+  // Gather system information
+  const nodeVersion = process.version;
+  const memoryUsage = process.memoryUsage();
+  const memoryUsageMB = Math.round(memoryUsage.heapUsed / 1024 / 1024);
+  const totalMemoryMB = Math.round(memoryUsage.heapTotal / 1024 / 1024);
+  const cpuInfo = os.cpus()[0].model;
+  const cpuCount = os.cpus().length;
+  const platform = `${os.type()} ${os.release()}`;
+
+  // Create the README content
+  let content = `# Variant-Linker Benchmark Results
+
+`;
+  content += `Benchmark run completed on: ${new Date(timestamp).toLocaleString()}\n\n`;
+
+  // Add benchmark parameters
+  content += `## Benchmark Parameters\n\n`;
+  content += `- Assembly: ${options.assembly}\n`;
+  content += `- Repeat Count: ${options.repeat}\n`;
+  content += `- Variant Types: ${options.variantType === 'all' ? 'All Types' : options.variantType}\n`;
+  content += `- Variant Counts: ${options.variantCount === 'all' ? 'All Sizes' : options.variantCount}\n`;
+  if (options.input) {
+    content += `- Custom Input: ${options.input}\n`;
+  }
+
+  // Add system information
+  content += `\n## System Information\n\n`;
+  content += `- Node.js Version: ${nodeVersion}\n`;
+  content += `- Platform: ${platform}\n`;
+  content += `- CPU: ${cpuInfo} (${cpuCount} cores)\n`;
+  content += `- Memory Usage: ${memoryUsageMB}MB / ${totalMemoryMB}MB\n`;
+
+  // Add results table
+  content += `\n## Results\n\n`;
+
+  // First table for basic metrics
+  content += `### Basic Metrics\n\n`;
+  // Format results as markdown table
+  const headers = ['Scenario', 'Runtime (s)', 'Variants', 'Time/Variant (s)', 'Retries', 'Chunks'];
+  const tableRows = [headers];
+
+  // Add a row for each result
+  for (const result of results) {
+    if (result.status === 'error') {
+      tableRows.push([result.name, 'ERROR', '', '', '', '']);
+      continue;
+    }
+
+    // Get the data, either from averages or from the single run
+    const data = result.averages || result;
+
+    // Safety check to ensure we have valid data
+    if (!data || typeof data.executionTime !== 'number') {
+      tableRows.push([result.name, 'N/A', 'N/A', 'N/A', 'N/A', 'N/A']);
+      continue;
+    }
+
+    tableRows.push([
+      result.name,
+      data.executionTime.toFixed(2),
+      data.variantsProcessed.toString(),
+      data.avgTimePerVariant.toFixed(4),
+      data.retryCount.toString(),
+      data.chunkCount.toString(),
+    ]);
+  }
+
+  // Convert the rows to a markdown table
+  content += tableRows
+    .map((row, index) => {
+      if (index === 0) {
+        // Header row
+        return `| ${row.join(' | ')} |\n| ${row.map(() => '---').join(' | ')} |`;
+      }
+      return `| ${row.join(' | ')} |`;
+    })
+    .join('\n');
+
+  // Add a second table with advanced metrics if we have detailed stats
+  const hasDetailedStats = results.some((r) => r.averages && 'minExecutionTime' in r.averages);
+
+  if (hasDetailedStats) {
+    content += `\n\n### Detailed Statistics\n\n`;
+
+    const detailedHeaders = [
+      'Scenario',
+      'Min Runtime (s)',
+      'Max Runtime (s)',
+      'Std Deviation (s)',
+      'Success Ratio',
+    ];
+
+    const detailedRows = [detailedHeaders];
+
+    for (const result of results) {
+      if (result.status === 'error') {
+        detailedRows.push([result.name, 'ERROR', 'ERROR', 'ERROR', 'ERROR']);
+        continue;
+      }
+
+      // Get the data - either from averages or from single run
+      const data = result.averages || result;
+
+      // Skip if no detailed stats are available
+      if (!data || !('minExecutionTime' in data)) {
+        detailedRows.push([result.name, 'N/A', 'N/A', 'N/A', 'N/A']);
+        continue;
+      }
+
+      detailedRows.push([
+        result.name,
+        data.minExecutionTime.toFixed(2),
+        data.maxExecutionTime.toFixed(2),
+        data.stdDeviation.toFixed(4),
+        data.runsCompleted ? `${data.runsCompleted}/${data.totalRuns}` : 'N/A',
+      ]);
+    }
+
+    // Convert the rows to a markdown table
+    content += detailedRows
+      .map((row, index) => {
+        if (index === 0) {
+          // Header row
+          return `| ${row.join(' | ')} |\n| ${row.map(() => '---').join(' | ')} |`;
+        }
+        return `| ${row.join(' | ')} |`;
+      })
+      .join('\n');
+  }
+
+  // Add notes
+  content += `\n\n## Notes\n\n`;
+  content += `- Time/Variant: Average processing time per variant in seconds\n`;
+  content += `- Retries: Number of API request retries needed\n`;
+  content += `- Chunks: Number of variant chunks processed\n`;
+
+  if (hasDetailedStats) {
+    content += `- Min/Max Runtime: Fastest and slowest run times in seconds\n`;
+    content += `- Std Deviation: Standard deviation in execution times between runs\n`;
+    content += `- Success Ratio: Number of successful runs out of total run attempts\n`;
+  }
+
+  if (results.some((r) => r.status === 'error')) {
+    content += `\n⚠️ Some benchmarks failed. Check the log files for details.\n`;
+  }
+
+  // Write the README file
+  fs.writeFileSync(readmePath, content, 'utf8');
+
+  return readmePath;
 }
 
 // Run the benchmarks
