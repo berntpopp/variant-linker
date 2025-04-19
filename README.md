@@ -11,7 +11,8 @@ In addition to its CLI capabilities, Variant-Linker is designed with a modular a
 - **Filtering**: Filters VEP annotations based on transcript specifications.
 - **Modular Design**: Structured to facilitate reuse of core functionalities (as a library) in other projects.
 - **Extensibility**: Prepared for future extensions to include local installations of VEP and Variant Recoder.
-- **Output Customization**: Users can specify the output format (e.g., JSON, CSV).
+- **Output Customization**: Users can specify the output format (JSON, CSV, TSV) with configurable field selection.
+- **Tabular Data Export**: Provides CSV and TSV output with a "flatten by consequence" strategy for comprehensive variant analysis.
 - **VCF Handling**: Detects and processes VCF formatted input, converting it to the necessary format for Ensembl region-based annotation.
 - **Configuration File Support**: Allows users to provide parameters through a structured configuration file.
 
@@ -59,7 +60,7 @@ variant-linker --variants <variant1,variant2,variant3> --output <output_format> 
 - `--variant`, `-v`: Specify a single genetic variant to be analyzed.
 - `--variants-file`, `-vf`: Path to a file containing variants to be analyzed (one per line).
 - `--variants`, `-vs`: Comma-separated list of variants to be analyzed.
-- `--output`, `-o`: Define the desired output format (e.g., JSON, CSV). Default is JSON.
+- `--output`, `-o`: Define the desired output format (JSON, CSV, TSV). Default is JSON.
 - `--save`, `-s`: Filename to save the results. If not specified, results will be printed to the console.
 - `--debug`, `-d`: Enable debug mode for detailed logging. This is optional and is not enabled by default.
 - `--vep_params`, `--vp`: Optional parameters for VEP annotation in key=value format, separated by commas (default: "CADD=1").
@@ -97,12 +98,46 @@ Variant-Linker can detect and process variants provided in VCF format. When a VC
 
 Using command-line parameters:
 ```bash
+# JSON output
 variant-linker --variant 'ENST00000366667:c.803C>T' --output JSON
+
+# CSV output
+variant-linker --variant 'rs6025' --output CSV
+
+# TSV output
+variant-linker --variant '9 130716739 . G GT' --output TSV
 ```
 
 Using a configuration file:
 ```bash
 variant-linker --config example_input.json
+```
+
+### CSV and TSV Output
+
+Variant-Linker provides CSV and TSV output for variant annotations, using a "flatten by consequence" strategy that creates one row per transcript consequence for each variant.
+
+#### CSV/TSV Features
+
+- **Flatten by Consequence**: Creates one row per transcript consequence for variants with multiple consequences
+- **Consistent Structure**: Variants without consequences still generate a row with top-level data
+- **Default Headers**: Includes key fields like variant ID, location, gene symbol, consequence, and impact
+- **Filter Support**: CSV/TSV output works with all filtering options
+
+#### Example CSV Output
+
+```csv
+OriginalInput,VariantID,Location,Alleles,GeneSymbol,Consequence,Impact,HGVS_p
+rs6025,rs6025,1:169519049-169519049,T/C,F5,missense_variant,MODERATE,p.Arg534Gln
+rs6025,rs6025,1:169519049-169519049,T/C,F5,missense_variant,MODERATE,p.Arg564Gln
+```
+
+#### Example TSV Output
+
+```
+OriginalInput	VariantID	Location	Alleles	GeneSymbol	Consequence	Impact	HGVS_p
+rs6025	rs6025	1:169519049-169519049	T/C	F5	missense_variant	MODERATE	p.Arg534Gln
+rs6025	rs6025	1:169519049-169519049	T/C	F5	missense_variant	MODERATE	p.Arg564Gln
 ```
 
 ### Using Variant-Linker as a Library (API Usage)
@@ -147,8 +182,9 @@ async function analyzeBatchVariants() {
       recoderOptions: { vcf_string: '1' },
       vepOptions: { CADD: '1', hgvs: '1' },
       cache: false,
-      output: 'JSON'
+      output: 'JSON' // Can also use 'CSV' or 'TSV'
     });
+
     console.log('Batch Analysis Results:', batchResult);
     
     // Alternatively, use the variantRecoderPost function directly for batch recoding
@@ -162,6 +198,24 @@ async function analyzeBatchVariants() {
   }
 }
 analyzeBatchVariants();
+
+// Example: Using filtering criteria with CSV output
+async function analyzeWithFiltering() {
+  try {
+    const variantWithFilter = await analyzeVariant({
+      variant: 'ENST00000366667:c.803C>T',
+      filterOptions: {
+        biotype: 'protein_coding',
+        canonical: 1
+      },
+      output: 'CSV' // Use CSV format for tabular output
+    });
+    console.log('Filtered CSV Results:', variantWithFilter);
+  } catch (error) {
+    console.error('Error:', error.message);
+  }
+}
+analyzeWithFiltering();
 
 // Various other functions are similarly available for integration.
 ```

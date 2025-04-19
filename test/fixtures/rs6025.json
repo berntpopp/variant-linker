@@ -1,0 +1,380 @@
+{
+  "meta": {
+    "input": "rs6025",
+    "batchSize": 1,
+    "stepsPerformed": [
+      "Processing single variant"
+    ],
+    "startTime": "2025-04-19T09:07:43.525Z",
+    "endTime": "2025-04-19T09:07:45.233Z",
+    "durationMs": 1708,
+    "batchProcessing": false
+  },
+  "variantData": [
+    {
+      "A": {
+        "input": "rs6025",
+        "spdi": [
+          "NC_000001.11:169549810:C:A",
+          "LRG_553:41720:G:T"
+        ],
+        "vcf_string": [
+          "1-169549811-C-A",
+          "LRG_553-41721-G-T"
+        ],
+        "hgvsp": [
+          "ENSP00000356770.3:p.Arg534Leu",
+          "ENSP00000356771.3:p.Arg534Leu",
+          "NP_000121.2:p.Arg534Leu",
+          "LRG_553p1:p.Arg534Leu"
+        ],
+        "hgvsc": [
+          "ENST00000367796.3:c.1601G>T",
+          "ENST00000367797.9:c.1601G>T",
+          "NM_000130.5:c.1601G>T",
+          "LRG_553t1:c.1601G>T"
+        ],
+        "id": [
+          "rs6025",
+          "CM940389"
+        ],
+        "hgvsg": [
+          "NC_000001.11:g.169549811C>A",
+          "LRG_553:g.41721G>T"
+        ]
+      },
+      "T": {
+        "id": [
+          "rs6025",
+          "CM940389"
+        ],
+        "hgvsg": [
+          "NC_000001.11:g.169549811C>T",
+          "LRG_553:g.41721G>A"
+        ],
+        "input": "rs6025",
+        "spdi": [
+          "NC_000001.11:169549810:C:T",
+          "LRG_553:41720:G:A"
+        ],
+        "hgvsp": [
+          "ENSP00000356770.3:p.Arg534Gln",
+          "ENSP00000356771.3:p.Arg534Gln",
+          "NP_000121.2:p.Arg534Gln",
+          "LRG_553p1:p.Arg534Gln"
+        ],
+        "vcf_string": [
+          "1-169549811-C-T",
+          "LRG_553-41721-G-A"
+        ],
+        "hgvsc": [
+          "ENST00000367796.3:c.1601G>A",
+          "ENST00000367797.9:c.1601G>A",
+          "NM_000130.5:c.1601G>A",
+          "LRG_553t1:c.1601G>A"
+        ]
+      }
+    }
+  ],
+  "annotationData": [
+    {
+      "originalInput": "rs6025",
+      "inputFormat": "HGVS",
+      "input": "1 169549811 . C A . . .",
+      "most_severe_consequence": "missense_variant",
+      "transcript_consequences": [
+        {
+          "cdna_end": 1803,
+          "cadd_phred": 25,
+          "used_ref": "C",
+          "source": "Ensembl",
+          "codons": "cGa/cTa",
+          "impact": "MODERATE",
+          "gene_symbol": "F5",
+          "gene_symbol_source": "HGNC",
+          "strand": -1,
+          "cdna_start": 1803,
+          "cds_end": 1601,
+          "polyphen_prediction": "probably_damaging",
+          "protein_start": 534,
+          "polyphen_score": 0.936,
+          "amino_acids": "R/L",
+          "sift_score": 0,
+          "given_ref": "C",
+          "biotype": "protein_coding",
+          "sift_prediction": "deleterious",
+          "hgvsp": "ENSP00000356770.3:p.Arg534Leu",
+          "hgvsc": "ENST00000367796.3:c.1601G>T",
+          "hgnc_id": "HGNC:3542",
+          "cadd_raw": 4.353057,
+          "protein_end": 534,
+          "transcript_id": "ENST00000367796",
+          "consequence_terms": [
+            "missense_variant"
+          ],
+          "gene_id": "ENSG00000198734",
+          "cds_start": 1601,
+          "variant_allele": "A"
+        },
+        {
+          "cadd_phred": 25,
+          "cdna_end": 1696,
+          "mane_select": "NM_000130.5",
+          "source": "Ensembl",
+          "polyphen_score": 0.411,
+          "protein_start": 534,
+          "sift_prediction": "deleterious",
+          "biotype": "protein_coding",
+          "hgvsp": "ENSP00000356771.3:p.Arg534Leu",
+          "given_ref": "C",
+          "amino_acids": "R/L",
+          "cdna_start": 1696,
+          "gene_symbol_source": "HGNC",
+          "gene_symbol": "F5",
+          "polyphen_prediction": "benign",
+          "protein_end": 534,
+          "hgnc_id": "HGNC:3542",
+          "cds_start": 1601,
+          "consequence_terms": [
+            "missense_variant"
+          ],
+          "impact": "MODERATE",
+          "codons": "cGa/cTa",
+          "used_ref": "C",
+          "sift_score": 0,
+          "strand": -1,
+          "cds_end": 1601,
+          "cadd_raw": 4.353057,
+          "hgvsc": "ENST00000367797.9:c.1601G>T",
+          "gene_id": "ENSG00000198734",
+          "variant_allele": "A",
+          "mane": [
+            "MANE_Select"
+          ],
+          "transcript_id": "ENST00000367797"
+        },
+        {
+          "biotype": "protein_coding",
+          "sift_prediction": "deleterious",
+          "hgvsp": "NP_000121.2:p.Arg534Leu",
+          "amino_acids": "R/L",
+          "given_ref": "C",
+          "polyphen_score": 0.411,
+          "protein_start": 534,
+          "polyphen_prediction": "benign",
+          "cdna_start": 1696,
+          "gene_symbol_source": "EntrezGene",
+          "gene_symbol": "F5",
+          "mane_select": "ENST00000367797.9",
+          "source": "RefSeq",
+          "cadd_phred": 25,
+          "cdna_end": 1696,
+          "cds_start": 1601,
+          "consequence_terms": [
+            "missense_variant"
+          ],
+          "protein_end": 534,
+          "hgnc_id": "HGNC:3542",
+          "sift_score": 0,
+          "cds_end": 1601,
+          "strand": -1,
+          "impact": "MODERATE",
+          "codons": "cGa/cTa",
+          "used_ref": "C",
+          "variant_allele": "A",
+          "mane": [
+            "MANE_Select"
+          ],
+          "gene_id": "2153",
+          "transcript_id": "NM_000130.5",
+          "cadd_raw": 4.353057,
+          "hgvsc": "NM_000130.5:c.1601G>T"
+        }
+      ],
+      "id": ".",
+      "strand": 1,
+      "allele_string": "C/A",
+      "colocated_variants": [
+        {
+          "somatic": 1,
+          "allele_string": "HGMD_MUTATION",
+          "id": "CM940389",
+          "strand": 1,
+          "seq_region_name": "1",
+          "start": 169549811,
+          "phenotype_or_disease": 1,
+          "end": 169549811
+        },
+        {
+          "end": 169549811,
+          "phenotype_or_disease": 1,
+          "clin_sig_allele": "T:pathogenic;T:pathogenic/pathogenic,_low_penetrance;T:drug_response;T:risk_factor;T:uncertain_significance",
+          "pubmed": [
+            25741868,
+            34207366,
+            18513389,
+            19131662,
+            19263529,
+            19330901,
+            19559392,
+            21894447,
+            21919968,
+            23132613,
+            25361584,
+            25474356,
+            27348238,
+            27616475,
+            30182779,
+            21054877,
+            27589735,
+            28659664,
+            19682239,
+            20031567,
+            21463476,
+            27766050,
+            30842582,
+            31420334,
+            33128086,
+            30112393,
+            22388798,
+            26791477,
+            33170161,
+            19619703,
+            23274712,
+            23533563,
+            29334895,
+            31134135,
+            31019283,
+            24816905,
+            27233255,
+            32496628,
+            7586244,
+            7803250,
+            7877648,
+            7910348,
+            7911872,
+            7968118,
+            8049422,
+            8164730,
+            8164741,
+            8566967,
+            8616100,
+            8822583,
+            9245936,
+            9339109,
+            9372726,
+            9415695,
+            9454741,
+            9459326,
+            9518910,
+            9734642,
+            10328130,
+            10348711,
+            10477778,
+            10494770,
+            10507841,
+            10666427,
+            11018168,
+            11583312,
+            11686338,
+            12069454,
+            14996674,
+            15208046,
+            15534175,
+            15638861,
+            15946211,
+            16493002,
+            16769590,
+            16846490,
+            17048007,
+            17107626,
+            17677000,
+            18752569,
+            18805967,
+            18936436,
+            19415820,
+            19536175,
+            19538716,
+            19591822,
+            19786296,
+            20352152,
+            20417488,
+            20556870,
+            21116184,
+            21121051,
+            21163921,
+            21291465,
+            21332313,
+            21422408,
+            21502573,
+            21564075,
+            21659962,
+            21857382,
+            21935354,
+            21955043,
+            22273812,
+            22295056,
+            22353194,
+            22403240,
+            22421107,
+            22540831,
+            22707612,
+            22879966,
+            22992668,
+            23016735,
+            23018527,
+            23150947,
+            23650146,
+            23776350
+          ],
+          "seq_region_name": "1",
+          "start": 169549811,
+          "strand": 1,
+          "clin_sig": [
+            "uncertain_significance",
+            "benign",
+            "pathogenic",
+            "drug_response",
+            "risk_factor",
+            "pathogenic_low_penetrance"
+          ],
+          "id": "rs6025",
+          "allele_string": "C/A/T",
+          "var_synonyms": {
+            "ClinVar": [
+              "RCV003493407",
+              "RCV003761828",
+              "RCV003764502",
+              "RCV000514863",
+              "VCV000226007",
+              "RCV000023935",
+              "RCV000616414",
+              "RCV000454249",
+              "RCV000205002",
+              "RCV000000676",
+              "RCV000000675",
+              "VCV000000642",
+              "RCV003227589",
+              "RCV002399305",
+              "RCV001806997",
+              "RCV001095681"
+            ],
+            "UniProt": [
+              "VAR_001213"
+            ],
+            "PharmGKB": [
+              "PA166153554"
+            ],
+            "OMIM": [
+              612309.0001
+            ]
+          }
+        }
+      ],
+      "seq_region_name": "1",
+      "start": 169549811,
+      "end": 169549811,
+      "assembly_name": "GRCh38"
+    }
+  ]
+}

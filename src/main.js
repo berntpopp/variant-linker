@@ -77,7 +77,7 @@ function readVariantsFromFile(filePath) {
  * @throws {Error} If required parameters are missing or invalid
  */
 function validateParams(params) {
-  const validOutputs = ['JSON', 'CSV', 'SCHEMA'];
+  const validOutputs = ['JSON', 'CSV', 'TSV', 'SCHEMA'];
 
   // Check if at least one variant source is provided
   const hasVariant = Boolean(params.variant);
@@ -363,11 +363,20 @@ async function main() {
 
     // Output the results
     if (mergedParams.save) {
-      fs.writeFileSync(mergedParams.save, JSON.stringify(result, null, 2));
+      // For CSV/TSV formats, result is already a formatted string
+      const output = ['CSV', 'TSV'].includes(mergedParams.output.toUpperCase())
+        ? result
+        : JSON.stringify(result, null, 2);
+      fs.writeFileSync(mergedParams.save, output);
       console.log(`Results saved to ${mergedParams.save}`);
     } else {
-      // Always output valid JSON to stdout.
-      console.log(JSON.stringify(result, null, 2));
+      // For CSV/TSV formats, result is already a formatted string
+      if (['CSV', 'TSV'].includes(mergedParams.output.toUpperCase())) {
+        console.log(result);
+      } else {
+        // For JSON format, stringify the object
+        console.log(JSON.stringify(result, null, 2));
+      }
     }
 
     debug('Variant analysis process completed successfully');

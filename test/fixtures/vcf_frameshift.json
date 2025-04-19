@@ -1,0 +1,185 @@
+{
+  "meta": {
+    "input": "9 130716739 . G GT",
+    "batchSize": 1,
+    "stepsPerformed": [
+      "Processing single variant"
+    ],
+    "startTime": "2025-04-19T09:08:18.396Z",
+    "endTime": "2025-04-19T09:08:20.168Z",
+    "durationMs": 1772,
+    "batchProcessing": false
+  },
+  "variantData": [
+    {
+      "T": {
+        "input": "9 130716739 . G GT",
+        "vcf_string": [
+          "9-130716739-T-TT",
+          "LRG_769-7859-T-TT"
+        ],
+        "spdi": [
+          "NC_000009.12:130716739::T",
+          "LRG_769:7859::T"
+        ],
+        "hgvsc": [
+          "ENST00000372348.9:c.136+2287dup",
+          "ENST00000393293.4:c.136+2287dup",
+          "NM_007313.3:c.136+2287dup",
+          "LRG_769t2:c.136+2287dup"
+        ],
+        "hgvsg": [
+          "NC_000009.12:g.130716742dup",
+          "LRG_769:g.7862dup"
+        ]
+      }
+    }
+  ],
+  "annotationData": [
+    {
+      "originalInput": "9 130716739 . G GT",
+      "inputFormat": "HGVS",
+      "input": "9 130716739 . T TT . . .",
+      "assembly_name": "GRCh38",
+      "end": 130716739,
+      "seq_region_name": "9",
+      "allele_string": "-/T",
+      "id": ".",
+      "strand": 1,
+      "transcript_consequences": [
+        {
+          "given_ref": "-",
+          "consequence_terms": [
+            "intron_variant"
+          ],
+          "hgvsc": "ENST00000372348.9:c.136+2287dup",
+          "gene_symbol_source": "HGNC",
+          "used_ref": "-",
+          "hgvs_offset": 3,
+          "gene_id": "ENSG00000097007",
+          "strand": 1,
+          "hgnc_id": "HGNC:76",
+          "biotype": "protein_coding",
+          "gene_symbol": "ABL1",
+          "transcript_id": "ENST00000372348",
+          "source": "Ensembl",
+          "variant_allele": "T",
+          "impact": "MODIFIER"
+        },
+        {
+          "source": "Ensembl",
+          "variant_allele": "T",
+          "transcript_id": "ENST00000393293",
+          "impact": "MODIFIER",
+          "gene_symbol": "ABL1",
+          "biotype": "protein_coding",
+          "strand": 1,
+          "hgnc_id": "HGNC:76",
+          "used_ref": "-",
+          "hgvs_offset": 3,
+          "gene_id": "ENSG00000097007",
+          "hgvsc": "ENST00000393293.4:c.136+2287dup",
+          "consequence_terms": [
+            "intron_variant"
+          ],
+          "gene_symbol_source": "HGNC",
+          "given_ref": "-",
+          "flags": [
+            "cds_end_NF"
+          ]
+        },
+        {
+          "consequence_terms": [
+            "downstream_gene_variant"
+          ],
+          "mane": [
+            "MANE_Select"
+          ],
+          "mane_select": "NM_001414901.1",
+          "distance": 3015,
+          "impact": "MODIFIER",
+          "gene_id": "ENSG00000288570",
+          "variant_allele": "T",
+          "source": "Ensembl",
+          "used_ref": "-",
+          "transcript_id": "ENST00000674075",
+          "strand": 1,
+          "given_ref": "-",
+          "biotype": "protein_coding"
+        },
+        {
+          "consequence_terms": [
+            "upstream_gene_variant"
+          ],
+          "transcript_id": "ENST00000819196",
+          "used_ref": "-",
+          "source": "Ensembl",
+          "variant_allele": "T",
+          "impact": "MODIFIER",
+          "gene_id": "ENSG00000306514",
+          "distance": 3745,
+          "strand": -1,
+          "biotype": "lncRNA",
+          "given_ref": "-"
+        },
+        {
+          "given_ref": "-",
+          "biotype": "lncRNA",
+          "strand": -1,
+          "transcript_id": "ENST00000819197",
+          "used_ref": "-",
+          "source": "Ensembl",
+          "variant_allele": "T",
+          "gene_id": "ENSG00000306514",
+          "impact": "MODIFIER",
+          "distance": 3433,
+          "consequence_terms": [
+            "upstream_gene_variant"
+          ]
+        },
+        {
+          "gene_id": "128092248",
+          "used_ref": "-",
+          "gene_symbol_source": "EntrezGene",
+          "consequence_terms": [
+            "downstream_gene_variant"
+          ],
+          "mane": [
+            "MANE_Select"
+          ],
+          "mane_select": "ENST00000674075.1",
+          "given_ref": "-",
+          "impact": "MODIFIER",
+          "distance": 3015,
+          "transcript_id": "NM_001414901.1",
+          "variant_allele": "T",
+          "source": "RefSeq",
+          "gene_symbol": "LOC128092248",
+          "biotype": "protein_coding",
+          "strand": 1
+        },
+        {
+          "gene_symbol_source": "EntrezGene",
+          "consequence_terms": [
+            "intron_variant"
+          ],
+          "hgvsc": "NM_007313.3:c.136+2287dup",
+          "gene_id": "25",
+          "hgvs_offset": 3,
+          "used_ref": "-",
+          "given_ref": "-",
+          "gene_symbol": "ABL1",
+          "impact": "MODIFIER",
+          "transcript_id": "NM_007313.3",
+          "source": "RefSeq",
+          "variant_allele": "T",
+          "hgnc_id": "HGNC:76",
+          "strand": 1,
+          "biotype": "protein_coding"
+        }
+      ],
+      "start": 130716740,
+      "most_severe_consequence": "intron_variant"
+    }
+  ]
+}

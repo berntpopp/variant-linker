@@ -1,0 +1,6 @@
+{
+  "timeout": 30000,
+  "reporter": "spec",
+  "bail": false,
+  "recursive": true
+}

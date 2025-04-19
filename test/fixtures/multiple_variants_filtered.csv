@@ -1,0 +1,7 @@
+OriginalInput,VEPInput,Location,Allele,MostSevereConsequence,Impact,GeneSymbol,GeneID,FeatureType,TranscriptID,ConsequenceTerms,MANE,HGVSc,HGVSp,ProteinPosition,Amino_acids,Codons,ExistingVariation,CADD,SIFT,PolyPhen
+1 169549811 . C A . . .,.,1:169549811-169549811(1),C/A,missense_variant,,,,,,,,,,,,,,,,
+1 169549811 . C T . . .,.,1:169549811-169549811(1),C/T,missense_variant,,,,,,,,,,,,,,,,
+17 7676154 . G T . . .,.,17:7676154-7676154(1),G/T,missense_variant,,,,,,,,,,,,,,,,
+17 7676154 . G C . . .,.,17:7676154-7676154(1),G/C,missense_variant,,,,,,,,,,,,,,,,
+17 7676154 . G A . . .,.,17:7676154-7676154(1),G/A,missense_variant,,,,,,,,,,,,,,,,
+3 46373455 . AGTCAGTATCAATTCTGGAAGAATTTCCAGACA A . . .,.,3:46373456-46373487(1),GTCAGTATCAATTCTGGAAGAATTTCCAGACA/-,frameshift_variant,,,,,,,,,,,,,,,,

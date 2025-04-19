@@ -1,0 +1,8 @@
+OriginalInput,VEPInput,Location,Allele,MostSevereConsequence,Impact,GeneSymbol,GeneID,FeatureType,TranscriptID,ConsequenceTerms,MANE,HGVSc,HGVSp,ProteinPosition,Amino_acids,Codons,ExistingVariation,CADD,SIFT,PolyPhen
+9 130716739 . T TT . . .,.,9:130716740-130716739(1),-/T,intron_variant,MODIFIER,ABL1,ENSG00000097007,,ENST00000372348,intron_variant,,ENST00000372348.9:c.136+2287dup,,,,,,,,
+9 130716739 . T TT . . .,.,9:130716740-130716739(1),-/T,intron_variant,MODIFIER,ABL1,ENSG00000097007,,ENST00000393293,intron_variant,,ENST00000393293.4:c.136+2287dup,,,,,,,,
+9 130716739 . T TT . . .,.,9:130716740-130716739(1),-/T,intron_variant,MODIFIER,,ENSG00000288570,,ENST00000674075,downstream_gene_variant,"[""MANE_Select""]",,,,,,,,,
+9 130716739 . T TT . . .,.,9:130716740-130716739(1),-/T,intron_variant,MODIFIER,,ENSG00000306514,,ENST00000819196,upstream_gene_variant,,,,,,,,,,
+9 130716739 . T TT . . .,.,9:130716740-130716739(1),-/T,intron_variant,MODIFIER,,ENSG00000306514,,ENST00000819197,upstream_gene_variant,,,,,,,,,,
+9 130716739 . T TT . . .,.,9:130716740-130716739(1),-/T,intron_variant,MODIFIER,LOC128092248,128092248,,NM_001414901.1,downstream_gene_variant,"[""MANE_Select""]",,,,,,,,,
+9 130716739 . T TT . . .,.,9:130716740-130716739(1),-/T,intron_variant,MODIFIER,ABL1,25,,NM_007313.3,intron_variant,,NM_007313.3:c.136+2287dup,,,,,,,,

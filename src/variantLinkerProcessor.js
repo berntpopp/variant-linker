@@ -13,6 +13,7 @@
 // Use fs only if in a Node environment.
 const fs = typeof window === 'undefined' ? require('fs') : null;
 const debug = require('debug')('variant-linker:processor');
+const { flattenAnnotationData, formatToTabular, defaultColumnConfig } = require('./dataExtractor');
 
 /**
  * Helper: Resolves a dot‐notation path from an object.
@@ -315,8 +316,34 @@ function filterAndFormatResults(results, filterParam, format) {
     case 'JSON':
       formattedResults = JSON.stringify(filteredResults, null, 2);
       break;
+    case 'CSV':
+    case 'TSV':
+      const delimiter = format.toUpperCase() === 'CSV' ? ',' : '\t';
+
+      // Ensure we're working with clean filtered data before flattening
+      const annotationToUse = Array.isArray(filteredResults.annotationData)
+        ? filteredResults.annotationData
+        : [];
+
+      // Flatten the nested annotation data using the "flatten by consequence" strategy
+      const flatRows = flattenAnnotationData(annotationToUse, defaultColumnConfig);
+
+      // Format the flattened data as CSV/TSV
+      formattedResults = formatToTabular(flatRows, defaultColumnConfig, delimiter, true);
+
+      filteredResults.meta.stepsPerformed.push(
+        `Formatted output as ${format.toUpperCase()} using flatten-by-consequence strategy` +
+          ` with ${flatRows.length} rows`
+      );
+      break;
+    case 'SCHEMA':
+      // Existing SCHEMA support will be added later
+      formattedResults = JSON.stringify(filteredResults, null, 2);
+      break;
     default:
-      throw new Error('Unsupported format');
+      throw new Error(
+        `Unsupported format: ${format}. Valid formats are JSON, CSV, TSV, and SCHEMA`
+      );
   }
   return formattedResults;
 }

@@ -369,15 +369,24 @@ async function analyzeVariant(params) {
     stepsPerformed.push('Schema.org output validated successfully.');
   }
 
+  let filterParam;
   if (params.filter) {
-    let filterParam;
     try {
       filterParam = JSON.parse(params.filter);
     } catch (err) {
       throw new Error(`Invalid filter JSON string: ${err.message}`);
     }
-    finalOutput = JSON.parse(filterAndFormatResults(finalOutput, filterParam, 'JSON'));
     stepsPerformed.push('Applied filtering to results.');
+  }
+
+  // Apply formatting based on output format
+  const outputFormat = params.output ? params.output.toUpperCase() : 'JSON';
+  if (['CSV', 'TSV'].includes(outputFormat)) {
+    // For CSV/TSV, return the formatted string directly
+    return filterAndFormatResults(finalOutput, filterParam, outputFormat);
+  } else if (outputFormat === 'JSON' && filterParam) {
+    // For JSON with filtering, parse the formatted JSON string back to an object
+    finalOutput = JSON.parse(filterAndFormatResults(finalOutput, filterParam, 'JSON'));
   }
 
   return finalOutput;
