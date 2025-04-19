@@ -1,6 +1,6 @@
 # Variant-Linker Benchmark Results
 
-Benchmark run completed on: 20.4.2025, 01:05:04
+Benchmark run completed on: 4/20/2025, 1:20:46 AM
 
 ## Benchmark Parameters
 
@@ -11,10 +11,10 @@ Benchmark run completed on: 20.4.2025, 01:05:04
 
 ## System Information
 
-- Node.js Version: v20.16.0
-- Platform: Windows_NT 10.0.26100
+- Node.js Version: v22.12.0
+- Platform: Linux 5.15.167.4-microsoft-standard-WSL2
 - CPU: 12th Gen Intel(R) Core(TM) i7-1260P (16 cores)
-- Memory Usage: 62MB / 119MB
+- Memory Usage: 63MB / 123MB
 
 ## Results
 
@@ -22,27 +22,27 @@ Benchmark run completed on: 20.4.2025, 01:05:04
 
 | Scenario | Runtime (s) | Variants | Time/Variant (s) | Retries | Chunks |
 | --- | --- | --- | --- | --- | --- |
-| Single Variant VCF | 3.07 | 1 | 3.0704 | 0 | 1 |
-| Single Variant rsID | 6.04 | 1 | 6.0398 | 0 | 1 |
-| Tiny Batch VCF | 2.51 | 10 | 0.2515 | 0 | 1 |
-| Tiny Batch HGVS/rsID | 6.01 | 13 | 0.4626 | 0 | 1 |
-| Small Batch VCF | 4.60 | 50 | 0.0920 | 0 | 1 |
-| Small Batch HGVS/rsID | 15.02 | 67 | 0.2242 | 1 | 1 |
-| Large Batch VCF | 21.55 | 499 | 0.0432 | 1 | 3 |
-| Large Batch HGVS/rsID | 90.72 | 680 | 0.1334 | 2 | 7 |
+| Single Variant VCF | 9.00 | 1 | 9.0024 | 0 | 1 |
+| Single Variant rsID | 10.14 | 1 | 10.1392 | 0 | 1 |
+| Tiny Batch VCF | 9.96 | 10 | 0.9963 | 0 | 1 |
+| Tiny Batch HGVS/rsID | 16.69 | 13 | 1.2840 | 0 | 1 |
+| Small Batch VCF | 13.43 | 50 | 0.2685 | 0 | 1 |
+| Small Batch HGVS/rsID | 24.75 | 67 | 0.3694 | 0 | 1 |
+| Large Batch VCF | 28.95 | 499 | 0.0580 | 0 | 3 |
+| Large Batch HGVS/rsID | 91.30 | 680 | 0.1343 | 1 | 7 |
 
 ### Detailed Statistics
 
 | Scenario | Min Runtime (s) | Max Runtime (s) | Std Deviation (s) | Success Ratio |
 | --- | --- | --- | --- | --- |
-| Single Variant VCF | 2.48 | 4.23 | 0.8194 | 3/3 |
-| Single Variant rsID | 2.82 | 8.46 | 2.3747 | 3/3 |
-| Tiny Batch VCF | 2.29 | 2.67 | 0.1621 | 3/3 |
-| Tiny Batch HGVS/rsID | 4.81 | 7.34 | 1.0379 | 3/3 |
-| Small Batch VCF | 3.52 | 5.84 | 0.9545 | 3/3 |
-| Small Batch HGVS/rsID | 12.19 | 19.90 | 3.4610 | 3/3 |
-| Large Batch VCF | 16.25 | 28.84 | 5.3264 | 3/3 |
-| Large Batch HGVS/rsID | 87.49 | 96.13 | 3.8490 | 3/3 |
+| Single Variant VCF | 8.24 | 9.46 | 0.5410 | 3/3 |
+| Single Variant rsID | 8.55 | 12.42 | 1.6560 | 3/3 |
+| Tiny Batch VCF | 8.99 | 11.36 | 1.0135 | 3/3 |
+| Tiny Batch HGVS/rsID | 14.70 | 17.87 | 1.4143 | 3/3 |
+| Small Batch VCF | 10.02 | 18.91 | 3.9161 | 3/3 |
+| Small Batch HGVS/rsID | 18.19 | 29.94 | 4.8912 | 3/3 |
+| Large Batch VCF | 23.74 | 32.11 | 3.7122 | 3/3 |
+| Large Batch HGVS/rsID | 86.23 | 97.50 | 4.6712 | 3/3 |
 
 ## Notes
 
