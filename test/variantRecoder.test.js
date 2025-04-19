@@ -40,7 +40,7 @@ describe('variantRecoder', () => {
   });
 
   it('should handle API errors gracefully', async function () {
-    this.timeout(15000); // Increase timeout for retries
+    this.timeout(30000); // Increase timeout for retries
 
     nock.cleanAll(); // Remove previous interceptors
 

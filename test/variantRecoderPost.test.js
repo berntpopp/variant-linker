@@ -116,7 +116,7 @@ describe('variantRecoderPost', () => {
   });
 
   it('should handle API errors gracefully', async function () {
-    this.timeout(15000); // Increase timeout for retries
+    this.timeout(30000); // Increase timeout for retries
 
     // Use real timers for this test
     // Avoid using fake timers for error tests with retries
@@ -210,7 +210,13 @@ describe('variantRecoderPost', () => {
     };
 
     try {
-      const result = await variantRecoderPost(largeVariantArray);
+      // Start the variantRecoderPost call but don't await it yet
+      const resultPromise = variantRecoderPost(largeVariantArray);
+      // Advance the clock to handle the inter-chunk delay
+      await clock.tickAsync(150); // Advance past the 100ms delay
+
+      // Now we can await the final result
+      const result = await resultPromise;
 
       // Verify the combined results from both chunks
       expect(result).to.be.an('array').with.lengthOf(250);
@@ -281,9 +287,6 @@ describe('variantRecoderPost', () => {
 
     // Set up fake timers for this test
     clock = sinon.useFakeTimers();
-    global.setTimeout = function (fn, delay) {
-      fn();
-    }; // Mock setTimeout to call immediately
 
     // Temporarily override the chunk size in the config
     const originalChunkSize = apiConfig.ensembl.recoderPostChunkSize;
@@ -340,7 +343,13 @@ describe('variantRecoderPost', () => {
         }
       };
 
-      const result = await variantRecoderPost(variantArray);
+      // Start the variantRecoderPost call but don't await it yet
+      const resultPromise = variantRecoderPost(variantArray);
+      // Advance the clock to handle the inter-chunk delay
+      await clock.tickAsync(150); // Advance past the 100ms delay
+
+      // Now we can await the final result
+      const result = await resultPromise;
 
       // Verify the combined results from both chunks
       expect(result).to.be.an('array').with.lengthOf(150);

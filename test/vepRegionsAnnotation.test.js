@@ -6,7 +6,6 @@ const nock = require('nock');
 const vepRegionsAnnotation = require('../src/vepRegionsAnnotation');
 const apiConfig = require('../config/apiConfig.json');
 const sinon = require('sinon');
-const { fetchApi } = require('../src/apiHelper');
 
 describe('vepRegionsAnnotation', () => {
   // Use the environment variable override if set, otherwise use the config baseUrl
@@ -17,8 +16,6 @@ describe('vepRegionsAnnotation', () => {
 
   // Clock for testing timers (only used in specific tests)
   let clock;
-  // Original setTimeout to restore after tests
-  const originalSetTimeout = global.setTimeout;
 
   // Mock response for the API
   const mockResponse = [
@@ -121,9 +118,6 @@ describe('vepRegionsAnnotation', () => {
 
     // Set up fake timers for this test
     clock = sinon.useFakeTimers();
-    global.setTimeout = function (fn, delay) {
-      fn();
-    }; // Mock setTimeout to call immediately
 
     // Create a larger array of variants to test chunking
     const largeVariantArray = [];
@@ -162,25 +156,23 @@ describe('vepRegionsAnnotation', () => {
     });
 
     // Stub fetchApi to return appropriate responses
-    let callCount = 0;
-    const apiHelper = require('../src/apiHelper');
-    const fetchApiOriginal = apiHelper.fetchApi;
+    const fetchApiStub = sinon.stub(apiHelper, 'fetchApi');
+    fetchApiStub.onCall(0).callsFake((endpoint, options, cacheEnabled, method, requestBody) => {
+      expect(requestBody.variants).to.have.lengthOf(200); // First chunk should have 200 variants
+      expect(requestBody.variants).to.deep.equal(firstChunkVariants);
+      return Promise.resolve(firstChunkResponse);
+    });
+
+    fetchApiStub.onCall(1).callsFake((endpoint, options, cacheEnabled, method, requestBody) => {
+      expect(requestBody.variants).to.have.lengthOf(50); // Second chunk should have 50 variants
+      expect(requestBody.variants).to.deep.equal(secondChunkVariants);
+      return Promise.resolve(secondChunkResponse);
+    });
 
     try {
-      apiHelper.fetchApi = function (endpoint, options, cacheEnabled, method, requestBody) {
-        callCount++;
-        if (callCount === 1) {
-          expect(requestBody.variants).to.have.lengthOf(200);
-          expect(requestBody.variants).to.deep.equal(firstChunkVariants);
-          return Promise.resolve(firstChunkResponse);
-        } else {
-          expect(requestBody.variants).to.have.lengthOf(50);
-          expect(requestBody.variants).to.deep.equal(secondChunkVariants);
-          return Promise.resolve(secondChunkResponse);
-        }
-      };
-
-      const result = await vepRegionsAnnotation(largeVariantArray);
+      const resultPromise = vepRegionsAnnotation(largeVariantArray);
+      await clock.tickAsync(150); // Advance clock to trigger the second chunk
+      const result = await resultPromise;
 
       // Verify the combined results from both chunks
       expect(result).to.be.an('array').with.lengthOf(250);
@@ -194,11 +186,10 @@ describe('vepRegionsAnnotation', () => {
       expect(result[249]).to.have.property('seq_region_name', '250');
 
       // Verify the API was called twice
-      expect(callCount).to.equal(2);
+      expect(fetchApiStub.callCount).to.equal(2);
     } finally {
-      // Restore the original fetchApi and setTimeout
-      apiHelper.fetchApi = fetchApiOriginal;
-      global.setTimeout = originalSetTimeout;
+      // Restore the stub
+      fetchApiStub.restore();
     }
   });
 
@@ -250,9 +241,6 @@ describe('vepRegionsAnnotation', () => {
 
     // Set up fake timers for this test
     clock = sinon.useFakeTimers();
-    global.setTimeout = function (fn, delay) {
-      fn();
-    }; // Mock setTimeout to call immediately
 
     // Temporarily override the chunk size in the config
     const originalChunkSize = apiConfig.ensembl.vepPostChunkSize;
@@ -296,36 +284,30 @@ describe('vepRegionsAnnotation', () => {
       });
 
       // Stub fetchApi to return appropriate responses
-      let callCount = 0;
-      const apiHelper = require('../src/apiHelper');
+      const fetchApiStub = sinon.stub(apiHelper, 'fetchApi');
+      fetchApiStub.onCall(0).callsFake((endpoint, options, cacheEnabled, method, requestBody) => {
+        expect(requestBody.variants).to.have.lengthOf(100); // Should match custom chunk size
+        expect(requestBody.variants).to.deep.equal(firstChunkVariants);
+        return Promise.resolve(firstChunkResponse);
+      });
 
-      apiHelper.fetchApi = (endpoint, options, cacheEnabled, method, requestBody) => {
-        callCount++;
-        if (callCount === 1) {
-          expect(requestBody.variants).to.have.lengthOf(100); // Should match custom chunk size
-          expect(requestBody.variants).to.deep.equal(firstChunkVariants);
-          return Promise.resolve(firstChunkResponse);
-        } else {
-          expect(requestBody.variants).to.have.lengthOf(50); // Second chunk should have 50 variants
-          expect(requestBody.variants).to.deep.equal(secondChunkVariants);
-          return Promise.resolve(secondChunkResponse);
-        }
-      };
+      fetchApiStub.onCall(1).callsFake((endpoint, options, cacheEnabled, method, requestBody) => {
+        expect(requestBody.variants).to.have.lengthOf(50); // Second chunk should have 50 variants
+        expect(requestBody.variants).to.deep.equal(secondChunkVariants);
+        return Promise.resolve(secondChunkResponse);
+      });
 
-      const result = await vepRegionsAnnotation(variantArray);
+      const resultPromise = vepRegionsAnnotation(variantArray);
+      await clock.tickAsync(150); // Advance clock to trigger the second chunk
+      const result = await resultPromise;
 
       // Verify the combined results from both chunks
       expect(result).to.be.an('array').with.lengthOf(150);
-      expect(callCount).to.equal(2); // Should make exactly two API calls
+      expect(fetchApiStub.callCount).to.equal(2); // Should make exactly two API calls
     } finally {
-      // Restore original setTimeout and chunk size regardless of test outcome
-      global.setTimeout = originalSetTimeout;
+      // Restore chunk size and stub regardless of test outcome
       apiConfig.ensembl.vepPostChunkSize = originalChunkSize;
-
-      // Restore fetchApi if it was replaced
-      if (typeof require('../src/apiHelper').fetchApi !== 'function') {
-        require('../src/apiHelper').fetchApi = fetchApi;
-      }
+      fetchApiStub.restore();
     }
   });
 });

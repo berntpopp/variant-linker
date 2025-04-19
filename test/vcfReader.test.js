@@ -29,13 +29,7 @@ describe('VCF Reader', () => {
 
     // Mock the fs module to return our test VCF content
     sandbox.stub(fs, 'existsSync').returns(true);
-    sandbox.stub(fs, 'createReadStream').callsFake(() => {
-      const { Readable } = require('stream');
-      const stream = new Readable();
-      stream.push(mockVcfContent);
-      stream.push(null);
-      return stream;
-    });
+    sandbox.stub(fs, 'readFileSync').withArgs(testVcfPath, 'utf8').returns(mockVcfContent);
   });
 
   afterEach(() => {
@@ -80,15 +74,9 @@ describe('VCF Reader', () => {
 1\t12345\t.\tA\tG\t.\tPASS\tDP=50;AF=0.5
 `;
 
-    // Replace the createReadStream stub to return our new content
-    fs.createReadStream.restore();
-    sandbox.stub(fs, 'createReadStream').callsFake(() => {
-      const { Readable } = require('stream');
-      const stream = new Readable();
-      stream.push(mockVcfContentWithoutFileformat);
-      stream.push(null);
-      return stream;
-    });
+    // Replace the readFileSync stub to return our new content
+    fs.readFileSync.restore();
+    sandbox.stub(fs, 'readFileSync').withArgs(testVcfPath, 'utf8').returns(mockVcfContentWithoutFileformat);
 
     const result = await readVariantsFromVcf(testVcfPath);
 
@@ -97,6 +85,7 @@ describe('VCF Reader', () => {
     expect(result.variantsToProcess).to.be.an('array');
     expect(result.headerLines).to.be.an('array');
     expect(result.headerLines).to.have.lengthOf(3); // 2 header lines + CHROM line
+    // The header should be preserved as-is, with the first line being ##reference=GRCh38
     expect(result.headerLines[0]).to.equal('##reference=GRCh38');
   });
 

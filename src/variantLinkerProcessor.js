@@ -458,10 +458,21 @@ function _formatResultsToVcf(results, vcfRecordMap, vcfHeaderLines) {
     (vcfRecordMap && vcfRecordMap.size > 0) || (vcfHeaderLines && vcfHeaderLines.length > 0);
 
   // Use provided header or generate a default one if missing
-  const finalVcfHeaderLines =
+  let finalVcfHeaderLines =
     vcfHeaderLines && vcfHeaderLines.length > 0
       ? [...vcfHeaderLines] // Use a copy
       : _generateDefaultVcfHeader();
+
+  // Ensure ##fileformat=VCFv4.2 is always the first line
+  const fileformatRegex = /^##fileformat=/i;
+  const hasFileformat =
+    finalVcfHeaderLines.length > 0 && fileformatRegex.test(finalVcfHeaderLines[0]);
+  if (!hasFileformat) {
+    // Remove any fileformat lines elsewhere (shouldn't happen, but KISS/DRY)
+    finalVcfHeaderLines = finalVcfHeaderLines.filter((line) => !fileformatRegex.test(line));
+    // Insert at the top
+    finalVcfHeaderLines.unshift('##fileformat=VCFv4.2');
+  }
 
   // Define VL_CSQ format following VEP's convention - ensure this matches _generateDefaultVcfHeader
   const vlCsqFormat = [
