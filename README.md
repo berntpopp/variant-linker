@@ -13,7 +13,7 @@ In addition to its CLI capabilities, Variant-Linker is designed with a modular a
 - **Extensibility**: Prepared for future extensions to include local installations of VEP and Variant Recoder.
 - **Output Customization**: Users can specify the output format (JSON, CSV, TSV) with configurable field selection.
 - **Tabular Data Export**: Provides CSV and TSV output with a "flatten by consequence" strategy for comprehensive variant analysis.
-- **VCF Handling**: Detects and processes VCF formatted input, converting it to the necessary format for Ensembl region-based annotation.
+- **VCF Handling**: Detects and processes VCF formatted input, converting it to the necessary format for Ensembl region-based annotation. Supports both VCF input and output formats, preserving original VCF metadata.
 - **Exponential Backoff Retry**: Implements automatic retry with exponential backoff for transient API errors, improving reliability when Ensembl services experience temporary issues.
 - **Configuration File Support**: Allows users to provide parameters through a structured configuration file.
 
@@ -54,6 +54,9 @@ variant-linker --variants-file <file_path> --output <output_format> [--debug]
 
 # Process multiple variants as a comma-separated list
 variant-linker --variants <variant1,variant2,variant3> --output <output_format> [--debug]
+
+# Process variants from a VCF file
+variant-linker --vcf-input <vcf_file_path> --output <output_format> [--debug]
 ```
 
 #### Command-Line Options
@@ -61,7 +64,8 @@ variant-linker --variants <variant1,variant2,variant3> --output <output_format> 
 - `--variant`, `-v`: Specify a single genetic variant to be analyzed.
 - `--variants-file`, `-vf`: Path to a file containing variants to be analyzed (one per line).
 - `--variants`, `-vs`: Comma-separated list of variants to be analyzed.
-- `--output`, `-o`: Define the desired output format (JSON, CSV, TSV). Default is JSON.
+- `--vcf-input`, `-vi`: Path to a VCF file containing variants to be analyzed.
+- `--output`, `-o`: Define the desired output format (JSON, CSV, TSV, VCF). Default is JSON. Note that VCF output requires VCF input.
 - `--save`, `-s`: Filename to save the results. If not specified, results will be printed to the console.
 - `--debug`, `-d`: Enable debug mode for detailed logging. This is optional and is not enabled by default.
 - `--vep_params`, `--vp`: Optional parameters for VEP annotation in key=value format, separated by commas (default: "CADD=1").
@@ -194,6 +198,9 @@ variant-linker --variant 'rs6025' --output CSV
 
 # TSV output
 variant-linker --variant '9 130716739 . G GT' --output TSV
+
+# VCF input and output
+variant-linker --vcf-input sample.vcf --output VCF
 ```
 
 Using a configuration file:
@@ -204,6 +211,23 @@ variant-linker --config example_input.json
 ### CSV and TSV Output
 
 Variant-Linker provides CSV and TSV output for variant annotations, using a "flatten by consequence" strategy that creates one row per transcript consequence for each variant.
+
+### VCF Input and Output
+
+Variant-Linker can read standard VCF (Variant Call Format) files via the `--vcf-input` option and can also produce annotated VCF files by specifying `--output VCF`. This allows for direct integration into bioinformatics workflows.
+
+#### VCF Input Features
+
+- **Header Preservation**: The original VCF header is preserved, including all metadata.
+- **Multi-allelic Site Handling**: Multi-allelic sites in the input VCF are properly split and processed as separate variants.
+- **VCF Record Mapping**: Each variant from the VCF is mapped to maintain its original context.
+
+#### VCF Output Features
+
+- **Standard Compliant**: Generated VCF output adheres to VCF v4.2 specifications.
+- **INFO Field Annotation**: Annotations are added as an `INFO` field named `VL_CSQ` with a pipe-delimited format similar to VEP's CSQ notation.
+- **VL_CSQ Format**: The `VL_CSQ` field contains key information including consequence terms, impact, gene symbols, transcript IDs, and protein changes.
+- **Original Data Preservation**: All original VCF data is preserved in the output, including existing INFO fields.
 
 #### CSV/TSV Features
 

@@ -12,6 +12,7 @@ const yargs = require('yargs');
 const packageJson = require('../package.json');
 const { analyzeVariant } = require('./variantLinkerCore');
 const { getBaseUrl } = require('./configHelper');
+const { readVariantsFromVcf } = require('./vcfReader');
 
 // Set up debug loggers.
 const debug = require('debug')('variant-linker:main');
@@ -77,19 +78,30 @@ function readVariantsFromFile(filePath) {
  * @throws {Error} If required parameters are missing or invalid
  */
 function validateParams(params) {
-  const validOutputs = ['JSON', 'CSV', 'TSV', 'SCHEMA'];
+  const validOutputs = ['JSON', 'CSV', 'TSV', 'SCHEMA', 'VCF'];
 
   // Check if at least one variant source is provided
   const hasVariant = Boolean(params.variant);
   const hasVariantsFile = Boolean(params.variantsFile); // Using camelCase
+  const hasVcfInput = Boolean(params.vcfInput);
   // Check variants parameter format
   const hasVariantsParam = Boolean(params.variants);
   const isStringType = hasVariantsParam && typeof params.variants === 'string';
   const hasVariantsList = Boolean(isStringType);
 
-  if (!hasVariant && !hasVariantsFile && !hasVariantsList) {
+  // Check for multiple input methods
+  const inputMethods = [hasVariant, hasVariantsFile, hasVariantsList, hasVcfInput];
+  const inputMethodCount = inputMethods.filter(Boolean).length;
+
+  if (inputMethodCount === 0) {
     throw new Error(
-      'At least one variant source is required: --variant, --variants-file, or --variants'
+      'At least one variant source is required: --variant, --variants-file, --variants, or --vcf-input'
+    );
+  }
+
+  if (inputMethodCount > 1) {
+    throw new Error(
+      'Only one variant source can be provided at a time: --variant, --variants-file, --variants, or --vcf-input'
     );
   }
 
@@ -101,6 +113,11 @@ function validateParams(params) {
     throw new Error(
       `Invalid output format: ${params.output}. Valid formats are ${validOutputs.join(', ')}`
     );
+  }
+
+  // VCF output requires VCF input
+  if (params.output === 'VCF' && !hasVcfInput) {
+    throw new Error('VCF output format requires --vcf-input to be provided');
   }
 
   if (params.debug && (typeof params.debug !== 'number' || params.debug < 1 || params.debug > 3)) {
@@ -215,6 +232,11 @@ const argv = yargs
     description: 'Path to log file for debug info',
     type: 'string',
   })
+  .option('vcf-input', {
+    alias: 'vi',
+    description: 'Path to VCF file to analyze',
+    type: 'string',
+  })
   .option('cache', {
     alias: 'C',
     description: 'Enable caching of API responses',
@@ -326,25 +348,43 @@ async function main() {
 
     // Collect variants from all possible sources
     let variants = [];
+    let vcfRecordMap;
+    let vcfHeaderText;
+    let vcfHeaderLines;
 
-    // Add single variant if provided
-    if (mergedParams.variant) {
-      variants.push(mergedParams.variant);
-    }
+    // Process VCF input if provided
+    if (mergedParams.vcfInput) {
+      debug(`Reading variants from VCF file: ${mergedParams.vcfInput}`);
+      try {
+        const vcfData = await readVariantsFromVcf(mergedParams.vcfInput);
+        variants = vcfData.variantsToProcess;
+        vcfRecordMap = vcfData.vcfRecordMap;
+        vcfHeaderText = vcfData.headerText;
+        vcfHeaderLines = vcfData.headerLines;
+        debug(`Read ${variants.length} variants from VCF file`);
+      } catch (error) {
+        throw new Error(`Error reading VCF file: ${error.message}`);
+      }
+    } else {
+      // Add single variant if provided
+      if (mergedParams.variant) {
+        variants.push(mergedParams.variant);
+      }
 
-    // Add variants from comma-separated list if provided
-    if (mergedParams.variants) {
-      const variantsList = mergedParams.variants
-        .split(',')
-        .map((v) => v.trim())
-        .filter(Boolean);
-      variants = [...variants, ...variantsList];
-    }
+      // Add variants from comma-separated list if provided
+      if (mergedParams.variants) {
+        const variantsList = mergedParams.variants
+          .split(',')
+          .map((v) => v.trim())
+          .filter(Boolean);
+        variants = [...variants, ...variantsList];
+      }
 
-    // Add variants from file if provided
-    if (mergedParams.variantsFile) {
-      const fileVariants = readVariantsFromFile(mergedParams.variantsFile);
-      variants = [...variants, ...fileVariants];
+      // Add variants from file if provided
+      if (mergedParams.variantsFile) {
+        const fileVariants = readVariantsFromFile(mergedParams.variantsFile);
+        variants = [...variants, ...fileVariants];
+      }
     }
 
     debug(`Processing ${variants.length} variants`);
@@ -359,19 +399,23 @@ async function main() {
       scoringConfigPath: mergedParams.scoring_config_path,
       output: mergedParams.output,
       filter: mergedParams.filter,
+      // Pass VCF data if available
+      vcfRecordMap,
+      vcfHeaderText,
+      vcfHeaderLines,
     });
 
     // Output the results
     if (mergedParams.save) {
-      // For CSV/TSV formats, result is already a formatted string
-      const output = ['CSV', 'TSV'].includes(mergedParams.output.toUpperCase())
+      // For CSV/TSV/VCF formats, result is already a formatted string
+      const output = ['CSV', 'TSV', 'VCF'].includes(mergedParams.output.toUpperCase())
         ? result
         : JSON.stringify(result, null, 2);
       fs.writeFileSync(mergedParams.save, output);
       console.log(`Results saved to ${mergedParams.save}`);
     } else {
-      // For CSV/TSV formats, result is already a formatted string
-      if (['CSV', 'TSV'].includes(mergedParams.output.toUpperCase())) {
+      // For CSV/TSV/VCF formats, result is already a formatted string
+      if (['CSV', 'TSV', 'VCF'].includes(mergedParams.output.toUpperCase())) {
         console.log(result);
       } else {
         // For JSON format, stringify the object

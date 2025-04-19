@@ -263,18 +263,30 @@ function formatResults(results, format = 'table') {
 
   // Determine if we have partial results
   const hasPartials = validResults.some((r) => r.status === 'partial');
-  
+
   // Determine if we have repeated runs with statistics
-  const hasDetailedStats = validResults.some(r => 'minExecutionTime' in r && 'maxExecutionTime' in r);
+  const hasDetailedStats = validResults.some(
+    (r) => 'minExecutionTime' in r && 'maxExecutionTime' in r
+  );
 
   // Prepare data for table
   let header = ['Scenario', 'Runtime (s)', 'Variants', 'Time/Variant (s)', 'Retries', 'Chunks'];
-  
+
   // Add columns for detailed stats if available
   if (hasDetailedStats) {
-    header = ['Scenario', 'Avg Runtime (s)', 'Min (s)', 'Max (s)', 'StdDev (s)', 'Variants', 'Time/Variant (s)', 'Retries', 'Chunks'];
+    header = [
+      'Scenario',
+      'Avg Runtime (s)',
+      'Min (s)',
+      'Max (s)',
+      'StdDev (s)',
+      'Variants',
+      'Time/Variant (s)',
+      'Retries',
+      'Chunks',
+    ];
   }
-  
+
   if (hasPartials) {
     header.push('Success');
   }
@@ -282,7 +294,7 @@ function formatResults(results, format = 'table') {
   // Format each row of data
   const data = validResults.map((result) => {
     let row;
-    
+
     if (hasDetailedStats && 'minExecutionTime' in result) {
       row = [
         result.name,
@@ -312,38 +324,29 @@ function formatResults(results, format = 'table') {
 
     return row;
   });
-  
+
   // Add error rows if any
-  const errorRows = errorResults.map(result => {
+  const errorRows = errorResults.map((result) => {
     const errorRow = [result.name, 'ERROR', '-', '-', '-', '-'];
     if (hasDetailedStats) {
       return [result.name, 'ERROR', '-', '-', '-', '-', '-', '-', '-'];
     }
     return errorRow;
   });
-  
+
   const allRows = [...data, ...errorRows];
 
   // Format as requested
   switch (format.toLowerCase()) {
     case 'csv':
-      return [
-        header.join(','),
-        ...allRows.map((row) => row.join(',')),
-      ].join('\n');
+      return [header.join(','), ...allRows.map((row) => row.join(','))].join('\n');
 
     case 'tsv':
-      return [
-        header.join('\t'),
-        ...allRows.map((row) => row.join('\t')),
-      ].join('\n');
+      return [header.join('\t'), ...allRows.map((row) => row.join('\t'))].join('\n');
 
     case 'table':
     default:
-      return table([
-        [...header],
-        ...allRows,
-      ], {
+      return table([[...header], ...allRows], {
         header: {
           alignment: 'center',
           content: '📊 BENCHMARK RESULTS',
@@ -469,7 +472,7 @@ async function runBenchmarkScenario(scenario, options = {}) {
               chunkCount = Math.ceil(variantCount / 10);
               if (chunkCount < 1) chunkCount = 1;
               debugLog(
-                `   Inferred ${chunkCount} chunks based on ${variantCount} variants and assumed batch size`
+                `   Inferred ${chunkCount} chunks (${variantCount} variants, assumed batch size)`
               );
             } else {
               chunkCount = 1; // At least one chunk if we have output
@@ -609,16 +612,18 @@ async function runBenchmarkScenario(scenario, options = {}) {
     const successfulRuns = results.filter((r) => r.status === 'success');
 
     // Calculate average metrics
-    const executionTimes = successfulRuns.map(r => r.executionTime);
-    const avgExecutionTime = executionTimes.reduce((acc, time) => acc + time, 0) / executionTimes.length;
+    const executionTimes = successfulRuns.map((r) => r.executionTime);
+    const avgExecutionTime =
+      executionTimes.reduce((acc, time) => acc + time, 0) / executionTimes.length;
     const minExecutionTime = Math.min(...executionTimes);
     const maxExecutionTime = Math.max(...executionTimes);
-    
+
     // Calculate standard deviation
-    const variance = executionTimes.reduce((acc, time) => {
-      const diff = time - avgExecutionTime;
-      return acc + (diff * diff);
-    }, 0) / executionTimes.length;
+    const variance =
+      executionTimes.reduce((acc, time) => {
+        const diff = time - avgExecutionTime;
+        return acc + diff * diff;
+      }, 0) / executionTimes.length;
     const stdDeviation = Math.sqrt(variance);
 
     const avgVariantsProcessed = Math.round(

@@ -336,13 +336,30 @@ function filterAndFormatResults(results, filterParam, format) {
           ` with ${flatRows.length} rows`
       );
       break;
+    case 'VCF':
+      // Ensure necessary VCF data is provided
+      if (!results.vcfRecordMap || !results.vcfHeaderLines) {
+        throw new Error('VCF output requires VCF input data');
+      }
+
+      // Format results as VCF
+      formattedResults = _formatResultsToVcf(
+        filteredResults,
+        results.vcfRecordMap,
+        results.vcfHeaderLines
+      );
+
+      filteredResults.meta.stepsPerformed.push(
+        `Formatted output as VCF with annotations added as VL_CSQ INFO field`
+      );
+      break;
     case 'SCHEMA':
       // Existing SCHEMA support will be added later
       formattedResults = JSON.stringify(filteredResults, null, 2);
       break;
     default:
       throw new Error(
-        `Unsupported format: ${format}. Valid formats are JSON, CSV, TSV, and SCHEMA`
+        `Unsupported format: ${format}. Valid formats are JSON, CSV, TSV, VCF, and SCHEMA`
       );
   }
   return formattedResults;
@@ -370,9 +387,271 @@ function outputResults(results, filename) {
   }
 }
 
+/**
+ * Formats annotation results to VCF format with annotations added as INFO fields.
+ *
+ * @param {Object} results - The filtered annotation results
+ * @param {Map} vcfRecordMap - Map of variant keys to original VCF record data
+ * @param {Array<string>} vcfHeaderLines - Original VCF header lines
+ * @returns {string} Formatted VCF content
+ * @private
+ */
+function _formatResultsToVcf(results, vcfRecordMap, vcfHeaderLines) {
+  const outputLines = [];
+
+  // Define the format for the VL_CSQ INFO field
+  // These fields are derived from defaultColumnConfig in dataExtractor.js
+  const vlCsqFormat = [
+    'Allele',
+    'Consequence',
+    'IMPACT',
+    'SYMBOL',
+    'Gene',
+    'Feature_type',
+    'Feature',
+    'BIOTYPE',
+    'HGVSc',
+    'HGVSp',
+    'Protein_position',
+    'Amino_acids',
+    'Codons',
+    'SIFT',
+    'PolyPhen',
+  ];
+
+  // Create VL_CSQ info field definition
+  const csqInfoDef = `##INFO=<ID=VL_CSQ,Number=.,Type=String,Description="Variant Linker consequence annotations. Format: ${vlCsqFormat.join('|')}">`;
+
+  // Process header
+  let hasFileFormat = false;
+  let hasInfoVlCsq = false;
+  let chromLine = null;
+
+  // First pass to check for required headers
+  for (const line of vcfHeaderLines) {
+    if (line.startsWith('##fileformat=')) {
+      hasFileFormat = true;
+    } else if (line.startsWith('##INFO=<ID=VL_CSQ,')) {
+      hasInfoVlCsq = true;
+    } else if (line.startsWith('#CHROM')) {
+      chromLine = line;
+    }
+  }
+
+  // Generate final header
+  // Add fileformat if missing
+  if (!hasFileFormat) {
+    outputLines.push('##fileformat=VCFv4.2');
+    debug('Added missing ##fileformat line to VCF output');
+  }
+
+  // Add all original header lines except #CHROM (which goes last)
+  for (const line of vcfHeaderLines) {
+    if (!line.startsWith('#CHROM')) {
+      outputLines.push(line);
+    }
+  }
+
+  // Add VL_CSQ info definition if not already present
+  if (!hasInfoVlCsq) {
+    outputLines.push(csqInfoDef);
+  }
+
+  // Add #CHROM line last in header
+  if (chromLine) {
+    outputLines.push(chromLine);
+  } else {
+    // Fallback CHROM line if original not available
+    outputLines.push('#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO');
+    debug('Added default #CHROM line to VCF output');
+  }
+
+  // Group annotations by variant key for faster lookup
+  const annotationsByKey = {};
+  if (Array.isArray(results.annotationData)) {
+    for (const annotation of results.annotationData) {
+      // Use the originalInput field which is in the format 'CHROM-POS-REF-ALT'
+      if (annotation.originalInput) {
+        // Convert from 'CHROM-POS-REF-ALT' format to 'CHROM:POS:REF:ALT' for key matching
+        const parts = annotation.originalInput.split('-');
+        if (parts.length === 4) {
+          const key = `${parts[0]}:${parts[1]}:${parts[2]}:${parts[3]}`;
+          annotationsByKey[key] = annotation;
+        }
+      }
+    }
+  }
+
+  debug(`Mapped ${Object.keys(annotationsByKey).length} annotations for VCF output`);
+
+  // Group records by position for multi-allelic handling
+  const positionGroups = new Map();
+
+  // First pass - group by chrom:pos:ref
+  for (const [key, entry] of vcfRecordMap.entries()) {
+    const { originalRecord } = entry;
+    if (!originalRecord) {
+      debug(`Warning: No original record found for variant key: ${key}`);
+      continue;
+    }
+
+    const chrom = originalRecord.CHROM || '';
+    const pos = originalRecord.POS || '';
+    const ref = originalRecord.REF || '';
+
+    // Use chrom:pos:ref as the key for grouping
+    const posKey = `${chrom}:${pos}:${ref}`;
+
+    if (!positionGroups.has(posKey)) {
+      positionGroups.set(posKey, {
+        records: [],
+        annotations: [],
+      });
+    }
+
+    const group = positionGroups.get(posKey);
+    group.records.push({
+      key,
+      entry,
+    });
+
+    // Add annotations if available
+    const annotation = annotationsByKey[key];
+    if (annotation) {
+      group.annotations.push({
+        alt: entry.alt,
+        annotation,
+      });
+    }
+  }
+
+  // Second pass - create VCF lines by position group
+  for (const [, group] of positionGroups.entries()) {
+    if (group.records.length === 0) continue;
+
+    // Use the first record as the base
+    const baseRecord = group.records[0].entry.originalRecord;
+    const chrom = baseRecord.CHROM || '';
+    const pos = baseRecord.POS || '';
+    const id = baseRecord.ID
+      ? Array.isArray(baseRecord.ID)
+        ? baseRecord.ID.join(';')
+        : baseRecord.ID
+      : '.';
+    const ref = baseRecord.REF || '';
+
+    // Collect all ALT alleles
+    const altAlleles = group.records.map((r) => r.entry.alt).filter(Boolean);
+    const uniqueAltAlleles = [...new Set(altAlleles)];
+    const alt = uniqueAltAlleles.join(',');
+
+    const qual = baseRecord.QUAL || '.';
+    const filter = baseRecord.FILTER
+      ? Array.isArray(baseRecord.FILTER)
+        ? baseRecord.FILTER.join(';')
+        : baseRecord.FILTER
+      : '.';
+
+    // Collect INFO fields from the base record
+    let info = baseRecord.INFO
+      ? Object.entries(baseRecord.INFO)
+          .map(([key, val]) => {
+            if (val === true) return key;
+            return `${key}=${val}`;
+          })
+          .join(';')
+      : '.';
+
+    // Build VL_CSQ values for each allele
+    const alleleToConsqMap = new Map();
+
+    for (const { alt, annotation } of group.annotations) {
+      if (
+        !annotation.transcript_consequences ||
+        !Array.isArray(annotation.transcript_consequences) ||
+        annotation.transcript_consequences.length === 0
+      ) {
+        continue;
+      }
+
+      const csqValues = [];
+
+      for (const consequence of annotation.transcript_consequences) {
+        // Create a pipe-delimited string following vlCsqFormat
+        const csqParts = vlCsqFormat.map((field) => {
+          switch (field) {
+            case 'Allele':
+              return alt || '';
+            case 'Consequence':
+              return Array.isArray(consequence.consequence_terms)
+                ? consequence.consequence_terms.join('&')
+                : consequence.consequence_terms || '';
+            case 'IMPACT':
+              return consequence.impact || '';
+            case 'SYMBOL':
+              return consequence.gene_symbol || '';
+            case 'Gene':
+              return consequence.gene_id || '';
+            case 'Feature_type':
+              return consequence.feature_type || '';
+            case 'Feature':
+              return consequence.transcript_id || '';
+            case 'BIOTYPE':
+              return consequence.biotype || '';
+            case 'HGVSc':
+              return consequence.hgvsc || '';
+            case 'HGVSp':
+              return consequence.hgvsp || '';
+            case 'Protein_position':
+              if (!consequence.protein_start) return '';
+              const end = consequence.protein_end || consequence.protein_start;
+              return `${consequence.protein_start}-${end}`;
+            case 'Amino_acids':
+              return consequence.amino_acids || '';
+            case 'Codons':
+              return consequence.codons || '';
+            case 'SIFT':
+              return consequence.sift_prediction || '';
+            case 'PolyPhen':
+              return consequence.polyphen_prediction || '';
+            default:
+              return '';
+          }
+        });
+
+        csqValues.push(csqParts.join('|'));
+      }
+
+      if (csqValues.length > 0) {
+        alleleToConsqMap.set(alt, csqValues);
+      }
+    }
+
+    // Combine all CSQ values
+    const allCsqValues = [];
+    for (const [, csqValues] of alleleToConsqMap.entries()) {
+      allCsqValues.push(...csqValues);
+    }
+
+    // Add VL_CSQ to INFO field if we have values
+    if (allCsqValues.length > 0) {
+      const vlCsqValue = allCsqValues.join(',');
+      info = info === '.' ? `VL_CSQ=${vlCsqValue}` : `${info};VL_CSQ=${vlCsqValue}`;
+    }
+
+    // Construct the final VCF line
+    const vcfLine = `${chrom}\t${pos}\t${id}\t${ref}\t${alt}\t${qual}\t${filter}\t${info}`;
+    outputLines.push(vcfLine);
+  }
+
+  return outputLines.join('\n');
+}
+
 module.exports = {
   processVariantLinking,
   filterAndFormatResults,
   outputResults,
   jsonApiFilter, // Exported in case standalone use is desired.
+  // Export for testing
+  _formatResultsToVcf,
 };

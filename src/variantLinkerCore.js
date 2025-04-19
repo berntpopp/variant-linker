@@ -362,6 +362,12 @@ async function analyzeVariant(params) {
     annotationData: result.annotationData,
   };
 
+  // Add VCF data to finalOutput if present in params
+  if (params.vcfRecordMap && params.vcfHeaderLines) {
+    finalOutput.vcfRecordMap = params.vcfRecordMap;
+    finalOutput.vcfHeaderLines = params.vcfHeaderLines;
+  }
+
   if (params.output && params.output.toUpperCase() === 'SCHEMA') {
     finalOutput = mapOutputToSchemaOrg(finalOutput);
     addCustomFormats();
@@ -381,8 +387,8 @@ async function analyzeVariant(params) {
 
   // Apply formatting based on output format
   const outputFormat = params.output ? params.output.toUpperCase() : 'JSON';
-  if (['CSV', 'TSV'].includes(outputFormat)) {
-    // For CSV/TSV, return the formatted string directly
+  if (['CSV', 'TSV', 'VCF'].includes(outputFormat)) {
+    // For CSV/TSV/VCF, return the formatted string directly
     return filterAndFormatResults(finalOutput, filterParam, outputFormat);
   } else if (outputFormat === 'JSON' && filterParam) {
     // For JSON with filtering, parse the formatted JSON string back to an object

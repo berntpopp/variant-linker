@@ -44,4 +44,6 @@ pnpm-debug.log*
 *.vcf.tbi
 variant_summary.txt*
 clinvar_*.txt
+!examples/*.vcf
 !examples/benchmark_data/*.vcf
+!test/fixtures/*.vcf
