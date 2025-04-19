@@ -178,27 +178,15 @@ function getFilteredScenarios() {
     console.log(`🔍 Using specific input file: ${inputPath}`);
 
     // Find scenarios matching this input file
-    const matchingScenarios = benchmarkScenarios.filter((scenario) => {
-      // Skip VCF variants for now until fully implemented
-      if (scenario.variantType === 'vcf') {
-        return false;
-      }
-
-      return path.resolve(scenario.inputFile) === inputPath;
-    });
+    const matchingScenarios = benchmarkScenarios.filter(
+      (scenario) => path.resolve(scenario.inputFile) === inputPath
+    );
 
     // If no existing scenario matches, create a custom scenario
     if (matchingScenarios.length === 0) {
       // Determine variant type from file extension
       const fileExt = path.extname(inputPath).toLowerCase();
       const variantType = fileExt === '.vcf' ? 'vcf' : 'rsid';
-
-      // Skip VCF variants for now
-      if (variantType === 'vcf') {
-        console.warn('⚠️ VCF processing is not fully implemented yet');
-        return [];
-      }
-
       // Create custom scenario
       const customScenario = {
         name: `Custom Input: ${path.basename(inputPath)}`,
@@ -219,11 +207,6 @@ function getFilteredScenarios() {
 
   // Otherwise, filter according to other criteria
   const filtered = benchmarkScenarios.filter((scenario) => {
-    // Skip VCF variants
-    if (scenario.variantType === 'vcf') {
-      return false;
-    }
-
     // Filter by variant type
     if (
       argv.variantType !== 'all' &&
@@ -397,7 +380,7 @@ async function runBenchmarkScenario(scenario, options = {}) {
       // Build command to run variant-linker
       const command = [
         VARIANT_LINKER_PATH,
-        '--variants-file',
+        scenario.variantType === 'vcf' ? '--vcf-input' : '--variants-file',
         scenario.inputFile,
         '--assembly',
         scenario.assembly,
