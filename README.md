@@ -105,6 +105,24 @@ With the default configuration, the tool will:
 - Respect `Retry-After` headers for rate-limiting (HTTP 429) responses
 - Only retry on server errors (5xx) and network issues, not on client errors (4xx)
 
+##### Batch Processing and Chunking
+
+When processing large numbers of variants, Variant-Linker automatically splits them into smaller batches ("chunks") to avoid overwhelming the Ensembl APIs, which typically have limits around 200 variants per request. This chunking behavior can be configured in the `config/apiConfig.json` file:
+
+```json
+"ensembl": {
+  "recoderPostChunkSize": 200,  // Maximum variants per Variant Recoder POST request
+  "vepPostChunkSize": 200       // Maximum variants per VEP Region POST request
+}
+```
+
+With the default configuration:
+- Variant Recoder POST requests are limited to 200 variants per chunk
+- VEP Region POST requests are limited to 200 variants per chunk
+- When processing more variants than the chunk size, multiple API requests are made automatically
+- Results from all chunks are aggregated seamlessly before being returned
+- A small delay is added between chunk requests to be polite to the API
+
 #### VCF Handling
 
 Variant-Linker can detect and process variants provided in VCF format. When a VCF formatted variant is detected, the tool:
@@ -198,7 +216,7 @@ console.log('Ensembl Format:', ensemblFormat);
 // Example: Using batch variant processing
 async function analyzeBatchVariants() {
   try {
-    // Process multiple variants at once
+    // Process multiple variants at once (will be automatically chunked if needed)
     const batchResult = await analyzeVariant({
       variants: ['rs123', 'ENST00000366667:c.803C>T', '1-65568-A-C'],
       recoderOptions: { vcf_string: '1' },
