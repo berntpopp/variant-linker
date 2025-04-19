@@ -68,15 +68,67 @@ async function readVariantsFromVcf(filePath) {
     const dataLines = lines.filter((line) => !line.startsWith('#') && line.trim() !== '');
 
     for (const line of dataLines) {
-      const record = parser.parseLine(line);
+      // Try to parse the line, but handle any parsing errors
+      let record;
+      try {
+        record = parser.parseLine(line);
+      } catch (parseError) {
+        debug(
+          `Warning: Failed to parse VCF line: ${line.substring(0, 100)}... ` +
+            `(Error: ${parseError.message})`
+        );
+        continue; // Skip this line and continue with the next one
+      }
+
+      // Verify we have required fields
+      if (!record || !record.CHROM || !record.POS || !record.REF) {
+        debug(
+          `Warning: Missing required fields in VCF record, skipping line: ` +
+            `${line.substring(0, 100)}...`
+        );
+        continue;
+      }
 
       const chrom = record.CHROM;
       const pos = record.POS;
       const ref = record.REF;
       const altAlleles = record.ALT;
 
+      // Validate altAlleles is iterable before processing
+      if (!altAlleles || !Array.isArray(altAlleles)) {
+        debug(
+          `Warning: Invalid ALT field in record at ${chrom}:${pos}, ` +
+            `skipping: ${JSON.stringify(record)}`
+        );
+        continue; // Skip this record and continue with the next one
+      }
+
+      // Skip records with empty ALT arrays
+      if (altAlleles.length === 0) {
+        debug(`Warning: Empty ALT field in record at ${chrom}:${pos}, skipping`);
+        continue;
+      }
+
+      // Check for missing alternative alleles (represented as periods in VCF)
+      if (altAlleles.length === 1 && altAlleles[0] === '.') {
+        debug(
+          `Warning: Missing alternative allele (ALT=.) in record at ${chrom}:${pos}, ` +
+            `skipping: This is a valid VCF format for reference-only variants, ` +
+            `but requires an alternative allele for annotation.`
+        );
+        continue;
+      }
+
       // Handle each alternative allele as a separate variant
       for (const alt of altAlleles) {
+        // Skip invalid alt values
+        if (alt === null || alt === undefined || alt === '') {
+          debug(
+            `Warning: Invalid ALT value in record at ${chrom}:${pos}, ` + `skipping this alt allele`
+          );
+          continue;
+        }
+
         // Create a unique key for the variant
         const key = `${chrom}:${pos}:${ref}:${alt}`;
 
@@ -106,6 +158,9 @@ async function readVariantsFromVcf(filePath) {
       headerLines,
     };
   } catch (error) {
+    // Provide more detailed error message for debugging
+    const errorDetails = error.stack ? `\n${error.stack}` : '';
+    debug(`VCF parsing error: ${error.message}${errorDetails}`);
     throw new Error(`Error parsing VCF file: ${error.message}`);
   }
 }

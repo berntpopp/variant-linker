@@ -76,7 +76,10 @@ describe('VCF Reader', () => {
 
     // Replace the readFileSync stub to return our new content
     fs.readFileSync.restore();
-    sandbox.stub(fs, 'readFileSync').withArgs(testVcfPath, 'utf8').returns(mockVcfContentWithoutFileformat);
+    sandbox
+      .stub(fs, 'readFileSync')
+      .withArgs(testVcfPath, 'utf8')
+      .returns(mockVcfContentWithoutFileformat);
 
     const result = await readVariantsFromVcf(testVcfPath);
 

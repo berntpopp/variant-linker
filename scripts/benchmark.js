@@ -243,31 +243,32 @@ function getFilteredScenarios() {
   }
 
   // Otherwise, filter according to other criteria
-  const filtered = benchmarkScenarios.filter((scenario) => {
-    // Filter by variant type
-    if (
-      argv.variantType !== 'all' &&
-      argv.t !== 'all' &&
-      scenario.variantType !== argv.variantType &&
-      scenario.variantType !== argv.t
-    ) {
-      return false;
-    }
+  let scenariosToRun = benchmarkScenarios;
 
-    // Filter by variant count
-    if (
-      argv.variantCount !== 'all' &&
-      argv.c !== 'all' &&
-      scenario.variantCount !== argv.variantCount &&
-      scenario.variantCount !== argv.c
-    ) {
-      return false;
-    }
+  // Filter by variant count if specified
+  if (argv.variantCount !== 'all' && argv.c !== 'all') {
+    scenariosToRun = scenariosToRun.filter(
+      (scenario) => scenario.variantCount === argv.variantCount || scenario.variantCount === argv.c
+    );
+  }
 
-    return true;
-  });
+  // Filter by variant type if specified
+  if (argv.variantType !== 'all' && argv.t !== 'all') {
+    scenariosToRun = scenariosToRun.filter(
+      (scenario) => scenario.variantType === argv.variantType || scenario.variantType === argv.t
+    );
+  }
 
-  return filtered;
+  // Warn about potential memory issues with large batches
+  const hasLargeBatches = scenariosToRun.some((s) => s.variantCount === '500');
+  if (hasLargeBatches) {
+    console.log('\n⚠️  Warning: Running large batch scenarios may require significant memory.');
+    console.log('   If you encounter "null status" errors, try:');
+    console.log('   1. Reducing the number of variants');
+    console.log('   2. Increasing Node.js memory with NODE_OPTIONS="--max-old-space-size=8192"');
+  }
+
+  return scenariosToRun;
 }
 
 /**
@@ -437,7 +438,7 @@ async function runBenchmarkScenario(scenario, options = {}) {
           logMessage = prefix + truncateDetailedLog(jsonContent);
         }
       }
-      
+
       fs.appendFileSync(logFile, logMessage + '\n', 'utf8');
     }
   };
@@ -488,11 +489,14 @@ async function runBenchmarkScenario(scenario, options = {}) {
         debugLog(`   Command: node ${command.join(' ')}`);
       }
 
-      // Run the command with debug logging enabled
-      result = spawnSync('node', command, {
+      // Run the command with debug logging enabled and increased memory allocation
+      result = spawnSync('node', ['--max-old-space-size=4096', ...command], {
         env: { ...process.env, DEBUG: 'variant-linker:detailed,variant-linker:all' },
         encoding: 'utf8',
         stdio: 'pipe',
+        // Add timeout to prevent hanging
+        timeout: 120000, // 2 minute timeout
+        maxBuffer: 50 * 1024 * 1024, // 50MB buffer for stdout/stderr (increased from default 1MB)
       });
 
       // Assign stdout/stderr values as soon as we have them
@@ -510,15 +514,14 @@ async function runBenchmarkScenario(scenario, options = {}) {
         // Sanitize filename by replacing spaces, slashes, colons, and other invalid chars
         const runLogFile = `${logFile}.${scenario.name.replace(/[\s\/:*?"<>|]+/g, '_')}.run${i + 1}.log`;
         // Process stdout/stderr to truncate large API responses
-        const processedStdout = stdout.replace(
-          /([\[{].{1,})$/gm,
-          (match) => truncateDetailedLog(match)
+        const processedStdout = stdout.replace(/([\[{].{1,})$/gm, (match) =>
+          truncateDetailedLog(match)
         );
         const processedStderr = stderr.replace(
           /(Response data:|Chunk request body:|API response:)(.+)$/gm,
           (match, prefix, data) => `${prefix} ${truncateDetailedLog(data)}`
         );
-        
+
         const fullOutput = [
           `=== COMMAND ===\n${command.join(' ')}\n`,
           `=== STDOUT ===\n${processedStdout}\n`,
@@ -533,8 +536,22 @@ async function runBenchmarkScenario(scenario, options = {}) {
       // Check if the command succeeded
       if (result.status !== 0) {
         const errorMessage = result.stderr || result.error?.message || 'Unknown error';
-        debugLog(`   ❌ Command failed with status ${result.status}`);
+        const statusMsg =
+          result.status === null ? 'null (likely memory issue or timeout)' : result.status;
+
+        debugLog(`   ❌ Command failed with status ${statusMsg}`);
         debugLog(`   Error: ${truncateLog(errorMessage)}`);
+
+        // Add specific guidance for memory errors
+        if (result.status === null) {
+          debugLog(`   💡 This may indicate an out-of-memory issue or timeout.`);
+          debugLog(
+            `      Try running with fewer variants or increasing Node.js memory limit further.`
+          );
+        } else if (result.signal) {
+          debugLog(`   💡 Process terminated with signal: ${result.signal}`);
+        }
+
         throw new Error(`Command failed: ${errorMessage}`);
       }
 
@@ -645,8 +662,9 @@ async function runBenchmarkScenario(scenario, options = {}) {
     return {
       name: scenario.name,
       status: successfulRuns.length > 0 ? 'success' : 'error',
-      averages: successfulRuns.length > 0
-        ? {
+      averages:
+        successfulRuns.length > 0
+          ? {
               executionTime: avgExecutionTime,
               variantsProcessed: avgVariantsProcessed,
               retryCount: avgRetryCount,
