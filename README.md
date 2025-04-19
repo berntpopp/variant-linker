@@ -14,6 +14,7 @@ In addition to its CLI capabilities, Variant-Linker is designed with a modular a
 - **Output Customization**: Users can specify the output format (JSON, CSV, TSV) with configurable field selection.
 - **Tabular Data Export**: Provides CSV and TSV output with a "flatten by consequence" strategy for comprehensive variant analysis.
 - **VCF Handling**: Detects and processes VCF formatted input, converting it to the necessary format for Ensembl region-based annotation.
+- **Exponential Backoff Retry**: Implements automatic retry with exponential backoff for transient API errors, improving reliability when Ensembl services experience temporary issues.
 - **Configuration File Support**: Allows users to provide parameters through a structured configuration file.
 
 ## Installation
@@ -82,6 +83,27 @@ Variant-Linker can accept a JSON configuration file to specify parameters. Comma
   "scoring_config_path": "scoring/meta_score/"
 }
 ```
+
+##### API Retry Configuration
+
+Variant-Linker automatically retries failed API requests when encountering transient errors. The retry behavior can be customized in the `config/apiConfig.json` file:
+
+```json
+"requests": {
+  "retry": {
+    "maxRetries": 4,         // Maximum number of retry attempts
+    "baseDelayMs": 1000,     // Initial delay in milliseconds
+    "retryableStatusCodes": [429, 500, 502, 503, 504]  // HTTP status codes that trigger a retry
+  }
+}
+```
+
+With the default configuration, the tool will:
+- Retry up to 4 times (5 total attempts including the initial request)
+- Use exponential backoff starting at 1 second (approximately 1s, 2s, 4s, 8s for retries)
+- Add jitter to prevent thundering herd issues
+- Respect `Retry-After` headers for rate-limiting (HTTP 429) responses
+- Only retry on server errors (5xx) and network issues, not on client errors (4xx)
 
 #### VCF Handling
 

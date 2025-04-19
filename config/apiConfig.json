@@ -8,5 +8,12 @@
       "variantRecoder": "/variant_recoder/human",
       "variantRecoderBase": "/variant_recoder"
     }
+  },
+  "requests": {
+    "retry": {
+      "maxRetries": 4,
+      "baseDelayMs": 1000,
+      "retryableStatusCodes": [429, 500, 502, 503, 504]
+    }
   }
 }
