@@ -215,16 +215,4 @@ describe('VCF output formatting', () => {
     expect(secondDataLine).to.include('LOW');
     expect(secondDataLine).to.include('GENE2');
   });
-
-  it('should throw an error when VCF output is requested without VCF input data', () => {
-    const invalidData = {
-      meta: { stepsPerformed: [] },
-      annotationData: [{ input: 'test' }],
-      // Missing vcfRecordMap and vcfHeaderLines
-    };
-
-    expect(() => filterAndFormatResults(invalidData, null, 'VCF')).to.throw(
-      /VCF output requires VCF input data/
-    );
-  });
 });

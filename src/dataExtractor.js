@@ -372,9 +372,128 @@ function formatToTabular(
   return lines.join('\n');
 }
 
+/**
+ * Maps VCF CSQ field names (VEP style) to paths within the annotation object
+ * or provides special handling logic.
+ * Uses defaultColumnConfig as a base where possible.
+ */
+const csqFieldMapping = {
+  Allele: (ann, alt) => alt || '', // Special case: Use provided ALT
+  Consequence: (ann) => ann?.most_severe_consequence || '', // Direct mapping
+  IMPACT: (ann) => {
+    // Find impact from the most severe consequence within the transcript_consequences array
+    const cons = ann?.transcript_consequences?.find((c) =>
+      c.consequence_terms?.includes(ann.most_severe_consequence)
+    );
+    return cons?.impact || '';
+  },
+  SYMBOL: (ann) => {
+    const cons = ann?.transcript_consequences?.find((c) => c.gene_symbol);
+    return cons?.gene_symbol || '';
+  },
+  Gene: (ann) => {
+    const cons = ann?.transcript_consequences?.find((c) => c.gene_id);
+    return cons?.gene_id || '';
+  },
+  Feature_type: (ann) => {
+    const cons = ann?.transcript_consequences?.find((c) => c.feature_type);
+    return cons?.feature_type || '';
+  },
+  Feature: (ann) => {
+    // Usually transcript_id for transcripts
+    const cons = ann?.transcript_consequences?.find((c) => c.transcript_id);
+    return cons?.transcript_id || '';
+  },
+  BIOTYPE: (ann) => {
+    const cons = ann?.transcript_consequences?.find((c) => c.biotype);
+    return cons?.biotype || '';
+  },
+  HGVSc: (ann) => {
+    const cons = ann?.transcript_consequences?.find((c) => c.hgvsc);
+    return cons?.hgvsc || '';
+  },
+  HGVSp: (ann) => {
+    const cons = ann?.transcript_consequences?.find((c) => c.hgvsp);
+    return cons?.hgvsp || '';
+  },
+  Protein_position: (ann) => {
+    const cons = ann?.transcript_consequences?.find((c) => c.protein_start);
+    if (!cons?.protein_start) return '';
+    const end = cons.protein_end || cons.protein_start;
+    return `${cons.protein_start}-${end}`;
+  },
+  Amino_acids: (ann) => {
+    const cons = ann?.transcript_consequences?.find((c) => c.amino_acids);
+    return cons?.amino_acids || '';
+  },
+  Codons: (ann) => {
+    const cons = ann?.transcript_consequences?.find((c) => c.codons);
+    return cons?.codons || '';
+  },
+  Existing_variation: (ann) =>
+    Array.isArray(ann?.existing_variation)
+      ? ann.existing_variation.join('&')
+      : ann?.existing_variation || '',
+  // Note: SIFT/PolyPhen often apply per-transcript. This gets the first one found.
+  // A more complex implementation might try to match the specific transcript.
+  SIFT: (ann) => {
+    const cons = ann?.transcript_consequences?.find((c) => c.sift_prediction);
+    return cons?.sift_prediction || '';
+  },
+  PolyPhen: (ann) => {
+    const cons = ann?.transcript_consequences?.find((c) => c.polyphen_prediction);
+    return cons?.polyphen_prediction || '';
+  },
+  // Add mappings for other VEP fields if needed
+};
+
+/**
+ * Formats a single annotation object into a VCF CSQ string field value.
+ *
+ * @param {Object} annotation - The annotation object (usually from VEP results).
+ * @param {Array<string>} csqFormatFields - An array of CSQ field names in the desired order
+ *   (e.g., from vlCsqFormat in processor).
+ * @param {string} altAllele - The specific ALT allele this consequence pertains to.
+ * @returns {string} The formatted CSQ string (pipe-separated values), or empty string if no data.
+ */
+function formatVcfCsqString(annotation, csqFormatFields, altAllele) {
+  if (!annotation || !Array.isArray(csqFormatFields) || csqFormatFields.length === 0) {
+    return '';
+  }
+
+  const values = csqFormatFields.map((fieldName) => {
+    const handler = csqFieldMapping[fieldName];
+    let value = '';
+    if (typeof handler === 'function') {
+      value = handler(annotation, altAllele); // Pass annotation and altAllele
+    } else {
+      // Basic fallback: Look for a direct property match (lowercase)
+      value = annotation[fieldName.toLowerCase()] || '';
+      debug(
+        `Warning: No specific CSQ handler for field '${fieldName}'. ` +
+          'Using direct property lookup.'
+      );
+    }
+
+    // Sanitize value: replace pipes, semicolons, commas, equals, spaces with underscore or encode?
+    // VEP uses URL encoding for problematic characters within fields.
+    // Simple approach: replace common delimiters. More robust: URL encode.
+    // For now, just ensure it's a string and handle null/undefined.
+    value = value === null || value === undefined ? '' : String(value);
+
+    // Replace problematic characters (simple approach)
+    // return value.replace(/[|;,=\s]/g, '_');
+    // VEP standard: URL-encode
+    return encodeURIComponent(value);
+  });
+
+  return values.join('|');
+}
+
 module.exports = {
   extractField,
   flattenAnnotationData,
   formatToTabular,
+  formatVcfCsqString, // Export the new function
   defaultColumnConfig,
 };

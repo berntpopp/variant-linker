@@ -115,10 +115,8 @@ function validateParams(params) {
     );
   }
 
-  // VCF output requires VCF input
-  if (params.output === 'VCF' && !hasVcfInput) {
-    throw new Error('VCF output format requires --vcf-input to be provided');
-  }
+  // VCF output from non-VCF input is now supported
+  // VCF header information and minimal structure will be generated automatically
 
   if (params.debug && (typeof params.debug !== 'number' || params.debug < 1 || params.debug > 3)) {
     throw new Error('Debug level must be a number between 1 and 3');
