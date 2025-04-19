@@ -13,7 +13,8 @@ In addition to its CLI capabilities, Variant-Linker is designed with a modular a
 - **Extensibility**: Prepared for future extensions to include local installations of VEP and Variant Recoder.
 - **Output Customization**: Users can specify the output format (JSON, CSV, TSV) with configurable field selection.
 - **Tabular Data Export**: Provides CSV and TSV output with a "flatten by consequence" strategy for comprehensive variant analysis.
-- **VCF Handling**: Detects and processes VCF formatted input, converting it to the necessary format for Ensembl region-based annotation. Supports both VCF input and output formats, preserving original VCF metadata.
+- **VCF Handling**: Supports standard VCF file input (`--vcf-input`) and generation of annotated VCF output (`--output VCF`), preserving original headers and adding annotations to the INFO field. Works with any input type; a default header is generated if input was not a VCF file.
+- **Batch Request Chunking**: Automatically splits large batches of variants into smaller chunks for API requests, ensuring compliance with Ensembl limits and efficient processing.
 - **Exponential Backoff Retry**: Implements automatic retry with exponential backoff for transient API errors, improving reliability when Ensembl services experience temporary issues.
 - **Configuration File Support**: Allows users to provide parameters through a structured configuration file.
 
@@ -64,8 +65,8 @@ variant-linker --vcf-input <vcf_file_path> --output <output_format> [--debug]
 - `--variant`, `-v`: Specify a single genetic variant to be analyzed.
 - `--variants-file`, `-vf`: Path to a file containing variants to be analyzed (one per line).
 - `--variants`, `-vs`: Comma-separated list of variants to be analyzed.
-- `--vcf-input`, `-vi`: Path to a VCF file containing variants to be analyzed.
-- `--output`, `-o`: Define the desired output format (JSON, CSV, TSV, VCF). Default is JSON. Note that VCF output requires VCF input.
+- `--vcf-input`, `-vi`: Path to a VCF file containing variants to be analyzed. The file's header and record structure are preserved in output if `--output VCF` is used.
+- `--output`, `-o`: Define the desired output format (JSON, CSV, TSV, VCF). Default is JSON.
 - `--save`, `-s`: Filename to save the results. If not specified, results will be printed to the console.
 - `--debug`, `-d`: Enable debug mode for detailed logging. This is optional and is not enabled by default.
 - `--vep_params`, `--vp`: Optional parameters for VEP annotation in key=value format, separated by commas (default: "CADD=1").
@@ -175,13 +176,9 @@ With the default configuration:
 - Results from all chunks are aggregated seamlessly before being returned
 - A small delay is added between chunk requests to be polite to the API
 
-#### VCF Handling
+#### VCF String Input Conversion
 
-Variant-Linker can detect and process variants provided in VCF format. When a VCF formatted variant is detected, the tool:
-- Converts the VCF notation to Ensembl region and allele format.
-- Uses the converted format to fetch annotations via the VEP API.
-
-##### VCF Format Example
+Variant-Linker can internally convert VCF-style string representations (e.g., `chr-pos-ref-alt`) to the Ensembl region format required for annotation. For example:
 - **Input**: `1-65568-A-C`
 - **Ensembl region format**: `1:65568-65568:1`
 - **Allele**: `C`
@@ -212,23 +209,35 @@ variant-linker --config example_input.json
 
 Variant-Linker provides CSV and TSV output for variant annotations, using a "flatten by consequence" strategy that creates one row per transcript consequence for each variant.
 
-### VCF Input and Output
+### VCF File Input and Output
 
-Variant-Linker can read standard VCF (Variant Call Format) files via the `--vcf-input` option and can also produce annotated VCF files by specifying `--output VCF`. This allows for direct integration into bioinformatics workflows.
+Variant-Linker provides robust support for VCF files:
 
-#### VCF Input Features
+- **VCF Input (`--vcf-input <file>`):** Reads variants from a standard VCF file. The original VCF header is preserved in the output. Multi-allelic sites are automatically split and processed as separate variants.
+- **VCF Output (`--output VCF`):** Produces an annotated VCF file. Annotations are added to the INFO field using a `VL_CSQ` tag. The original header is preserved if input was a VCF file; otherwise, a default VCF header is generated.
+- **Universal VCF Output:** You can use `--output VCF` with any input type (`--variant`, `--variants-file`, or `--vcf-input`). If the input was not a VCF file, a minimal standard-compliant VCF header is generated.
+- **INFO Field Annotation:** Annotations are added as an `INFO` field named `VL_CSQ` with a pipe-delimited format similar to VEP's CSQ notation.
+- **VL_CSQ Format:** The `VL_CSQ` field contains: `Allele|Consequence|IMPACT|SYMBOL|Gene|Feature_type|Feature|BIOTYPE|HGVSc|HGVSp|Protein_position|Amino_acids|Codons|SIFT|PolyPhen`
+- **Header Example:**
+  ```
+  ##fileformat=VCFv4.2
+  ##INFO=<ID=VL_CSQ,Number=.,Type=String,Description="Consequence annotations from variant-linker. Format: Allele|Consequence|IMPACT|SYMBOL|Gene|Feature_type|Feature|BIOTYPE|HGVSc|HGVSp|Protein_position|Amino_acids|Codons|SIFT|PolyPhen">
+  #CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO
+  ```
+- **Multi-allelic Handling:** Multi-allelic records are split internally for annotation and then merged into the output, preserving original context.
 
-- **Header Preservation**: The original VCF header is preserved, including all metadata.
-- **Multi-allelic Site Handling**: Multi-allelic sites in the input VCF are properly split and processed as separate variants.
-- **VCF Record Mapping**: Each variant from the VCF is mapped to maintain its original context.
+**Example: Annotated VCF output from VCF input**
+```bash
+variant-linker --vcf-input sample.vcf --output VCF
+```
 
-#### VCF Output Features
+**Example: Annotated VCF output from non-VCF input**
+```bash
+# VCF output from HGVS input
+variant-linker --variant 'rs6025' --output VCF --save annotated_rs6025.vcf
+```
 
-- **Standard Compliant**: Generated VCF output adheres to VCF v4.2 specifications.
-- **INFO Field Annotation**: Annotations are added as an `INFO` field named `VL_CSQ` with a pipe-delimited format similar to VEP's CSQ notation.
-- **VL_CSQ Format**: The `VL_CSQ` field contains key information including consequence terms, impact, gene symbols, transcript IDs, and protein changes.
-- **Original Data Preservation**: All original VCF data is preserved in the output, including existing INFO fields.
-
+The annotated VCF output will have all original (or default) header lines, and each variant record will include a `VL_CSQ` annotation in the INFO column.
 #### CSV/TSV Features
 
 - **Flatten by Consequence**: Creates one row per transcript consequence for variants with multiple consequences
@@ -316,10 +325,10 @@ async function analyzeWithFiltering() {
   try {
     const variantWithFilter = await analyzeVariant({
       variant: 'ENST00000366667:c.803C>T',
-      filterOptions: {
-        biotype: 'protein_coding',
-        canonical: 1
-      },
+      filter: JSON.stringify({
+        'transcript_consequences.*.biotype': { eq: 'protein_coding' },
+        'transcript_consequences.*.canonical': { eq: 1 }
+      }),
       output: 'CSV' // Use CSV format for tabular output
     });
     console.log('Filtered CSV Results:', variantWithFilter);
