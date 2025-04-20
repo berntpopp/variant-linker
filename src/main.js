@@ -356,7 +356,6 @@ async function main() {
     // Collect variants from all possible sources
     let variants = [];
     const vcfRecordMap = new Map();
-    let vcfHeaderText;
     let vcfHeaderLines;
 
     // Process VCF input if provided
@@ -367,19 +366,17 @@ async function main() {
       debug(`Processing VCF file: ${mergedParams.vcfInput}`);
       try {
         vcfData = await readVariantsFromVcf(mergedParams.vcfInput);
-        variantIds = vcfData.variants;
+        variantIds = vcfData.variantsToProcess;
+        vcfHeaderLines = vcfData.headerLines;
         debug(`Extracted ${variantIds.length} variant(s) from VCF file`);
+        debug(`Captured VCF header with ${vcfHeaderLines.length} lines`);
 
-        // Get the VCF record map with genotype data for inheritance pattern calculation
-        if (vcfData.genotypes && Object.keys(vcfData.genotypes).length > 0) {
-          for (const variantKey of variantIds) {
-            if (vcfData.genotypes[variantKey]) {
-              vcfRecordMap.set(variantKey, {
-                genotypes: vcfData.genotypes[variantKey],
-              });
-            }
+        // Get the VCF record map with record data and genotypes
+        if (vcfData.vcfRecordMap) {
+          for (const [key, record] of vcfData.vcfRecordMap) {
+            vcfRecordMap.set(key, record);
           }
-          debug(`Created VCF record map with genotype data for ${vcfRecordMap.size} variants`);
+          debug(`Created VCF record map with data for ${vcfRecordMap.size} variants`);
         }
 
         // Extract sample IDs for inheritance pattern calculation
@@ -493,18 +490,19 @@ async function main() {
     // Prepare analysis parameters
     const analysisParams = {
       variants: mergedParams.vcfInput ? variantIds : variants,
-      assembly: mergedParams.assembly,
       output: mergedParams.output,
-      outputFile: mergedParams.outputFile,
-      level: mergedParams.level,
       filter: mergedParams.filter,
+      assembly: mergedParams.assembly,
+      cache: mergedParams.cache,
+      calculateInheritance: mergedParams.calculateInheritance,
+      pedigreeData,
+      sampleMap,
+      vcfRecordMap: vcfRecordMap,
+      vcfHeaderLines: vcfData ? vcfData.headerLines : undefined,
       scoringConfigPath: mergedParams.scoringConfigPath,
       vepParams: mergedParams.vepParams,
       recoderParams: mergedParams.recoderParams,
       skipRecoder: mergedParams.skipRecoder,
-      // Pass VCF data if available
-      vcfRecordMap,
-      vcfHeaderText,
       vcfHeaderLines,
     };
 
