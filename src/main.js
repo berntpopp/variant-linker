@@ -204,6 +204,11 @@ const argv = yargs
     type: 'string',
     default: 'JSON',
   })
+  .option('output-file', {
+    alias: 'of',
+    description: 'Output file path',
+    type: 'string',
+  })
   .option('save', { alias: 's', description: 'Filename to save the results', type: 'string' })
   .option('debug', {
     alias: 'd',
@@ -234,6 +239,18 @@ const argv = yargs
   .option('ped', {
     alias: 'p',
     description: 'Path to the PED file defining family structure and affected status',
+    type: 'string',
+  })
+  .option('calculate-inheritance', {
+    alias: 'ci',
+    description: 'Enable automatic inheritance pattern deduction and segregation check',
+    type: 'boolean',
+  })
+  .option('sample-map', {
+    alias: 'sm',
+    description:
+      'Comma-separated sample IDs for Index, Mother, Father if PED file is not provided ' +
+      '(used for default trio mode)',
     type: 'string',
   })
   .option('vcf-input', {
@@ -349,6 +366,49 @@ async function main() {
         // Continue without pedigree data
       }
     }
+
+    // Parse sample mapping for trio mode if provided
+    let sampleMap = null;
+    if (mergedParams.sampleMap) {
+      try {
+        const sampleIds = mergedParams.sampleMap.split(',').map((id) => id.trim());
+        if (sampleIds.length === 3) {
+          sampleMap = {
+            index: sampleIds[0],
+            mother: sampleIds[1],
+            father: sampleIds[2],
+          };
+          debug(
+            `Using provided sample map: Index=${sampleMap.index}, ` +
+              `Mother=${sampleMap.mother}, Father=${sampleMap.father}`
+          );
+        } else {
+          debug(
+            `Warning: Invalid sample map format, expected 3 comma-separated IDs, ` +
+              `got ${sampleIds.length}`
+          );
+          console.error('Warning: Invalid sample map format. Expected: Index,Mother,Father');
+        }
+      } catch (error) {
+        debug(`Error parsing sample map: ${error.message}`);
+        console.error(`Warning: Could not parse sample map: ${error.message}`);
+      }
+    }
+
+    // Determine if we should calculate inheritance patterns
+    let calculateInheritance = Boolean(mergedParams.calculateInheritance);
+
+    // If --calculate-inheritance not explicitly set but we have PED or VCF with samples, enable it
+    if (calculateInheritance === false && mergedParams.calculateInheritance === undefined) {
+      if (pedigreeData || (vcfData && vcfData.samples && vcfData.samples.length > 1)) {
+        calculateInheritance = true;
+        debug('Automatically enabling inheritance pattern calculation based on available data');
+      }
+    }
+
+    if (calculateInheritance) {
+      debug('Inheritance pattern calculation is enabled');
+    }
     const recoderOptions = parseOptionalParameters(mergedParams.recoder_params, {
       vcf_string: '1',
     });
@@ -366,24 +426,45 @@ async function main() {
 
     // Collect variants from all possible sources
     let variants = [];
-    let vcfRecordMap;
+    const vcfRecordMap = new Map();
     let vcfHeaderText;
     let vcfHeaderLines;
 
     // Process VCF input if provided
+    let variantIds = [];
+    let vcfData = null;
+
     if (mergedParams.vcfInput) {
-      debug(`Reading variants from VCF file: ${mergedParams.vcfInput}`);
+      debug(`Processing VCF file: ${mergedParams.vcfInput}`);
       try {
-        const vcfData = await readVariantsFromVcf(mergedParams.vcfInput);
-        variants = vcfData.variantsToProcess;
-        vcfRecordMap = vcfData.vcfRecordMap;
-        vcfHeaderText = vcfData.headerText;
-        vcfHeaderLines = vcfData.headerLines;
-        debug(`Read ${variants.length} variants from VCF file`);
+        vcfData = await readVariantsFromVcf(mergedParams.vcfInput);
+        variantIds = vcfData.variants;
+        debug(`Extracted ${variantIds.length} variant(s) from VCF file`);
+
+        // Get the VCF record map with genotype data for inheritance pattern calculation
+        if (vcfData.genotypes && Object.keys(vcfData.genotypes).length > 0) {
+          for (const variantKey of variantIds) {
+            if (vcfData.genotypes[variantKey]) {
+              vcfRecordMap.set(variantKey, {
+                genotypes: vcfData.genotypes[variantKey],
+              });
+            }
+          }
+          debug(`Created VCF record map with genotype data for ${vcfRecordMap.size} variants`);
+        }
+
+        // Extract sample IDs for inheritance pattern calculation
+        if (vcfData.samples && vcfData.samples.length > 0) {
+          debug(
+            `VCF file contains ${vcfData.samples.length} samples: ${vcfData.samples.join(', ')}`
+          );
+        }
       } catch (error) {
-        throw new Error(`Error reading VCF file: ${error.message}`);
+        debug(`Error processing VCF file: ${error.message}`);
+        console.error(`Error processing VCF file: ${error.message}`);
+        throw new Error(`Failed to process VCF file: ${error.message}`);
       }
-    } else {
+    } else if (mergedParams._.length > 0) {
       // Add single variant if provided
       if (mergedParams.variant) {
         variants.push(mergedParams.variant);
@@ -408,22 +489,54 @@ async function main() {
     debug(`Processing ${variants.length} variants`);
     debugDetailed(`Variants: ${JSON.stringify(variants)}`);
 
-    // Call the core analysis function with the variants array
-    const result = await analyzeVariant({
+    // Prepare analysis parameters
+    const analysisParams = {
       variants, // Use the collected variants array instead of a single variant
-      recoderOptions,
-      vepOptions,
-      cache: mergedParams.cache,
-      scoringConfigPath: mergedParams.scoring_config_path,
+      assembly: mergedParams.assembly,
+      format: format,
       output: mergedParams.output,
+      outputFile: mergedParams.outputFile,
+      level: mergedParams.level,
       filter: mergedParams.filter,
+      scoringConfigPath: mergedParams.scoringConfigPath,
+      vepParams: mergedParams.vepParams,
+      recoderParams: mergedParams.recoderParams,
+      skipRecoder: mergedParams.skipRecoder,
       // Pass VCF data if available
       vcfRecordMap,
       vcfHeaderText,
       vcfHeaderLines,
-      // Pass pedigree data if available
-      pedigreeData,
-    });
+    };
+
+    // Add pedigree data to analysis params if available
+    if (pedigreeData) {
+      analysisParams.pedigreeData = pedigreeData;
+    }
+
+    // Add inheritance pattern calculation parameters if enabled
+    if (calculateInheritance) {
+      analysisParams.calculateInheritance = true;
+
+      // Add VCF records with genotype data if available
+      if (vcfRecordMap && vcfRecordMap.size > 0) {
+        analysisParams.vcfRecordMap = vcfRecordMap;
+      }
+
+      // Add sample IDs if available
+      if (vcfData && vcfData.samples && vcfData.samples.length > 0) {
+        analysisParams.samples = vcfData.samples;
+      }
+
+      // Add sample mapping for trio analysis if available
+      if (sampleMap) {
+        analysisParams.sampleMap = sampleMap;
+      }
+
+      debug('Added inheritance pattern calculation parameters to analysis');
+    }
+
+    // Get the results by analyzing variants
+    const result = await analyzeVariant(analysisParams);
 
     // Output the results
     if (mergedParams.save) {

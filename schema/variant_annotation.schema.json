@@ -30,7 +30,34 @@
       },
       "annotationData": {
         "type": "array",
-        "items": { "type": "object" }
+        "items": { 
+          "type": "object",
+          "properties": {
+            "deducedInheritancePattern": {
+              "type": "object",
+              "properties": {
+                "patterns": {
+                  "type": "array",
+                  "items": { "type": "string" },
+                  "description": "List of possible inheritance patterns for this variant"
+                },
+                "confidence": {
+                  "type": "string",
+                  "enum": ["high", "medium", "low"],
+                  "description": "Confidence level in the deduced inheritance pattern"
+                },
+                "patternDetails": {
+                  "type": "object",
+                  "description": "Additional details about the inheritance pattern"
+                }
+              }
+            }
+          }
+        }
+      },
+      "pedigreeData": {
+        "type": "object",
+        "description": "Family relationships and affected status from PED file"
       }
     },
     "required": ["meta", "annotationData"]

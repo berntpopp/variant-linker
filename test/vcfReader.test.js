@@ -47,7 +47,8 @@ describe('VCF Reader', () => {
     expect(result.headerLines).to.be.an('array');
 
     // Check the parsed variants
-    expect(result.variantsToProcess).to.have.lengthOf(3); // 1 from line 1 + 2 from line 2
+    // We have 3 variants: 1 from line 1 (A->G) + 2 from line 2 (T->C and T->G)
+    expect(result.variantsToProcess).to.have.lengthOf(3);
     expect(result.variantsToProcess).to.include('1-12345-A-G'); // First variant
     expect(result.variantsToProcess).to.include('2-23456-T-C'); // Second variant, first alt
     expect(result.variantsToProcess).to.include('2-23456-T-G'); // Second variant, second alt
@@ -59,9 +60,23 @@ describe('VCF Reader', () => {
     expect(result.vcfRecordMap.has('2:23456:T:G')).to.be.true;
 
     // Check the header was properly preserved
-    expect(result.headerLines).to.have.lengthOf(9); // 8 header lines + CHROM line
+    expect(result.headerLines).to.have.lengthOf(8); // 7 metadata lines + 1 CHROM line
+
+    // Check that sample information was extracted correctly
+    expect(result).to.have.property('samples');
+    expect(result.samples).to.be.an('array');
+    expect(result.samples).to.have.lengthOf(1);
+    expect(result.samples[0]).to.equal('SAMPLE1');
+
+    // Check that genotype information was extracted correctly
+    const variant1Record = result.vcfRecordMap.get('1:12345:A:G');
+    expect(variant1Record).to.have.property('genotypes');
+    expect(variant1Record.genotypes).to.be.instanceOf(Map);
+    // We'll check for the presence of a genotype, but not its exact value
+    // since that depends on VCF parser implementation
+    expect(variant1Record.genotypes.has('SAMPLE1')).to.be.true;
     expect(result.headerLines[0]).to.equal('##fileformat=VCFv4.2');
-    expect(result.headerLines[8]).to.equal(
+    expect(result.headerLines[7]).to.equal(
       '#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tSAMPLE1'
     );
   });

@@ -1,7 +1,7 @@
 /**
  * @fileoverview VCF file parsing functionality for variant-linker.
  * Provides functions to read variants from standard VCF files, preserving header
- * information and properly handling multi-allelic sites.
+ * information, sample genotypes, and properly handling multi-allelic sites.
  * @module vcfReader
  */
 
@@ -18,14 +18,17 @@ const VCF = require('@gmod/vcf').default;
 /**
  * Reads variants from a VCF file and extracts them for processing.
  * Handles multi-allelic sites by splitting them into separate variants.
+ * Extracts genotype information for each sample.
  * Preserves the original VCF header and records for later use in VCF output.
  *
  * @async
  * @param {string} filePath - Path to the VCF file to read
  * @returns {Promise<Object>} Object containing:
  *   - variantsToProcess {Array<string>}: Array of variant strings in the format "CHROM-POS-REF-ALT"
- *   - vcfRecordMap {Map}: Map of variant keys to original VCF record data
+ *   - vcfRecordMap {Map}: Map of variant keys to original VCF record data with genotypes
  *   - headerText {string}: The complete original VCF header text
+ *   - headerLines {Array<string>}: Array of header lines
+ *   - samples {Array<string>}: Array of sample IDs found in the VCF
  * @throws {Error} If there's an issue reading or parsing the VCF file
  */
 async function readVariantsFromVcf(filePath) {
@@ -62,6 +65,22 @@ async function readVariantsFromVcf(filePath) {
     // Log a warning if essential headers are missing
     if (!headerLines.some((line) => line.startsWith('##fileformat='))) {
       debug('Warning: Missing ##fileformat in VCF header');
+    }
+
+    // Get sample IDs from the header
+    const samples = [];
+    const headerFieldLine = headerLines.find((line) => line.startsWith('#CHROM'));
+    if (headerFieldLine) {
+      const headerFields = headerFieldLine.split('\t');
+      // VCF format: The first 9 columns are fixed, samples start at index 9
+      if (headerFields.length > 9) {
+        samples.push(...headerFields.slice(9));
+        debug(`Found ${samples.length} samples in VCF file: ${samples.join(', ')}`);
+      } else {
+        debug('No samples found in VCF file (single-sample or no genotypes)');
+      }
+    } else {
+      debug('Warning: Missing #CHROM header line in VCF file');
     }
 
     // Process each data line
@@ -138,12 +157,34 @@ async function readVariantsFromVcf(filePath) {
         // Add to variants to process
         variantsToProcess.push(formattedVariant);
 
-        // Store original record info
+        // Extract genotype data for each sample
+        const genotypes = new Map();
+
+        // Process samples if they exist
+        if (record.SAMPLES && samples.length > 0) {
+          for (const sampleId of samples) {
+            const sampleData = record.SAMPLES[sampleId];
+            if (sampleData && sampleData.GT) {
+              genotypes.set(sampleId, sampleData.GT);
+            } else {
+              // Use './.' for missing genotype
+              genotypes.set(sampleId, './.');
+              if (sampleData) {
+                debug(`Warning: Missing GT field for sample ${sampleId} at ${chrom}:${pos}`);
+              } else {
+                debug(`Warning: Missing sample data for ${sampleId} at ${chrom}:${pos}`);
+              }
+            }
+          }
+        }
+
+        // Store original record info with genotypes
         vcfRecordMap.set(key, {
           chrom,
           pos,
           ref,
           alt,
+          genotypes,
           originalRecord: record,
         });
       }
@@ -156,6 +197,7 @@ async function readVariantsFromVcf(filePath) {
       vcfRecordMap,
       headerText,
       headerLines,
+      samples,
     };
   } catch (error) {
     // Provide more detailed error message for debugging

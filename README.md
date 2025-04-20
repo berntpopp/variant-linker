@@ -14,6 +14,7 @@ In addition to its CLI capabilities, Variant-Linker is designed with a modular a
 - **Output Customization**: Users can specify the output format (JSON, CSV, TSV) with configurable field selection.
 - **Tabular Data Export**: Provides CSV and TSV output with a "flatten by consequence" strategy for comprehensive variant analysis.
 - **PED File Support**: Reads standard 6-column PED files to extract family structure and affected status information for inheritance analysis.
+- **Inheritance Pattern Analysis**: Automatically deduces potential inheritance patterns (de novo, autosomal dominant/recessive, X-linked) from multi-sample VCF files and family structure information.
 - **VCF Handling**: Supports standard VCF file input (`--vcf-input`) and generation of annotated VCF output (`--output VCF`), preserving original headers and adding annotations to the INFO field. Works with any input type; a default header is generated if input was not a VCF file.
 - **Batch Request Chunking**: Automatically splits large batches of variants into smaller chunks for API requests, ensuring compliance with Ensembl limits and efficient processing.
 - **Exponential Backoff Retry**: Implements automatic retry with exponential backoff for transient API errors, improving reliability when Ensembl services experience temporary issues.
@@ -73,6 +74,8 @@ variant-linker --vcf-input <vcf_file_path> --output <output_format> [--debug]
 - `--vep_params`, `--vp`: Optional parameters for VEP annotation in key=value format, separated by commas (default: "CADD=1").
 - `--recoder_params`, `--rp`: Optional parameters for Variant Recoder in key=value format, separated by commas (default: "vcf_string=1").
 - `--ped`, `-p`: Path to the PED file defining family structure and affected status. Provides pedigree information for inheritance analysis.
+- `--calculate-inheritance`, `-ci`: Enable automatic inheritance pattern deduction and segregation check.
+- `--sample-map`, `-sm`: Comma-separated sample IDs for Index, Mother, Father if PED file is not provided (used for default trio mode).
 - `--scoring_config_path`, `--scp`: Path to the scoring configuration directory.
 
 #### Configuration File
@@ -457,6 +460,48 @@ FAM1 SAMPLE3 SAMPLE1 SAMPLE2 1 2  # Male child (affected)
 ```
 
 PED files can use either tabs or spaces as delimiters. Lines starting with '#' are treated as comments and ignored. This pedigree data enables inheritance analysis and filtering based on family relationships.
+
+## Inheritance Pattern Analysis
+
+Variant-Linker can automatically analyze genotype data and family relationships to deduce potential inheritance patterns for variants. This feature helps prioritize variants based on their segregation within a family.
+
+### Supported Inheritance Patterns
+
+- **De novo**: Variants present in child but absent in both parents
+- **Autosomal dominant**: Heterozygous variants segregating with affected status
+- **Autosomal recessive**: Homozygous variants in affected individuals with carrier parents
+- **X-linked dominant**: Variants on X chromosome following dominant inheritance 
+- **X-linked recessive**: Variants on X chromosome following recessive inheritance
+
+### Analysis Modes
+
+The inheritance pattern analysis can operate in three modes:
+
+1. **Single Sample Mode**: When only one sample is present in the VCF file. Limited to basic inheritance pattern possibilities.
+2. **Trio Mode**: When a parent-child trio is available, either automatically detected in the VCF file or specified via `--sample-map`.
+3. **PED-based Mode**: When a comprehensive family structure is provided via PED file, enabling multi-generational inheritance analysis.
+
+### Usage
+
+To enable inheritance pattern analysis:
+
+```bash
+# Using a PED file with family structure
+variant-linker --vcf-input sample.vcf --ped family.ped --calculate-inheritance
+
+# Using manual trio mapping
+variant-linker --vcf-input sample.vcf --sample-map "PROBAND,MOTHER,FATHER" --calculate-inheritance
+```
+
+### Output
+
+When inheritance pattern analysis is enabled, each variant annotation will include a `deducedInheritancePattern` property with the following information:
+
+- **patterns**: Array of possible inheritance patterns for the variant
+- **confidence**: Confidence level in the deduced pattern (high, medium, low)
+- **patternDetails**: Additional information about the inheritance pattern
+
+This information can be used to prioritize variants that follow the expected inheritance pattern for the disease of interest.
 
 ## Code Style & Linting
 

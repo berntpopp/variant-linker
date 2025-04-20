@@ -11,12 +11,15 @@ const variantRecoder = require('./variantRecoder');
 const variantRecoderPost = require('./variantRecoderPost');
 const vepRegionsAnnotation = require('./vepRegionsAnnotation');
 const { applyScoring } = require('./scoring');
+const { calculateDeducedPattern } = require('./inheritanceCalculator');
 const {
   mapOutputToSchemaOrg,
   validateSchemaOrgOutput,
   addCustomFormats,
 } = require('./schemaMapper');
 const { filterAndFormatResults } = require('./variantLinkerProcessor');
+
+const debug = require('debug')('variant-linker:core');
 
 /**
  * Detects whether the input variant is in VCF or HGVS format.
@@ -309,6 +312,9 @@ async function processBatchVariants(variants, params) {
  * @param {string} [params.filter] - Optional JSON string specifying filtering criteria.
  * @param {Map<string, Object>} [params.pedigreeData] - Pedigree data parsed from PED file
  * containing family relationships and affected status.
+ * @param {boolean} [params.calculateInheritance] - Whether to calculate inheritance patterns.
+ * @param {Object} [params.sampleMap] - Manual mapping of sample roles if PED not available.
+ * @param {Array<string>} [params.samples] - List of sample IDs from VCF file.
  * @return {Promise<Object>} Result object with meta, variantData, and
  * annotationData properties.
  */
@@ -379,6 +385,63 @@ async function analyzeVariant(params) {
     });
     finalOutput.pedigreeData = pedigreeObject;
     stepsPerformed.push('Added pedigree data from PED file.');
+  }
+
+  // Calculate inheritance patterns if enabled
+  if (params.calculateInheritance) {
+    debug('Calculating inheritance patterns for variant annotations');
+
+    // Iterate through each annotation and calculate the inheritance pattern
+    let calculatedPatternsCount = 0;
+
+    for (const annotation of finalOutput.annotationData) {
+      try {
+        // Construct a key to look up the VCF record
+        const chrom = annotation.seq_region_name || annotation.chr || '';
+        const pos = annotation.start || '';
+        const ref = annotation.allele_string ? annotation.allele_string.split('/')[0] : '';
+        const alt = annotation.allele_string ? annotation.allele_string.split('/')[1] : '';
+
+        // Build the variant key in the same format used in vcfReader
+        const key = `${chrom}:${pos}:${ref}:${alt}`;
+
+        // Look up genotype information from the VCF record map
+        if (params.vcfRecordMap && params.vcfRecordMap.has(key)) {
+          const vcfRecord = params.vcfRecordMap.get(key);
+
+          if (vcfRecord.genotypes && vcfRecord.genotypes.size > 0) {
+            // We have genotype data - calculate the inheritance pattern
+            const variantInfo = { chrom };
+
+            const pattern = calculateDeducedPattern(
+              vcfRecord.genotypes,
+              params.pedigreeData,
+              params.sampleMap,
+              variantInfo
+            );
+
+            // Add the deduced pattern to the annotation
+            annotation.deducedInheritancePattern = pattern;
+            calculatedPatternsCount++;
+          } else {
+            debug(`No genotype data found for variant ${key}`);
+          }
+        } else {
+          debug(`VCF record not found for variant ${key}`);
+        }
+      } catch (error) {
+        debug(`Error calculating inheritance pattern: ${error.message}`);
+        // Continue with next annotation
+      }
+    }
+
+    if (calculatedPatternsCount > 0) {
+      stepsPerformed.push(
+        `Calculated inheritance patterns for ${calculatedPatternsCount} variants.`
+      );
+    } else {
+      stepsPerformed.push('No inheritance patterns could be calculated (missing genotype data).');
+    }
   }
 
   if (params.output && params.output.toUpperCase() === 'SCHEMA') {
