@@ -13,6 +13,7 @@ const packageJson = require('../package.json');
 const { analyzeVariant } = require('./variantLinkerCore');
 const { getBaseUrl } = require('./configHelper');
 const { readVariantsFromVcf } = require('./vcfReader');
+const { readPedigree } = require('./pedReader');
 
 // Set up debug loggers.
 const debug = require('debug')('variant-linker:main');
@@ -230,6 +231,11 @@ const argv = yargs
     description: 'Path to log file for debug info',
     type: 'string',
   })
+  .option('ped', {
+    alias: 'p',
+    description: 'Path to the PED file defining family structure and affected status',
+    type: 'string',
+  })
   .option('vcf-input', {
     alias: 'vi',
     description: 'Path to VCF file to analyze',
@@ -329,6 +335,20 @@ if (!process.env.ENSEMBL_BASE_URL) {
 async function main() {
   try {
     debug('Starting variant analysis process');
+
+    // Read PED file if provided
+    let pedigreeData = null;
+    if (mergedParams.ped) {
+      try {
+        debug(`Reading pedigree data from PED file: ${mergedParams.ped}`);
+        pedigreeData = await readPedigree(mergedParams.ped);
+        debug(`Parsed pedigree data for ${pedigreeData.size} samples`);
+      } catch (error) {
+        debug(`Error reading PED file: ${error.message}`);
+        console.error(`Warning: Could not read PED file: ${error.message}`);
+        // Continue without pedigree data
+      }
+    }
     const recoderOptions = parseOptionalParameters(mergedParams.recoder_params, {
       vcf_string: '1',
     });
@@ -401,6 +421,8 @@ async function main() {
       vcfRecordMap,
       vcfHeaderText,
       vcfHeaderLines,
+      // Pass pedigree data if available
+      pedigreeData,
     });
 
     // Output the results

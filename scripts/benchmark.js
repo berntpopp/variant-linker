@@ -57,7 +57,8 @@ function truncateDetailedLog(str) {
   // For JSON objects, try to shorten while keeping structure
   if (str.startsWith('{') || str.startsWith('[')) {
     try {
-      return `${str.substring(0, MAX_DETAILED_LOG_LENGTH)}... (truncated JSON, ${str.length} chars)`;
+      const truncMsg = `... (truncated JSON, ${str.length} chars)`;
+      return `${str.substring(0, MAX_DETAILED_LOG_LENGTH)}${truncMsg}`;
     } catch (e) {
       // Fall back to simple truncation if JSON parsing fails
       const truncatedChars = str.length - MAX_DETAILED_LOG_LENGTH;

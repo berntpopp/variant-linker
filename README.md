@@ -13,6 +13,7 @@ In addition to its CLI capabilities, Variant-Linker is designed with a modular a
 - **Extensibility**: Prepared for future extensions to include local installations of VEP and Variant Recoder.
 - **Output Customization**: Users can specify the output format (JSON, CSV, TSV) with configurable field selection.
 - **Tabular Data Export**: Provides CSV and TSV output with a "flatten by consequence" strategy for comprehensive variant analysis.
+- **PED File Support**: Reads standard 6-column PED files to extract family structure and affected status information for inheritance analysis.
 - **VCF Handling**: Supports standard VCF file input (`--vcf-input`) and generation of annotated VCF output (`--output VCF`), preserving original headers and adding annotations to the INFO field. Works with any input type; a default header is generated if input was not a VCF file.
 - **Batch Request Chunking**: Automatically splits large batches of variants into smaller chunks for API requests, ensuring compliance with Ensembl limits and efficient processing.
 - **Exponential Backoff Retry**: Implements automatic retry with exponential backoff for transient API errors, improving reliability when Ensembl services experience temporary issues.
@@ -71,6 +72,7 @@ variant-linker --vcf-input <vcf_file_path> --output <output_format> [--debug]
 - `--debug`, `-d`: Enable debug mode for detailed logging. This is optional and is not enabled by default.
 - `--vep_params`, `--vp`: Optional parameters for VEP annotation in key=value format, separated by commas (default: "CADD=1").
 - `--recoder_params`, `--rp`: Optional parameters for Variant Recoder in key=value format, separated by commas (default: "vcf_string=1").
+- `--ped`, `-p`: Path to the PED file defining family structure and affected status. Provides pedigree information for inheritance analysis.
 - `--scoring_config_path`, `--scp`: Path to the scoring configuration directory.
 
 #### Configuration File
@@ -430,6 +432,31 @@ When adding new features, please include appropriate tests following these princ
 - **DRY (Don't Repeat Yourself)** - Use helpers and shared fixtures
 - **Mock external dependencies** - Don't make actual API calls in tests
 - **Clean up resources** - Use try/finally to ensure proper cleanup
+
+## PED File Format
+
+Variant-Linker supports standard 6-column PED (pedigree) files for family structure and affected status:
+
+```
+FamilyID SampleID FatherID MotherID Sex AffectedStatus
+```
+
+Where:
+- **FamilyID**: Identifier for family group
+- **SampleID**: Unique sample identifier (used for sample lookup)
+- **FatherID**: Father's sample ID (or '0' for founder/unknown)
+- **MotherID**: Mother's sample ID (or '0' for founder/unknown)
+- **Sex**: 1=male, 2=female, 0=unknown
+- **AffectedStatus**: 0=unknown, 1=unaffected, 2=affected
+
+Example PED file content:
+```
+FAM1 SAMPLE1 0 0 1 2       # Male founder (affected)
+FAM1 SAMPLE2 0 0 2 1       # Female founder (unaffected)
+FAM1 SAMPLE3 SAMPLE1 SAMPLE2 1 2  # Male child (affected)
+```
+
+PED files can use either tabs or spaces as delimiters. Lines starting with '#' are treated as comments and ignored. This pedigree data enables inheritance analysis and filtering based on family relationships.
 
 ## Code Style & Linting
 

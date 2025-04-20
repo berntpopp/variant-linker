@@ -296,8 +296,8 @@ async function processBatchVariants(variants, params) {
  * calling the appropriate APIs, and optionally applying scoring and filtering.
  *
  * @param {Object} params - The analysis parameters.
- * @param {string} [params.variant] - Single variant input (VCF/HGVS) - for backwards compatibility.
- * @param {Array<string>} [params.variants] - An array of variant inputs
+ * @param {string} [params.variant] - Single variant to analyze. Deprecated, use params.variants.
+ * @param {Array<string>} [params.variants] - Array of variants to analyze
  * (VCF or HGVS formats).
  * @param {Object} params.recoderOptions - Options for the Variant Recoder API.
  * @param {Object} params.vepOptions - Options for the VEP API.
@@ -307,6 +307,8 @@ async function processBatchVariants(variants, params) {
  * @param {string} params.output - Output format
  * ('JSON', 'CSV', or 'SCHEMA' are supported formats).
  * @param {string} [params.filter] - Optional JSON string specifying filtering criteria.
+ * @param {Map<string, Object>} [params.pedigreeData] - Pedigree data parsed from PED file
+ * containing family relationships and affected status.
  * @return {Promise<Object>} Result object with meta, variantData, and
  * annotationData properties.
  */
@@ -366,6 +368,17 @@ async function analyzeVariant(params) {
   if (params.vcfRecordMap && params.vcfHeaderLines) {
     finalOutput.vcfRecordMap = params.vcfRecordMap;
     finalOutput.vcfHeaderLines = params.vcfHeaderLines;
+  }
+
+  // Add pedigree data to finalOutput if present in params
+  if (params.pedigreeData) {
+    // Convert Map to a serializable object for the output
+    const pedigreeObject = {};
+    params.pedigreeData.forEach((value, key) => {
+      pedigreeObject[key] = value;
+    });
+    finalOutput.pedigreeData = pedigreeObject;
+    stepsPerformed.push('Added pedigree data from PED file.');
   }
 
   if (params.output && params.output.toUpperCase() === 'SCHEMA') {
