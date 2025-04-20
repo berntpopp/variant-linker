@@ -353,6 +353,71 @@ async function main() {
   try {
     debug('Starting variant analysis process');
 
+    // Collect variants from all possible sources
+    let variants = [];
+    const vcfRecordMap = new Map();
+    let vcfHeaderText;
+    let vcfHeaderLines;
+
+    // Process VCF input if provided
+    let variantIds = [];
+    let vcfData = null;
+
+    if (mergedParams.vcfInput) {
+      debug(`Processing VCF file: ${mergedParams.vcfInput}`);
+      try {
+        vcfData = await readVariantsFromVcf(mergedParams.vcfInput);
+        variantIds = vcfData.variants;
+        debug(`Extracted ${variantIds.length} variant(s) from VCF file`);
+
+        // Get the VCF record map with genotype data for inheritance pattern calculation
+        if (vcfData.genotypes && Object.keys(vcfData.genotypes).length > 0) {
+          for (const variantKey of variantIds) {
+            if (vcfData.genotypes[variantKey]) {
+              vcfRecordMap.set(variantKey, {
+                genotypes: vcfData.genotypes[variantKey],
+              });
+            }
+          }
+          debug(`Created VCF record map with genotype data for ${vcfRecordMap.size} variants`);
+        }
+
+        // Extract sample IDs for inheritance pattern calculation
+        if (vcfData.samples && vcfData.samples.length > 0) {
+          debug(
+            `VCF file contains ${vcfData.samples.length} samples: ${vcfData.samples.join(', ')}`
+          );
+        }
+      } catch (error) {
+        debug(`Error processing VCF file: ${error.message}`);
+        console.error(`Error processing VCF file: ${error.message}`);
+        throw new Error(`Failed to process VCF file: ${error.message}`);
+      }
+    } else {
+      // Add single variant if provided
+      if (mergedParams.variant) {
+        variants.push(mergedParams.variant);
+      }
+
+      // Add variants from comma-separated list if provided
+      if (mergedParams.variants) {
+        const variantsList = mergedParams.variants
+          .split(',')
+          .map((v) => v.trim())
+          .filter(Boolean);
+        variants = [...variants, ...variantsList];
+      }
+
+      // Add variants from file if provided
+      if (mergedParams.variantsFile) {
+        const fileVariants = readVariantsFromFile(mergedParams.variantsFile);
+        variants = [...variants, ...fileVariants];
+      }
+    }
+
+    debug(`Processing ${variants.length} variants`);
+    debugDetailed(`Variants: ${JSON.stringify(variants)}`);
+
     // Read PED file if provided
     let pedigreeData = null;
     if (mergedParams.ped) {
@@ -409,6 +474,7 @@ async function main() {
     if (calculateInheritance) {
       debug('Inheritance pattern calculation is enabled');
     }
+
     const recoderOptions = parseOptionalParameters(mergedParams.recoder_params, {
       vcf_string: '1',
     });
@@ -424,76 +490,10 @@ async function main() {
         ` vepOptions=${JSON.stringify(vepOptions)}`
     );
 
-    // Collect variants from all possible sources
-    let variants = [];
-    const vcfRecordMap = new Map();
-    let vcfHeaderText;
-    let vcfHeaderLines;
-
-    // Process VCF input if provided
-    let variantIds = [];
-    let vcfData = null;
-
-    if (mergedParams.vcfInput) {
-      debug(`Processing VCF file: ${mergedParams.vcfInput}`);
-      try {
-        vcfData = await readVariantsFromVcf(mergedParams.vcfInput);
-        variantIds = vcfData.variants;
-        debug(`Extracted ${variantIds.length} variant(s) from VCF file`);
-
-        // Get the VCF record map with genotype data for inheritance pattern calculation
-        if (vcfData.genotypes && Object.keys(vcfData.genotypes).length > 0) {
-          for (const variantKey of variantIds) {
-            if (vcfData.genotypes[variantKey]) {
-              vcfRecordMap.set(variantKey, {
-                genotypes: vcfData.genotypes[variantKey],
-              });
-            }
-          }
-          debug(`Created VCF record map with genotype data for ${vcfRecordMap.size} variants`);
-        }
-
-        // Extract sample IDs for inheritance pattern calculation
-        if (vcfData.samples && vcfData.samples.length > 0) {
-          debug(
-            `VCF file contains ${vcfData.samples.length} samples: ${vcfData.samples.join(', ')}`
-          );
-        }
-      } catch (error) {
-        debug(`Error processing VCF file: ${error.message}`);
-        console.error(`Error processing VCF file: ${error.message}`);
-        throw new Error(`Failed to process VCF file: ${error.message}`);
-      }
-    } else if (mergedParams._.length > 0) {
-      // Add single variant if provided
-      if (mergedParams.variant) {
-        variants.push(mergedParams.variant);
-      }
-
-      // Add variants from comma-separated list if provided
-      if (mergedParams.variants) {
-        const variantsList = mergedParams.variants
-          .split(',')
-          .map((v) => v.trim())
-          .filter(Boolean);
-        variants = [...variants, ...variantsList];
-      }
-
-      // Add variants from file if provided
-      if (mergedParams.variantsFile) {
-        const fileVariants = readVariantsFromFile(mergedParams.variantsFile);
-        variants = [...variants, ...fileVariants];
-      }
-    }
-
-    debug(`Processing ${variants.length} variants`);
-    debugDetailed(`Variants: ${JSON.stringify(variants)}`);
-
     // Prepare analysis parameters
     const analysisParams = {
-      variants, // Use the collected variants array instead of a single variant
+      variants: mergedParams.vcfInput ? variantIds : variants,
       assembly: mergedParams.assembly,
-      format: format,
       output: mergedParams.output,
       outputFile: mergedParams.outputFile,
       level: mergedParams.level,
