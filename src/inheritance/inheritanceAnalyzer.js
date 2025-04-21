@@ -125,7 +125,8 @@ function _groupAnnotationsByGene(annotations) {
       // Use a default placeholder if still no gene symbol
       geneSymbol = `NO_GENE_${annotation.seq_region_name || 'UNK'}`;
       debugDetailed(
-        `  Variant ${annotation.variantKey} - no gene symbol found. Using placeholder: ${geneSymbol}`
+        `  Variant ${annotation.variantKey} - no gene symbol found. ` +
+          `Using placeholder: ${geneSymbol}`
       );
       // Do not skip, group under placeholder
     }
@@ -158,7 +159,9 @@ function _mergeCompHetResults(inheritanceResults, geneSymbol, compHetResult) {
 
   // ** Added more detailed logging **
   debugDetailed(
-    `  Merging CompHet for ${geneSymbol}: Confirmed=${compHetResult.isCompHet}, Possible=${compHetResult.isPossible}, Pattern=${compHetResult.pattern}`
+    `  Merging CompHet for ${geneSymbol}:
+     Confirmed=${compHetResult.isCompHet}, Possible=${compHetResult.isPossible},
+     Pattern=${compHetResult.pattern}`
   );
 
   for (const variantKey of compHetResult.variantKeys) {
@@ -202,7 +205,8 @@ function _mergeCompHetResults(inheritanceResults, geneSymbol, compHetResult) {
       const isCurrentStrong = strongPatterns.includes(currentResult.prioritizedPattern);
 
       debugDetailed(
-        `    Variant ${variantKey}: isCurrentWeak=${isCurrentWeak}, isCurrentStrong=${isCurrentStrong}`
+        `    Variant ${variantKey}:
+         isCurrentWeak=${isCurrentWeak}, isCurrentStrong=${isCurrentStrong}`
       );
 
       if (compHetResult.isCompHet) {
@@ -223,7 +227,8 @@ function _mergeCompHetResults(inheritanceResults, geneSymbol, compHetResult) {
         // Possible CompHet overrides only weak or unknown patterns
         if (isCurrentWeak) {
           debugDetailed(
-            `    -> Overriding weak pattern '${newPrioritizedPattern}' with possible CompHet '${compHetResult.pattern}'`
+            `    -> Overriding weak pattern '${newPrioritizedPattern}' with possible CompHet ` +
+              `'${compHetResult.pattern}'`
           );
           // Use the specific 'possible' pattern from the compHetResult
           newPrioritizedPattern = compHetResult.pattern;
@@ -266,7 +271,8 @@ function _mergeCompHetResults(inheritanceResults, geneSymbol, compHetResult) {
 
       inheritanceResults.set(variantKey, enhancedResult);
       debugDetailed(
-        `    Updated inheritance result for variant ${variantKey} with CompHet info. Final Pattern: ${newPrioritizedPattern}`
+        `    Updated inheritance result for variant ${variantKey} with CompHet info. ` +
+          `Final Pattern: ${newPrioritizedPattern}`
       );
     } else {
       debugDetailed(
@@ -322,9 +328,8 @@ function analyzeInheritanceForSample(annotations, genotypesMap, pedigreeData, sa
         });
       } else {
         debugDetailed(
-          ` Cannot generate variantKey for annotation to report missing genotype error: ${JSON.stringify(
-            ann
-          )}`
+          ` Cannot generate variantKey for annotation to report missing genotype error:
+           ${JSON.stringify(ann, null, 2)}`
         );
       }
     }
@@ -353,13 +358,17 @@ function analyzeInheritanceForSample(annotations, genotypesMap, pedigreeData, sa
       annotation.variantKey = variantKey; // Ensure variantKey is set on the annotation object
     } else {
       debugDetailed(
-        `  SKIPPING - Cannot generate valid variantKey. Chrom: ${chrom}, Pos: ${pos}, Ref: ${ref}, Alt: ${alt}. OriginalInput: ${annotation.originalInput}`
+        `  SKIPPING - Cannot generate valid variantKey.
+         Chrom: ${chrom}, Pos: ${pos}, Ref: ${ref}, Alt: ${alt}.
+         OriginalInput: ${annotation.originalInput}`
       );
       continue; // Skip processing this annotation if key cannot be formed
     }
 
     debugDetailed(
-      `\nProcessing Annotation: Key=${variantKey}, Input=${annotation.originalInput || annotation.input}`
+      `\nProcessing Annotation:
+       Key=${variantKey}
+       Input=${annotation.originalInput || annotation.input}`
     );
 
     const genotypes = genotypesMap.get(variantKey);
@@ -499,7 +508,8 @@ function analyzeInheritanceForSample(annotations, genotypesMap, pedigreeData, sa
       // The analyzer handles missing PED internally now, but log remains useful.
       if (!pedigreeData || pedigreeData.size === 0) {
         debugDetailed(
-          `  Proceeding with CompHet analysis for ${geneSymbol} without PED data (will yield 'possible_no_pedigree').`
+          `  Proceeding with CompHet analysis for ${geneSymbol}
+           without PED data (will yield 'possible_no_pedigree').`
         );
       }
 

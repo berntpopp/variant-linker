@@ -168,13 +168,12 @@ async function readVariantsFromVcf(filePath) {
         // Store genotypes for this variant (CHROM/POS/REF/ALT)
         const genotypes = new Map();
 
-        // ** FIX: Correct check and function call **
         // Check if the parser actually returned a GENOTYPES function and if samples exist
         if (typeof record.GENOTYPES === 'function' && samples.length > 0) {
           let parsedGenotypes = null;
           try {
             // Call the function to parse genotypes lazily
-            parsedGenotypes = record.GENOTYPES(); // <-- CORRECT FUNCTION NAME (UPPERCASE)
+            // eslint-disable-next-line new-cap
             // Use more careful logging for potentially large objects
             if (parsedGenotypes && debugDetailed.enabled) {
               debugDetailed(`Parsed Genotypes object for ${key}: [Object]`);
@@ -241,8 +240,10 @@ async function readVariantsFromVcf(filePath) {
           }
         } else {
           // If no GENOTYPES function or no samples defined in header, store missing
+          // ** FIX: Corrected line break for length **
           debugDetailed(
-            `No GENOTYPES function or no samples found for ${key}. Using './.' for all samples.`
+            `No GENOTYPES function or no samples found for ${key}. ` +
+              `Using './.' for all samples.`
           );
           for (const sampleId of samples) {
             genotypes.set(sampleId, './.');
