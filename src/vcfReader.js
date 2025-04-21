@@ -170,7 +170,7 @@ async function readVariantsFromVcf(filePath) {
 
         // Check if the parser actually returned a GENOTYPES function and if samples exist
         if (typeof record.GENOTYPES === 'function' && samples.length > 0) {
-          let parsedGenotypes = null;
+          const parsedGenotypes = null;
           try {
             // Call the function to parse genotypes lazily
             // eslint-disable-next-line new-cap
