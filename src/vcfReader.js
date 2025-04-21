@@ -1,3 +1,5 @@
+// src/vcfReader.js
+
 /**
  * @fileoverview VCF file parsing functionality for variant-linker.
  * Provides functions to read variants from standard VCF files, preserving header
@@ -95,10 +97,8 @@ async function readVariantsFromVcf(filePath) {
         debugDetailed(
           `VCF Record (${record?.CHROM}:${record?.POS}): Has samples = ${Boolean(record?.SAMPLES)}`
         );
-        if (record?.SAMPLES) {
-          // Log the entire SAMPLES object for inspection
-          debugDetailed(`Parsed Record SAMPLES object: ${JSON.stringify(record.SAMPLES)}`);
-        }
+        // Note: record.SAMPLES is a function, record.SAMPLES() returns the data
+        // Logging record.SAMPLES directly might not show the genotypes
       } catch (parseError) {
         debug(
           `Warning: Failed to parse VCF line: ${line.substring(0, 100)}... ` +
@@ -172,33 +172,49 @@ async function readVariantsFromVcf(filePath) {
         if (typeof record.GENOTYPES === 'function' && samples.length > 0) {
           let parsedGenotypes = null;
           try {
-            // Call the function to parse genotypes lazily
-            parsedGenotypes = record.getGenotypes();
+            // Call the function to parse genotypes lazily - **CORRECTED FUNCTION NAME**
+            parsedGenotypes = record.GENOTYPES(); // <-- FIX IS HERE
             debugDetailed(`Parsed Genotypes object for ${key}: ${JSON.stringify(parsedGenotypes)}`);
           } catch (e) {
+            // Log the specific error when calling GENOTYPES()
             debugDetailed(`Error calling record.GENOTYPES() for ${key}: ${e.message}`);
-            // Continue without genotypes if parsing fails
+            // Continue without genotypes if parsing fails for this record
           }
 
           if (parsedGenotypes) {
+            // Check if parsing succeeded
             for (const sampleId of samples) {
               // Access the genotype string using the sampleId as the key
-              const gtString = parsedGenotypes[sampleId];
+              // The value might be an array (e.g., ['0/1']), handle this
+              const gtValue = parsedGenotypes[sampleId];
+              let gtString = './.'; // Default to missing
+
+              if (Array.isArray(gtValue) && gtValue.length > 0) {
+                gtString = String(gtValue[0]); // Take the first element if it's an array
+              } else if (gtValue !== undefined && gtValue !== null) {
+                gtString = String(gtValue); // Use it directly if not an array
+              }
 
               debugDetailed(
                 `Processing sample ${sampleId}: Extracted GT string = ${JSON.stringify(gtString)}`
               );
 
-              if (gtString !== undefined && gtString !== null && gtString !== '') {
+              // Check for undefined, null, or empty string representations AFTER potential array access
+              if (
+                gtString !== undefined &&
+                gtString !== null &&
+                gtString.trim() !== '' &&
+                gtString !== '.'
+              ) {
                 // Store the extracted genotype string (e.g., "0/1", "0|0")
-                genotypes.set(sampleId, String(gtString));
+                // Ensure it's stored as a string
+                genotypes.set(sampleId, gtString);
                 debugDetailed(` -> Storing GT '${gtString}' for sample ${sampleId}`);
               } else {
-                // Use './.' if GT is missing for the sample in the parsed object
+                // Use './.' if GT is missing, null, empty, or explicitly '.'
                 genotypes.set(sampleId, './.');
-                debugDetailed(` -> Sample ${sampleId}: GT missing/empty, storing './.'`);
                 debugDetailed(
-                  `   Warning: Missing GT value for sample ${sampleId} at ${chrom}:${pos}`
+                  ` -> Sample ${sampleId}: GT missing/empty/invalid ('${gtString}'), storing './.'`
                 );
               }
             }
@@ -214,7 +230,9 @@ async function readVariantsFromVcf(filePath) {
           }
         } else {
           // If no GENOTYPES function or no samples defined in header, store missing
-          debugDetailed(`No genotypes found for ${key}. Using './.' for all samples.`);
+          debugDetailed(
+            `No GENOTYPES function or no samples found for ${key}. Using './.' for all samples.`
+          );
           for (const sampleId of samples) {
             genotypes.set(sampleId, './.');
           }
@@ -231,8 +249,8 @@ async function readVariantsFromVcf(filePath) {
           pos,
           ref,
           alt,
-          genotypes,
-          originalRecord: record,
+          genotypes, // Store the populated or default genotypes map
+          originalRecord: record, // Keep original record if needed elsewhere
         });
       }
     }

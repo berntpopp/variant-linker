@@ -366,11 +366,20 @@ function _deducePedBasedPatterns(genotypes, pedigreeData, isXChromosome) {
   // --- Check Patterns for Consistency ---
   const consistentPatterns = [];
 
+  // Initialize flags/variables used later *before* the isXChromosome check
+  let affectedWithoutVariant = false;
+  let unaffectedWithVariant = false;
+  let xlrConsistent = false; // Assume not consistent unless X-linked checks run and pass
+  let xldConsistent = false;
+
   // 1. Check De Novo consistency
   let potentialDeNovo = false;
   for (const [affectedId, affectedData] of affectedIndividuals.entries()) {
     const indexGT = affectedData.genotype;
-    if (!genotypeUtils.isVariant(indexGT)) continue; // Skip if affected is ref
+    if (!genotypeUtils.isVariant(indexGT)) {
+      affectedWithoutVariant = true; // Flag if affected is reference
+      continue; // Skip if affected is ref for de novo check
+    }
 
     const { motherId, fatherId } = affectedData.pedData;
 
@@ -455,6 +464,7 @@ function _deducePedBasedPatterns(genotypes, pedigreeData, isXChromosome) {
     for (const [unaffectedId, unaffectedData] of unaffectedIndividuals.entries()) {
       if (genotypeUtils.isVariant(unaffectedData.genotype)) {
         adIncompletePenetrance = true;
+        unaffectedWithVariant = true; // Update flag here
         debugDetailed(
           `  PED AD Check: Unaffected ${unaffectedId} has variant (Incomplete Penetrance?).`
         );
@@ -533,13 +543,30 @@ function _deducePedBasedPatterns(genotypes, pedigreeData, isXChromosome) {
 
   // 4. Check X-linked consistency (simplified checks)
   if (isXChromosome) {
-    let xlrConsistent = true;
-    const xldConsistent = true;
+    // Initialize consistency flags for X-linked check
+    xlrConsistent = true; // Start assuming consistent
+    xldConsistent = true; // Start assuming consistent
+
+    // Check each affected individual for basic X-linked rules
+    for (const [affectedId, affectedData] of affectedIndividuals.entries()) {
+      const isMaleAffected = pedigreeUtils.isMale(affectedId, pedigreeData);
+      const affectedGT = affectedData.genotype;
+
+      // Affected male in XLR/XLD must have variant (het/hom for X is usually coded like homAlt)
+      if (isMaleAffected && !genotypeUtils.isVariant(affectedGT)) {
+        xlrConsistent = false;
+        xldConsistent = false; // Also inconsistent for XLD
+        debugDetailed(`XLR/XLD Fail: Affected Male ${affectedId} is Ref.`);
+      }
+
+      // Add more affected checks if needed (e.g., female HomAlt for XLR)
+    }
 
     // Check each unaffected individual
-    for (const unaffectedId of unaffectedIndividuals.keys()) {
-      const indexGT = unaffectedIndividuals.get(unaffectedId).genotype;
-      const isMaleUnaffected = affectedIndividuals.has(unaffectedId) ? false : true;
+    for (const [unaffectedId, unaffectedData] of unaffectedIndividuals.entries()) {
+      const indexGT = unaffectedData.genotype;
+      // Correctly determine sex using pedigree data
+      const isMaleUnaffected = pedigreeUtils.isMale(unaffectedId, pedigreeData);
 
       // Unaffected male cannot have variant in XLR
       if (xlrConsistent && isMaleUnaffected && genotypeUtils.isVariant(indexGT)) {
@@ -557,7 +584,8 @@ function _deducePedBasedPatterns(genotypes, pedigreeData, isXChromosome) {
       if (xldConsistent && genotypeUtils.isVariant(indexGT)) {
         // This indicates incomplete penetrance if XLD is true
         // For consistency check, mark basic XLD as inconsistent, but allow possibility later
-        // xldConsistent = false; // Keep XLD as possible? Let's mark inconsistent for now.
+        xldConsistent = false; // Mark basic XLD as inconsistent for now.
+        unaffectedWithVariant = true; // Mark the general flag
         debugDetailed(`XLD Inconsistency: Unaffected ${unaffectedId} has variant.`);
         // Could add 'x_linked_dominant_incomplete_penetrance' here or rely on general flag
         consistentPatterns.push('incomplete_penetrance');
@@ -567,8 +595,9 @@ function _deducePedBasedPatterns(genotypes, pedigreeData, isXChromosome) {
         break; // Stop checks if both ruled out
       }
     }
-  }
+  } // End of if(isXChromosome)
 
+  // Now check the consistency flags determined inside the X-linked block (or their initial 'false' values)
   if (xlrConsistent) {
     consistentPatterns.push('x_linked_recessive');
     debugDetailed("  PED Mode: 'x_linked_recessive' is consistent.");
@@ -576,18 +605,15 @@ function _deducePedBasedPatterns(genotypes, pedigreeData, isXChromosome) {
   if (xldConsistent) {
     consistentPatterns.push('x_linked_dominant');
     debugDetailed("  PED Mode: 'x_linked_dominant' is consistent.");
-    if (genotypeUtils.isVariant(unaffectedData.genotype)) {
-      unaffectedWithVariant = true;
-      // Already added 'incomplete_penetrance' if AD/XLD consistent
-    }
   }
 
+  // Check for overall segregation issues AFTER all pattern checks
   if (affectedWithoutVariant) {
     // This usually invalidates simple Mendelian patterns
     consistentPatterns.push('incomplete_segregation');
     debugDetailed(
-      `  Status check - No variant: ${affectedWithoutVariant}, ` +
-        `Has variant: ${unaffectedWithVariant}`
+      `  Status check - Affected without variant: ${affectedWithoutVariant}, ` +
+        `Unaffected with variant: ${unaffectedWithVariant}`
     );
   } else if (unaffectedWithVariant && !consistentPatterns.includes('incomplete_penetrance')) {
     // Add general incomplete penetrance if not added by AD/XLD checks
@@ -598,15 +624,15 @@ function _deducePedBasedPatterns(genotypes, pedigreeData, isXChromosome) {
   // Final fallback
   if (consistentPatterns.length === 0) {
     debugDetailed(`  PED Mode: No specific patterns identified as consistent after checks.`);
-    // Check if index has variant to distinguish non-causative vs unknown
-    let indexHasVariant = false;
+    // Check if any affected index has variant to distinguish non-causative vs unknown
+    let anyAffectedHasVariant = false;
     for (const [, affectedData] of affectedIndividuals.entries()) {
       if (genotypeUtils.isVariant(affectedData.genotype)) {
-        indexHasVariant = true;
+        anyAffectedHasVariant = true;
         break;
       }
     }
-    if (!indexHasVariant && affectedIndividuals.size > 0) {
+    if (!anyAffectedHasVariant && affectedIndividuals.size > 0) {
       consistentPatterns.push('non_causative_or_no_affected'); // Changed name
     } else {
       // If patterns failed consistency checks but affected *do* have variant
