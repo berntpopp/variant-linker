@@ -168,13 +168,23 @@ async function readVariantsFromVcf(filePath) {
         // Store genotypes for this variant (CHROM/POS/REF/ALT)
         const genotypes = new Map();
 
+        // ** FIX: Correct check and function call **
         // Check if the parser actually returned a GENOTYPES function and if samples exist
         if (typeof record.GENOTYPES === 'function' && samples.length > 0) {
           let parsedGenotypes = null;
           try {
-            // Call the function to parse genotypes lazily - **CORRECTED FUNCTION NAME**
-            parsedGenotypes = record.GENOTYPES(); // <-- FIX IS HERE
-            debugDetailed(`Parsed Genotypes object for ${key}: ${JSON.stringify(parsedGenotypes)}`);
+            // Call the function to parse genotypes lazily
+            parsedGenotypes = record.GENOTYPES(); // <-- CORRECT FUNCTION NAME (UPPERCASE)
+            // Use more careful logging for potentially large objects
+            if (parsedGenotypes && debugDetailed.enabled) {
+              debugDetailed(`Parsed Genotypes object for ${key}: [Object]`);
+              // Log genotypes individually if debugging detailed is enabled
+              Object.keys(parsedGenotypes).forEach((sampleId) => {
+                debugDetailed(`  Sample ${sampleId} (raw): ${parsedGenotypes[sampleId]}`);
+              });
+            } else if (!parsedGenotypes) {
+              debugDetailed(`Parsed Genotypes object for ${key}: null`);
+            }
           } catch (e) {
             // Log the specific error when calling GENOTYPES()
             debugDetailed(`Error calling record.GENOTYPES() for ${key}: ${e.message}`);
@@ -189,6 +199,7 @@ async function readVariantsFromVcf(filePath) {
               const gtValue = parsedGenotypes[sampleId];
               let gtString = './.'; // Default to missing
 
+              // ** Refined genotype string extraction **
               if (Array.isArray(gtValue) && gtValue.length > 0) {
                 gtString = String(gtValue[0]); // Take the first element if it's an array
               } else if (gtValue !== undefined && gtValue !== null) {
@@ -199,8 +210,7 @@ async function readVariantsFromVcf(filePath) {
                 `Processing sample ${sampleId}: Extracted GT string = ${JSON.stringify(gtString)}`
               );
 
-              // Check for undefined, null, or empty string representations
-              // AFTER potential array access
+              // Check for undefined, null, or empty string representations AFTER potential array access
               if (
                 gtString !== undefined &&
                 gtString !== null &&

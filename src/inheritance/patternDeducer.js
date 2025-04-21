@@ -325,12 +325,15 @@ function _deducePedBasedPatterns(genotypes, pedigreeData, isXChromosome) {
   const affectedIndividuals = new Map(); // sampleId -> { pedData, genotype }
   const unaffectedIndividuals = new Map(); // sampleId -> { pedData, genotype }
   let hasAffected = false;
+  let allAreReference = true; // Flag to check if everyone is 0/0
+  let nonMissingCount = 0; // Count individuals with actual genotype data
 
   for (const [sampleId, pedInfo] of pedigreeData.entries()) {
     if (genotypes.has(sampleId)) {
       const gt = genotypes.get(sampleId);
       // Only consider individuals with non-missing genotypes for pattern consistency checks
       if (!genotypeUtils.isMissing(gt)) {
+        nonMissingCount++; // Increment count of samples with genotype data
         const data = { pedData: pedInfo, genotype: gt };
         // Check affected status (string '2' or number 2)
         if (pedInfo.affectedStatus === '2' || pedInfo.affectedStatus === 2) {
@@ -338,6 +341,10 @@ function _deducePedBasedPatterns(genotypes, pedigreeData, isXChromosome) {
           hasAffected = true;
         } else if (pedInfo.affectedStatus === '1' || pedInfo.affectedStatus === 1) {
           unaffectedIndividuals.set(sampleId, data);
+        }
+        // Check if this individual is NOT reference homozygous
+        if (!genotypeUtils.isRef(gt)) {
+          allAreReference = false;
         }
       } else {
         debugDetailed(
@@ -352,6 +359,14 @@ function _deducePedBasedPatterns(genotypes, pedigreeData, isXChromosome) {
   debugDetailed(
     `  PED Mode: ${affectedIndividuals.size} affected, ${unaffectedIndividuals.size} unaffected`
   );
+
+  // ** FIX: Add early return for 'reference' if applicable **
+  // Only return 'reference' if we actually checked samples and they were all ref
+  if (nonMissingCount > 0 && allAreReference) {
+    debugDetailed(`  PED Mode: All non-missing samples are reference homozygous.`);
+    debugDetailed(`--- Exiting _deducePedBasedPatterns. Result: ["reference"] ---`);
+    return ['reference'];
+  }
 
   if (!hasAffected) {
     debug(
@@ -371,6 +386,7 @@ function _deducePedBasedPatterns(genotypes, pedigreeData, isXChromosome) {
   let unaffectedWithVariant = false;
   let xlrConsistent = false; // Assume not consistent unless X-linked checks run and pass
   let xldConsistent = false;
+  let addedXLinkedPattern = false; // Flag to track if X-linked was added
 
   // 1. Check De Novo consistency
   let potentialDeNovo = false;
@@ -448,173 +464,211 @@ function _deducePedBasedPatterns(genotypes, pedigreeData, isXChromosome) {
     }
   }
 
-  // 2. Check Autosomal Dominant consistency
-  let adConsistent = true;
-  let adIncompletePenetrance = false;
-  // Rule 1: All affected must have the variant (het or hom-alt)
-  for (const [affectedId, affectedData] of affectedIndividuals.entries()) {
-    if (!genotypeUtils.isVariant(affectedData.genotype)) {
-      adConsistent = false;
-      debugDetailed(`  PED AD Check: Affected ${affectedId} is Ref. AD inconsistent.`);
-      break;
-    }
-  }
-  // Rule 2: Check for unaffected carriers (incomplete penetrance)
-  if (adConsistent) {
-    for (const [unaffectedId, unaffectedData] of unaffectedIndividuals.entries()) {
-      if (genotypeUtils.isVariant(unaffectedData.genotype)) {
-        adIncompletePenetrance = true;
-        unaffectedWithVariant = true; // Update flag here
-        debugDetailed(
-          `  PED AD Check: Unaffected ${unaffectedId} has variant (Incomplete Penetrance?).`
-        );
-        // Don't break consistency, just note it
-      }
-    }
-    // Add more rules here if needed (e.g., parent transmission checks)
+  // 4. Check X-linked consistency FIRST if applicable
+  if (isXChromosome) {
+    xlrConsistent = true; // Start assuming consistent
+    xldConsistent = true; // Start assuming consistent
 
-    // If consistent and either fully penetrant or possibly incomplete penetrant
-    consistentPatterns.push('autosomal_dominant');
-    debugDetailed("  PED Mode: 'autosomal_dominant' is consistent.");
-    if (adIncompletePenetrance) {
-      // Add a specific pattern for incomplete penetrance if desired, or handle in prioritization
-      consistentPatterns.push('incomplete_penetrance'); // General flag
-      debugDetailed("  PED Mode: Also added 'incomplete_penetrance'.");
-    }
-  }
-
-  // 3. Check Autosomal Recessive consistency
-  let arConsistent = true;
-  // Check each affected individual for homozygous alternate state
-  for (const [affectedId, affectedData] of affectedIndividuals.entries()) {
-    if (!genotypeUtils.isHomAlt(affectedData.genotype)) {
-      arConsistent = false;
-      debugDetailed(`  PED AR Check: Affected ${affectedId} is not HomAlt.`);
-      break;
-    }
-  }
-  // Rule 2: If affected has parents with genotypes,
-  // they must be heterozygous (or HomAlt if also affected)
-  if (arConsistent) {
-    for (const [, affectedData] of affectedIndividuals.entries()) {
-      const { motherId, fatherId } = affectedData.pedData;
-      const motherGT =
-        motherId && motherId !== '0' && genotypes.has(motherId)
-          ? genotypes.get(motherId)
-          : undefined;
+    // Perform detailed X-linked checks...
+    for (const [affectedId, affectedData] of affectedIndividuals.entries()) {
+      const isMaleAffected = pedigreeUtils.isMale(affectedId, pedigreeData);
+      const affectedGT = affectedData.genotype;
+      const { fatherId, motherId } = affectedData.pedData;
       const fatherGT =
         fatherId && fatherId !== '0' && genotypes.has(fatherId)
           ? genotypes.get(fatherId)
           : undefined;
+      const motherGT =
+        motherId && motherId !== '0' && genotypes.has(motherId)
+          ? genotypes.get(motherId)
+          : undefined;
 
-      if (motherGT !== undefined && !genotypeUtils.isMissing(motherGT)) {
-        const motherIsAffected = affectedIndividuals.has(motherId);
+      // Rule out XLR if affected male has unaffected mother or affected father
+      if (isMaleAffected) {
+        if (!genotypeUtils.isMissing(motherGT) && genotypeUtils.isRef(motherGT)) {
+          xlrConsistent = false;
+          debugDetailed(`XLR Fail: Affected Male ${affectedId} has ref mother.`);
+        }
+        if (!genotypeUtils.isMissing(fatherGT) && genotypeUtils.isVariant(fatherGT)) {
+          xlrConsistent = false;
+          debugDetailed(`XLR Fail: Affected Male ${affectedId} has variant father.`);
+        }
+        // Rule out XLD if affected male has unaffected mother
+        if (!genotypeUtils.isMissing(motherGT) && genotypeUtils.isRef(motherGT)) {
+          xldConsistent = false;
+          debugDetailed(`XLD Fail: Affected Male ${affectedId} has ref mother.`);
+        }
+      } else {
+        // Female affected
+        // Rule out XLR if affected female (needs HomAlt) has unaffected father
         if (
-          !genotypeUtils.isHet(motherGT) &&
-          !(motherIsAffected && genotypeUtils.isHomAlt(motherGT))
+          genotypeUtils.isHomAlt(affectedGT) &&
+          !genotypeUtils.isMissing(fatherGT) &&
+          genotypeUtils.isRef(fatherGT)
         ) {
-          arConsistent = false;
-          debugDetailed(
-            `  PED AR Check: Parent ${motherId} GT ${motherGT} incompatible. AR inconsistent.`
-          );
-          break;
+          xlrConsistent = false;
+          debugDetailed(`XLR Fail: Affected Female (HomAlt) ${affectedId} has ref father.`);
+        }
+        // Rule out XLD if affected female has unaffected father
+        if (!genotypeUtils.isMissing(fatherGT) && genotypeUtils.isRef(fatherGT)) {
+          xldConsistent = false;
+          debugDetailed(`XLD Fail: Affected Female ${affectedId} has ref father.`);
+        }
+        // Rule out XLR if affected female is Het and mother is Ref (requires affected father)
+        if (
+          genotypeUtils.isHet(affectedGT) &&
+          !genotypeUtils.isMissing(motherGT) &&
+          genotypeUtils.isRef(motherGT)
+        ) {
+          xlrConsistent = false; // Cannot be carrier if mother is Ref
+          debugDetailed(`XLR Fail: Affected Female (Het) ${affectedId} has ref mother.`);
         }
       }
-      if (fatherGT !== undefined && !genotypeUtils.isMissing(fatherGT)) {
-        const fatherIsAffected = affectedIndividuals.has(fatherId);
-        if (
-          !genotypeUtils.isHet(fatherGT) &&
-          !(fatherIsAffected && genotypeUtils.isHomAlt(fatherGT))
-        ) {
-          arConsistent = false;
-          debugDetailed(
-            `  PED AR Check: Parent ${fatherId} GT ${fatherGT} incompatible. AR inconsistent.`
-          );
-          break;
-        }
-      }
-      if (!arConsistent) break; // Exit outer loop if inconsistency found
-    }
-  }
-  if (arConsistent) {
-    consistentPatterns.push('autosomal_recessive');
-    debugDetailed("  PED Mode: 'autosomal_recessive' is consistent.");
-  }
-
-  // 4. Check X-linked consistency (simplified checks)
-  if (isXChromosome) {
-    // Initialize consistency flags for X-linked check
-    xlrConsistent = true; // Start assuming consistent
-    xldConsistent = true; // Start assuming consistent
-
-    // Check each affected individual for basic X-linked rules
-    for (const [affectedId, affectedData] of affectedIndividuals.entries()) {
-      const isMaleAffected = pedigreeUtils.isMale(affectedId, pedigreeData);
-      const affectedGT = affectedData.genotype;
-
-      // Affected male in XLR/XLD must have variant (het/hom for X is usually coded like homAlt)
-      if (isMaleAffected && !genotypeUtils.isVariant(affectedGT)) {
+      // General check: affected must have variant
+      if (!genotypeUtils.isVariant(affectedGT)) {
         xlrConsistent = false;
-        xldConsistent = false; // Also inconsistent for XLD
-        debugDetailed(`XLR/XLD Fail: Affected Male ${affectedId} is Ref.`);
+        xldConsistent = false;
+        debugDetailed(
+          `XLR/XLD Fail: Affected ${affectedId} (${isMaleAffected ? 'M' : 'F'}) is Ref.`
+        );
       }
-
-      // Add more affected checks if needed (e.g., female HomAlt for XLR)
     }
 
-    // Check each unaffected individual
     for (const [unaffectedId, unaffectedData] of unaffectedIndividuals.entries()) {
       const indexGT = unaffectedData.genotype;
-      // Correctly determine sex using pedigree data
       const isMaleUnaffected = pedigreeUtils.isMale(unaffectedId, pedigreeData);
 
-      // Unaffected male cannot have variant in XLR
       if (xlrConsistent && isMaleUnaffected && genotypeUtils.isVariant(indexGT)) {
         xlrConsistent = false;
         debugDetailed(`XLR Fail: Unaffected Male ${unaffectedId} has variant.`);
       }
-
-      // Unaffected female cannot be HomAlt in XLR
       if (xlrConsistent && !isMaleUnaffected && genotypeUtils.isHomAlt(indexGT)) {
         xlrConsistent = false;
         debugDetailed(`XLR Fail: Unaffected Female ${unaffectedId} is HomAlt.`);
       }
-
-      // Unaffected cannot have variant in fully penetrant XLD
       if (xldConsistent && genotypeUtils.isVariant(indexGT)) {
-        // This indicates incomplete penetrance if XLD is true
-        // For consistency check, mark basic XLD as inconsistent, but allow possibility later
-        xldConsistent = false; // Mark basic XLD as inconsistent for now.
-        unaffectedWithVariant = true; // Mark the general flag
+        xldConsistent = false; // Basic XLD inconsistent if unaffected carries variant
+        unaffectedWithVariant = true;
         debugDetailed(`XLD Inconsistency: Unaffected ${unaffectedId} has variant.`);
-        // Could add 'x_linked_dominant_incomplete_penetrance' here or rely on general flag
-        consistentPatterns.push('incomplete_penetrance');
+        if (!consistentPatterns.includes('incomplete_penetrance')) {
+          consistentPatterns.push('incomplete_penetrance');
+        }
       }
+      // Early exit if both ruled out for this individual
+      if (!xlrConsistent && !xldConsistent) break;
+    }
 
-      if (!xlrConsistent && !xldConsistent) {
-        break; // Stop checks if both ruled out
+    // Add consistent X-linked patterns
+    if (xlrConsistent) {
+      consistentPatterns.push('x_linked_recessive');
+      addedXLinkedPattern = true; // Set flag
+      debugDetailed("  PED Mode: 'x_linked_recessive' is consistent.");
+    }
+    if (xldConsistent) {
+      consistentPatterns.push('x_linked_dominant');
+      addedXLinkedPattern = true; // Set flag
+      debugDetailed("  PED Mode: 'x_linked_dominant' is consistent.");
+    }
+  } // End if(isXChromosome)
+
+  // --- Autosomal Checks ---
+  // Only run these if no X-linked pattern was added
+  if (!addedXLinkedPattern) {
+    // 2. Check Autosomal Dominant consistency
+    let adConsistent = true;
+    let adIncompletePenetrance = false;
+    for (const [affectedId, affectedData] of affectedIndividuals.entries()) {
+      if (!genotypeUtils.isVariant(affectedData.genotype)) {
+        adConsistent = false;
+        debugDetailed(`  PED AD Check: Affected ${affectedId} is Ref. AD inconsistent.`);
+        break;
       }
     }
-  } // End of if(isXChromosome)
+    if (adConsistent) {
+      for (const [unaffectedId, unaffectedData] of unaffectedIndividuals.entries()) {
+        if (genotypeUtils.isVariant(unaffectedData.genotype)) {
+          adIncompletePenetrance = true;
+          unaffectedWithVariant = true;
+          debugDetailed(
+            `  PED AD Check: Unaffected ${unaffectedId} has variant (Incomplete Penetrance?).`
+          );
+        }
+      }
+      consistentPatterns.push('autosomal_dominant');
+      debugDetailed("  PED Mode: 'autosomal_dominant' is consistent.");
+      if (adIncompletePenetrance && !consistentPatterns.includes('incomplete_penetrance')) {
+        consistentPatterns.push('incomplete_penetrance');
+        debugDetailed("  PED Mode: Also added 'incomplete_penetrance' for AD.");
+      }
+    }
 
-  // Check X-linked flags determined in the X-chromosome block (or their initial 'false' values)
-  if (xlrConsistent) {
-    consistentPatterns.push('x_linked_recessive');
-    debugDetailed("  PED Mode: 'x_linked_recessive' is consistent.");
-  }
-  if (xldConsistent) {
-    consistentPatterns.push('x_linked_dominant');
-    debugDetailed("  PED Mode: 'x_linked_dominant' is consistent.");
-  }
+    // 3. Check Autosomal Recessive consistency
+    let arConsistent = true;
+    for (const [affectedId, affectedData] of affectedIndividuals.entries()) {
+      if (!genotypeUtils.isHomAlt(affectedData.genotype)) {
+        arConsistent = false;
+        debugDetailed(`  PED AR Check: Affected ${affectedId} is not HomAlt.`);
+        break;
+      }
+    }
+    if (arConsistent) {
+      for (const [, affectedData] of affectedIndividuals.entries()) {
+        const { motherId, fatherId } = affectedData.pedData;
+        const motherGT =
+          motherId && motherId !== '0' && genotypes.has(motherId)
+            ? genotypes.get(motherId)
+            : undefined;
+        const fatherGT =
+          fatherId && fatherId !== '0' && genotypes.has(fatherId)
+            ? genotypes.get(fatherId)
+            : undefined;
+
+        if (motherGT !== undefined && !genotypeUtils.isMissing(motherGT)) {
+          const motherIsAffected = affectedIndividuals.has(motherId);
+          if (
+            !genotypeUtils.isHet(motherGT) &&
+            !(motherIsAffected && genotypeUtils.isHomAlt(motherGT))
+          ) {
+            arConsistent = false;
+            debugDetailed(
+              `  PED AR Check: Parent ${motherId} GT ${motherGT} incompatible. AR inconsistent.`
+            );
+            break;
+          }
+        }
+        if (fatherGT !== undefined && !genotypeUtils.isMissing(fatherGT)) {
+          const fatherIsAffected = affectedIndividuals.has(fatherId);
+          if (
+            !genotypeUtils.isHet(fatherGT) &&
+            !(fatherIsAffected && genotypeUtils.isHomAlt(fatherGT))
+          ) {
+            arConsistent = false;
+            debugDetailed(
+              `  PED AR Check: Parent ${fatherId} GT ${fatherGT} incompatible. AR inconsistent.`
+            );
+            break;
+          }
+        }
+        if (!arConsistent) break;
+      }
+    }
+    if (arConsistent) {
+      consistentPatterns.push('autosomal_recessive');
+      debugDetailed("  PED Mode: 'autosomal_recessive' is consistent.");
+    }
+  } // End of conditional autosomal checks
 
   // Check for overall segregation issues AFTER all pattern checks
   if (affectedWithoutVariant) {
-    // This usually invalidates simple Mendelian patterns
-    consistentPatterns.push('incomplete_segregation');
-    debugDetailed(
-      `  Status check - Affected without variant: ${affectedWithoutVariant}, ` +
-        `Unaffected with variant: ${unaffectedWithVariant}`
-    );
+    // Don't add if we only found 'reference' initially
+    if (!allAreReference) {
+      // Check if the 'reference' pattern was the reason we skipped other checks
+      consistentPatterns.push('incomplete_segregation');
+      debugDetailed(
+        `  Status check - Affected without variant: ${affectedWithoutVariant}, ` +
+          `Unaffected with variant: ${unaffectedWithVariant}`
+      );
+    }
   } else if (unaffectedWithVariant && !consistentPatterns.includes('incomplete_penetrance')) {
     // Add general incomplete penetrance if not added by AD/XLD checks
     consistentPatterns.push('incomplete_penetrance');
@@ -624,7 +678,6 @@ function _deducePedBasedPatterns(genotypes, pedigreeData, isXChromosome) {
   // Final fallback
   if (consistentPatterns.length === 0) {
     debugDetailed(`  PED Mode: No specific patterns identified as consistent after checks.`);
-    // Check if any affected index has variant to distinguish non-causative vs unknown
     let anyAffectedHasVariant = false;
     for (const [, affectedData] of affectedIndividuals.entries()) {
       if (genotypeUtils.isVariant(affectedData.genotype)) {
@@ -633,20 +686,22 @@ function _deducePedBasedPatterns(genotypes, pedigreeData, isXChromosome) {
       }
     }
     if (!anyAffectedHasVariant && affectedIndividuals.size > 0) {
-      consistentPatterns.push('non_causative_or_no_affected'); // Changed name
-    } else {
-      // If patterns failed consistency checks but affected *do* have variant
+      // If allAreReference was true, the 'reference' pattern was already returned.
+      // If not, then this means affected exist but have no non-missing variant GTs.
+      if (!allAreReference) {
+        consistentPatterns.push('non_causative_or_no_affected');
+      }
+    } else if (anyAffectedHasVariant) {
+      // If affected individuals have the variant, but no standard pattern fit
       consistentPatterns.push('non_mendelian'); // Suggests complex or non-mendelian
+    } else {
+      // Fallback if no affected individuals have genotypes or other edge cases
+      consistentPatterns.push('unknown');
     }
   }
 
   // Remove duplicates and return
   const uniquePatterns = [...new Set(consistentPatterns)];
-  // If 'incomplete_penetrance' or 'incomplete_segregation' is present, remove basic AD/AR/XLD?
-  // Decision: Keep basic patterns alongside flags like incomplete_penetrance.
-  // Prioritization will handle the ranking of these patterns.
-  // Exception: If 'incomplete_segregation' (affected lack variant):
-  // Maybe remove AD/AR/XLD? No, keep for now.
 
   debugDetailed(
     `--- Exiting _deducePedBasedPatterns. Result: ${JSON.stringify(uniquePatterns)} ---`
@@ -730,5 +785,5 @@ function deduceInheritancePatterns(genotypes, pedigreeData, sampleMap, variantIn
 
 module.exports = {
   deduceInheritancePatterns,
-  // Note: Internal functions (_deduce*, _isMale, _isFemale) are not exported
+  // Note: Internal functions (_deduce*) are not exported
 };

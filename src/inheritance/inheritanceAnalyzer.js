@@ -81,7 +81,9 @@ function _determineIndexSampleId(genotypesMap, pedigreeData, sampleMap) {
 
 /**
  * Groups variant annotations by gene symbol.
- * Extracts the gene symbol from the first transcript consequence found.
+ * Extracts the gene symbol from the first transcript consequence found,
+ * with fallback to top-level gene_symbol if available.
+ * Assigns a placeholder if no gene symbol can be determined.
  *
  * @param {Array<Object>} annotations - Variant annotation objects with `variantKey`.
  * @returns {Map<string, Array<Object>>} Map of gene symbols to their variant annotations.
@@ -113,11 +115,19 @@ function _groupAnnotationsByGene(annotations) {
       }
     }
 
+    // Fallback: If no gene symbol in consequences, try top-level annotation
+    if (!geneSymbol && annotation.gene_symbol) {
+      geneSymbol = annotation.gene_symbol;
+      debugDetailed(` Using top-level gene symbol for ${annotation.variantKey}: ${geneSymbol}`);
+    }
+
     if (!geneSymbol) {
+      // Use a default placeholder if still no gene symbol
+      geneSymbol = `NO_GENE_${annotation.seq_region_name || 'UNK'}`;
       debugDetailed(
-        `  Skipping variant ${annotation.variantKey} - no gene symbol found in consequences.`
+        `  Variant ${annotation.variantKey} - no gene symbol found. Using placeholder: ${geneSymbol}`
       );
-      continue; // Skip if no gene symbol found
+      // Do not skip, group under placeholder
     }
 
     // Add to the map
@@ -146,42 +156,82 @@ function _mergeCompHetResults(inheritanceResults, geneSymbol, compHetResult) {
     return; // Nothing to merge
   }
 
-  debugDetailed(`  CompHet: ${geneSymbol} (Confirmed=${compHetResult.isCompHet})`);
+  // ** Added more detailed logging **
+  debugDetailed(
+    `  Merging CompHet for ${geneSymbol}: Confirmed=${compHetResult.isCompHet}, Possible=${compHetResult.isPossible}, Pattern=${compHetResult.pattern}`
+  );
 
   for (const variantKey of compHetResult.variantKeys) {
     if (inheritanceResults.has(variantKey)) {
       const currentResult = inheritanceResults.get(variantKey);
+      debugDetailed(
+        `    Variant ${variantKey}: Current Pattern='${currentResult.prioritizedPattern}'`
+      );
 
       // Determine if CompHet pattern should override the current pattern
       let newPrioritizedPattern = currentResult.prioritizedPattern;
-      // Generally, confirmed CompHet is strong evidence. Possible CompHet is weaker.
-      // Don't let 'possible' override strong patterns like 'de_novo'.
       const strongPatterns = [
         'de_novo',
         'autosomal_recessive',
         'x_linked_recessive',
-        'compound_heterozygous',
-      ]; // Define 'strong' patterns
+        'compound_heterozygous', // Confirmed CompHet itself is strong
+      ];
       const weakPatterns = [
-        'unknown',
+        'unknown', // Covers many unknown_* states
         'reference',
         'dominant',
         'homozygous',
         'potential_x_linked',
         'non_mendelian',
-      ]; // Patterns easily overridden
+        'autosomal_dominant', // Explicitly add autosomal_dominant if it wasn't covered by 'dominant'
+        // Add other potential initial patterns if needed
+        'autosomal_dominant_possible',
+        'autosomal_recessive_possible',
+        'x_linked_recessive_possible',
+        'x_linked_dominant_possible',
+        'de_novo_candidate',
+        // Explicitly add possible CompHet patterns as weak so confirmed can override
+        'compound_heterozygous_possible',
+        'compound_heterozygous_possible_missing_parents',
+        'compound_heterozygous_possible_no_pedigree',
+      ];
 
-      if (compHetResult.isCompHet && !strongPatterns.includes(currentResult.prioritizedPattern)) {
-        // Confirmed CompHet overrides unless current pattern is also strong evidence
-        newPrioritizedPattern = 'compound_heterozygous';
-      } else if (
-        compHetResult.isPossible &&
-        !compHetResult.isCompHet &&
-        (weakPatterns.includes(currentResult.prioritizedPattern) ||
-          currentResult.prioritizedPattern.startsWith('unknown_'))
-      ) {
+      const isCurrentWeak =
+        weakPatterns.includes(currentResult.prioritizedPattern) ||
+        currentResult.prioritizedPattern.startsWith('unknown_');
+      const isCurrentStrong = strongPatterns.includes(currentResult.prioritizedPattern);
+
+      debugDetailed(
+        `    Variant ${variantKey}: isCurrentWeak=${isCurrentWeak}, isCurrentStrong=${isCurrentStrong}`
+      );
+
+      if (compHetResult.isCompHet) {
+        // Confirmed CompHet overrides everything except other strong patterns
+        // Allow overriding AD even if considered strong by some metrics
+        if (!isCurrentStrong || currentResult.prioritizedPattern === 'autosomal_dominant') {
+          debugDetailed(
+            `    -> Overriding '${newPrioritizedPattern}' with confirmed 'compound_heterozygous'`
+          );
+          newPrioritizedPattern = 'compound_heterozygous';
+        } else {
+          debugDetailed(
+            `    -> Keeping strong pattern '${newPrioritizedPattern}' despite confirmed CompHet`
+          );
+        }
+      } else if (compHetResult.isPossible) {
+        // isPossible = true, isCompHet = false
         // Possible CompHet overrides only weak or unknown patterns
-        newPrioritizedPattern = compHetResult.pattern; // e.g., 'compound_heterozygous_possible'
+        if (isCurrentWeak) {
+          debugDetailed(
+            `    -> Overriding weak pattern '${newPrioritizedPattern}' with possible CompHet '${compHetResult.pattern}'`
+          );
+          // Use the specific 'possible' pattern from the compHetResult
+          newPrioritizedPattern = compHetResult.pattern;
+        } else {
+          debugDetailed(
+            `    -> Keeping non-weak pattern '${newPrioritizedPattern}' despite possible CompHet`
+          );
+        }
       }
 
       // Add CompHet details
@@ -200,7 +250,7 @@ function _mergeCompHetResults(inheritanceResults, geneSymbol, compHetResult) {
       // Update the result object
       const enhancedResult = {
         ...currentResult,
-        prioritizedPattern: newPrioritizedPattern,
+        prioritizedPattern: newPrioritizedPattern, // Use the potentially updated pattern
         possiblePatterns: [
           ...new Set([...(currentResult.possiblePatterns || []), compHetResult.pattern]),
         ],
@@ -215,7 +265,9 @@ function _mergeCompHetResults(inheritanceResults, geneSymbol, compHetResult) {
       };
 
       inheritanceResults.set(variantKey, enhancedResult);
-      debugDetailed(`    Updated inheritance result for variant ${variantKey} with CompHet info.`);
+      debugDetailed(
+        `    Updated inheritance result for variant ${variantKey} with CompHet info. Final Pattern: ${newPrioritizedPattern}`
+      );
     } else {
       debugDetailed(
         `    Warning: Variant key ${variantKey} from CompHet analysis not found in main results.`
@@ -252,13 +304,28 @@ function analyzeInheritanceForSample(annotations, genotypesMap, pedigreeData, sa
     debug('No genotype data provided for inheritance analysis.');
     // Populate results with error state for each annotation key if possible
     for (const ann of annotations) {
-      if (ann.variantKey) {
-        results.set(ann.variantKey, {
+      // Generate key if possible, otherwise log warning
+      const chrom = ann.seq_region_name || ann.chr || '';
+      const pos = ann.start || '';
+      const alleleParts = ann.allele_string ? ann.allele_string.split('/') : [];
+      const ref = alleleParts[0] || '';
+      const alt = alleleParts[1] || '';
+      const key = chrom && pos && ref && alt ? `${chrom}:${pos}:${ref}:${alt}` : null;
+
+      if (key) {
+        ann.variantKey = key; // Assign key
+        results.set(key, {
           prioritizedPattern: 'unknown_missing_genotypes',
           possiblePatterns: ['unknown_missing_genotypes'],
           segregationStatus: {},
           error: 'Genotype map was empty or not provided.',
         });
+      } else {
+        debugDetailed(
+          ` Cannot generate variantKey for annotation to report missing genotype error: ${JSON.stringify(
+            ann
+          )}`
+        );
       }
     }
     debugDetailed(`--- Exiting analyzeInheritanceForSample: No genotypes ---`);
@@ -273,14 +340,27 @@ function analyzeInheritanceForSample(annotations, genotypesMap, pedigreeData, sa
   // --- Pass 1: Initial Pattern Deduction, Segregation, and Prioritization per Variant ---
   debugDetailed(`--- Pass 1: Initial Analysis (${annotations.length} variants) ---`);
   for (const annotation of annotations) {
-    const variantKey = annotation.variantKey;
-    debugDetailed(`\nProcessing Annotation: Key=${variantKey}, Input=${annotation.originalInput}`);
+    // Regenerate key based on annotation details - ENSURE CONSISTENCY
+    const chrom = annotation.seq_region_name || annotation.chr || '';
+    const pos = annotation.start || '';
+    const alleleParts = annotation.allele_string ? annotation.allele_string.split('/') : [];
+    const ref = alleleParts[0] || '';
+    const alt = alleleParts.length > 1 ? alleleParts[1] : ''; // Handle cases like 'A/'
 
-    if (!variantKey) {
-      debugDetailed(`  SKIPPING - Annotation missing variantKey.`);
-      // Optionally add an error entry to results if needed
-      continue;
+    let variantKey = null;
+    if (chrom && pos && ref && alt) {
+      variantKey = `${chrom}:${pos}:${ref}:${alt}`;
+      annotation.variantKey = variantKey; // Ensure variantKey is set on the annotation object
+    } else {
+      debugDetailed(
+        `  SKIPPING - Cannot generate valid variantKey. Chrom: ${chrom}, Pos: ${pos}, Ref: ${ref}, Alt: ${alt}. OriginalInput: ${annotation.originalInput}`
+      );
+      continue; // Skip processing this annotation if key cannot be formed
     }
+
+    debugDetailed(
+      `\nProcessing Annotation: Key=${variantKey}, Input=${annotation.originalInput || annotation.input}`
+    );
 
     const genotypes = genotypesMap.get(variantKey);
     if (!genotypes) {
@@ -296,7 +376,7 @@ function analyzeInheritanceForSample(annotations, genotypesMap, pedigreeData, sa
 
     try {
       // 1. Deduce Patterns
-      const variantInfo = { chrom: annotation.seq_region_name || annotation.chr || '' };
+      const variantInfo = { chrom: chrom }; // Use consistent chrom value
       debugDetailed(`  --> Calling patternDeducer.deduceInheritancePatterns for ${variantKey}...`);
       const possiblePatterns = patternDeducer.deduceInheritancePatterns(
         genotypes,
@@ -312,20 +392,34 @@ function analyzeInheritanceForSample(annotations, genotypesMap, pedigreeData, sa
         debugDetailed(`  --> Checking segregation for ${possiblePatterns.length} patterns...`);
         segregationResults = new Map();
         for (const pattern of possiblePatterns) {
-          // Avoid checking segregation for non-specific or observational patterns
-          if (
-            [
-              'unknown',
-              'reference',
-              'dominant',
-              'homozygous',
-              'potential_x_linked',
-              'non_mendelian',
-            ].some((p) => pattern.includes(p)) ||
-            pattern.startsWith('error_')
-          ) {
+          // ** Refined list of patterns to skip segregation check for **
+          const patternsToSkipSegCheck = [
+            'unknown',
+            'reference',
+            'dominant',
+            'homozygous',
+            'potential_x_linked',
+            'non_mendelian',
+            'autosomal_dominant_possible',
+            'autosomal_recessive_possible',
+            'x_linked_recessive_possible',
+            'x_linked_dominant_possible',
+            'compound_heterozygous_possible', // Also skip possible CompHet patterns
+            'de_novo_candidate',
+          ];
+
+          // Check if pattern itself or starts with a skippable prefix (e.g., unknown_, error_)
+          const shouldSkip =
+            patternsToSkipSegCheck.includes(pattern) ||
+            pattern.startsWith('error_') ||
+            pattern.startsWith('unknown_') ||
+            pattern.startsWith('compound_heterozygous_possible'); // Catch all possible CompHet variants
+
+          if (shouldSkip) {
+            debugDetailed(`    Skipping segregation check for non-definitive pattern: ${pattern}`);
             continue;
           }
+
           try {
             debugDetailed(
               `    ---> Calling segregationChecker.checkSegregation for pattern: ${pattern}...`
@@ -390,16 +484,23 @@ function analyzeInheritanceForSample(annotations, genotypesMap, pedigreeData, sa
   } else {
     debugDetailed(`Analyzing ${geneVariantsMap.size} gene groups for compound heterozygosity...`);
     for (const [geneSymbol, geneVariants] of geneVariantsMap.entries()) {
+      // ** Skip placeholder gene groups **
+      if (geneSymbol.startsWith('NO_GENE_')) {
+        debugDetailed(`  Skipping placeholder gene group ${geneSymbol} for CompHet.`);
+        continue;
+      }
+
       if (geneVariants.length < 2) {
         debugDetailed(`  Skipping gene ${geneSymbol} - only ${geneVariants.length} variant(s).`);
         continue;
       }
 
       // Only attempt CompHet analysis if pedigree data is available (needed for confirmation)
+      // The analyzer handles missing PED internally now, but log remains useful.
       if (!pedigreeData || pedigreeData.size === 0) {
-        debugDetailed(`  Skipping CompHet analysis for ${geneSymbol} - pedigree data missing.`);
-        // Mark variants as possible if index is het for >=2?
-        // We can call the analyzer anyway, it will return 'possible_no_pedigree' status.
+        debugDetailed(
+          `  Proceeding with CompHet analysis for ${geneSymbol} without PED data (will yield 'possible_no_pedigree').`
+        );
       }
 
       debugDetailed(`  Analyzing gene ${geneSymbol} (${geneVariants.length} variants)...`);
@@ -444,5 +545,6 @@ function analyzeInheritanceForSample(annotations, genotypesMap, pedigreeData, sa
 module.exports = {
   // Core function
   analyzeInheritanceForSample,
-  // Do not export internal helper functions (_determineIndexSampleId, etc.)
+  // Do not export internal helper functions
+  // (_determineIndexSampleId, _groupAnnotationsByGene, _mergeCompHetResults)
 };
