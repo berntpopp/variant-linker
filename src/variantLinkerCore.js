@@ -322,7 +322,7 @@ async function analyzeVariant(params) {
   debug('Starting variant analysis process');
 
   debugDetailed(
-    `analyzeVariant received params.variants (${params.variants ? params.variants.length : 0}): ${JSON.stringify(params.variants)}`
+    `Received variants (${params.variants?.length || 0}): ${JSON.stringify(params.variants)}`
   );
   debugDetailed(
     `analyzeVariant received params.vcfRecordMap size: ${params.vcfRecordMap ? params.vcfRecordMap.size : 'N/A'}`
@@ -431,7 +431,8 @@ async function analyzeVariant(params) {
 
           if (!chrom || !pos || !ref || !alt) {
             debugDetailed(
-              `Skipping annotation due to missing key components: chrom=${chrom}, pos=${pos}, ref=${ref}, alt=${alt}. Input: ${annotation?.input}`
+              `Missing components: chr=${chrom}, pos=${pos}, ref=${ref}, alt=${alt}. ` +
+                `Input: ${annotation?.input}`
             );
             continue;
           }
@@ -440,19 +441,19 @@ async function analyzeVariant(params) {
           // Make sure variantKey is consistently set
           annotation.variantKey = key;
           debugDetailed(
-            `Generated key from annotation: ${key}. Annotation input: ${annotation?.input}, OriginalInput: ${annotation?.originalInput}`
+            `Key: ${key}. Input: ${annotation?.input}. ` + `Original: ${annotation?.originalInput}`
           );
 
           if (params.vcfRecordMap && params.vcfRecordMap.has(key)) {
             const vcfRecord = params.vcfRecordMap.get(key);
             debugDetailed(
-              `Found VCF record for key ${key}: Genotypes present = ${Boolean(vcfRecord.genotypes && vcfRecord.genotypes.size > 0)}`
+              `VCF record ${key}: Has genotypes = ${Boolean(vcfRecord.genotypes?.size)}`
             );
 
             if (vcfRecord.genotypes && vcfRecord.genotypes.size > 0) {
               genotypesMap.set(key, vcfRecord.genotypes);
               debugDetailed(
-                `-> Added genotypes for key ${key}: ${JSON.stringify(Array.from(vcfRecord.genotypes.entries()))}`
+                `-> Genotypes ${key}: ${JSON.stringify(Array.from(vcfRecord.genotypes.entries()))}`
               );
             } else {
               debugDetailed(`-> No genotype data found in VCF record map entry for variant ${key}`);
@@ -478,61 +479,39 @@ async function analyzeVariant(params) {
       debug(`Found genotype data for ${genotypesMap.size} variants`);
 
       // --- Start of new instrumented block ---
-      debugDetailed('Inheritance Core: Attempting to require inheritanceCalculator...');
-      let inheritanceCalculator;
+      debugDetailed('Inheritance Core: Attempting to require inheritance module...');
+      let inheritance;
       try {
-        inheritanceCalculator = require('./inheritanceCalculator');
-        debugDetailed('Inheritance Core: Successfully required inheritanceCalculator.');
+        inheritance = require('./inheritance');
+        debugDetailed('Inheritance Core: Successfully required inheritance module.');
       } catch (requireError) {
-        console.error('!!! FAILED TO REQUIRE inheritanceCalculator !!!');
+        console.error('!!! FAILED TO REQUIRE inheritance module !!!');
         console.error(requireError.stack);
         debugDetailed(
-          `!!! REQUIRE ERROR for inheritanceCalculator: ${requireError.message}\n${requireError.stack}`
+          `!!! REQUIRE ERROR for inheritance module: ${requireError.message}\n${requireError.stack}`
         );
         stepsPerformed.push('CRITICAL ERROR: Failed to load inheritance module.');
         // Skip further inheritance processing if require failed
-        inheritanceCalculator = null; // Ensure it's null
+        inheritance = null; // Ensure it's null
       }
 
-      if (inheritanceCalculator && inheritanceCalculator.analyzeInheritanceForSample) {
-        // Determine the index/proband sample from parameters or pedigree
-        // (Keep existing logic for determining indexSampleId here)
-        let indexSampleId = null;
-        if (params.sampleMap && params.sampleMap.proband) {
-          indexSampleId = params.sampleMap.proband;
-        } else if (params.sampleMap && params.sampleMap.index) {
-          indexSampleId = params.sampleMap.index;
-        }
-        // Add determination from PED if needed, similar to inside analyzeInheritanceForSample
-        if (!indexSampleId && params.pedigreeData) {
-          for (const [sampleId, sampleData] of params.pedigreeData.entries()) {
-            if (sampleData.affectedStatus === '2' || sampleData.affectedStatus === 2) {
-              indexSampleId = sampleId;
-              break;
-            }
-          }
-        }
-        debugDetailed(
-          `Inheritance Core: Determined indexSampleId (passed to calculator): ${indexSampleId}`
-        );
+      if (inheritance && inheritance.analyzeInheritanceForSample) {
+        // Index sample ID is now determined internally by the inheritance module
+        debugDetailed('Inheritance Core: Index sample ID will be determined by the module');
 
         debugDetailed('Inheritance Core: Preparing to call analyzeInheritanceForSample...');
         try {
-          const inheritanceResults = inheritanceCalculator.analyzeInheritanceForSample(
+          const inheritanceResults = inheritance.analyzeInheritanceForSample(
             finalOutput.annotationData,
             genotypesMap,
             params.pedigreeData,
-            params.sampleMap,
-            indexSampleId // Pass the determined ID
+            params.sampleMap
           );
-          debugDetailed(
-            `Inheritance Core: analyzeInheritanceForSample call completed. Result map size: ${inheritanceResults?.size}`
-          );
+          debugDetailed(`Inheritance analysis complete. Results: ${inheritanceResults?.size}`);
 
-          // Update annotations with inheritance results (ensure this part is robust)
+          // Update annotations with inheritance results
           let calculatedPatternsCount = 0;
           if (inheritanceResults instanceof Map) {
-            // Check if we got a Map back
             for (const annotation of finalOutput.annotationData) {
               if (annotation.variantKey && inheritanceResults.has(annotation.variantKey)) {
                 annotation.deducedInheritancePattern = inheritanceResults.get(
@@ -540,7 +519,6 @@ async function analyzeVariant(params) {
                 );
                 calculatedPatternsCount++;
               } else {
-                // Ensure pattern is set even if missing from results (shouldn't happen ideally)
                 annotation.deducedInheritancePattern = {
                   prioritizedPattern: 'unknown_not_processed',
                   possiblePatterns: [],
@@ -548,24 +526,20 @@ async function analyzeVariant(params) {
                 };
               }
             }
-            debugDetailed(
-              `Inheritance Core: Updated ${calculatedPatternsCount} annotations with results.`
-            );
             if (calculatedPatternsCount > 0) {
               stepsPerformed.push(
-                `Calculated inheritance patterns for ${calculatedPatternsCount} variants, including compound heterozygous detection.`
+                `Analyzed ${calculatedPatternsCount} variants (including compound heterozygous).`
               );
             } else if (finalOutput.annotationData.length > 0) {
               stepsPerformed.push(
                 'Inheritance patterns calculated, but no results matched annotations.'
-              ); // More specific message
+              );
             }
           } else {
             debugDetailed('Inheritance Core: analyzeInheritanceForSample did not return a Map.');
             stepsPerformed.push(
               'Error: Inheritance analysis function returned unexpected data type.'
             );
-            // Add default error pattern to all annotations
             for (const annotation of finalOutput.annotationData) {
               annotation.deducedInheritancePattern = {
                 prioritizedPattern: 'error_unexpected_result_type',
@@ -575,14 +549,9 @@ async function analyzeVariant(params) {
             }
           }
         } catch (analysisError) {
-          // Catch errors specifically from analyzeInheritanceForSample or result processing
-          console.error('!!! ERROR DURING analyzeInheritanceForSample CALL OR PROCESSING !!!');
-          console.error(analysisError.stack);
-          debugDetailed(
-            `!!! analyzeInheritanceForSample ERROR: ${analysisError.message}\n${analysisError.stack}`
-          );
-          stepsPerformed.push('Error during inheritance pattern analysis execution.');
-          // Add default error pattern to all annotations
+          console.error('Error during inheritance analysis:', analysisError);
+          debugDetailed(`Inheritance analysis error: ${analysisError.message}`);
+          stepsPerformed.push('Error during inheritance pattern analysis.');
           for (const annotation of finalOutput.annotationData) {
             annotation.deducedInheritancePattern = {
               prioritizedPattern: 'error_analysis_failed',
@@ -591,14 +560,13 @@ async function analyzeVariant(params) {
             };
           }
         }
-      } else if (inheritanceCalculator) {
+      } else if (inheritance) {
         // Handle case where module loaded but function is missing
         debugDetailed(
-          '!!! ERROR: inheritanceCalculator module loaded, but analyzeInheritanceForSample function not found!'
+          '!!! ERROR: inheritance module loaded, but analyzeInheritanceForSample function not found!'
         );
         stepsPerformed.push('CRITICAL ERROR: Inheritance analysis function missing.');
       }
-      // --- End of new instrumented block ---
     } else {
       stepsPerformed.push('No inheritance patterns could be calculated (missing genotype data).');
     }

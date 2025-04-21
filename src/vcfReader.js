@@ -93,7 +93,7 @@ async function readVariantsFromVcf(filePath) {
       try {
         record = parser.parseLine(line);
         debugDetailed(
-          `Parsed VCF Record (${record?.CHROM}:${record?.POS}): Samples property exists = ${Boolean(record?.SAMPLES)}`
+          `VCF Record (${record?.CHROM}:${record?.POS}): Has samples = ${Boolean(record?.SAMPLES)}`
         );
         if (record?.SAMPLES) {
           // Log the entire SAMPLES object for inspection
@@ -165,7 +165,7 @@ async function readVariantsFromVcf(filePath) {
         // Add to variants to process
         variantsToProcess.push(formattedVariant);
 
-        // Initialize the map to store genotypes for this specific variant (CHROM/POS/REF/ALT combination)
+        // Store genotypes for this variant (CHROM/POS/REF/ALT)
         const genotypes = new Map();
 
         // Check if the parser actually returned a GENOTYPES function and if samples exist
@@ -173,7 +173,7 @@ async function readVariantsFromVcf(filePath) {
           let parsedGenotypes = null;
           try {
             // Call the function to parse genotypes lazily
-            parsedGenotypes = record.GENOTYPES();
+            parsedGenotypes = record.getGenotypes();
             debugDetailed(`Parsed Genotypes object for ${key}: ${JSON.stringify(parsedGenotypes)}`);
           } catch (e) {
             debugDetailed(`Error calling record.GENOTYPES() for ${key}: ${e.message}`);
@@ -191,14 +191,12 @@ async function readVariantsFromVcf(filePath) {
 
               if (gtString !== undefined && gtString !== null && gtString !== '') {
                 // Store the extracted genotype string (e.g., "0/1", "0|0")
-                genotypes.set(sampleId, String(gtString)); // Ensure it's a string
-                debugDetailed(` -> Storing GT '${String(gtString)}' for sample ${sampleId}`);
+                genotypes.set(sampleId, String(gtString));
+                debugDetailed(` -> Storing GT '${gtString}' for sample ${sampleId}`);
               } else {
                 // Use './.' if GT is missing for the sample in the parsed object
                 genotypes.set(sampleId, './.');
-                debugDetailed(
-                  ` -> Storing './.' for sample ${sampleId} (GT missing or empty in parsedGenotypes object)`
-                );
+                debugDetailed(` -> Sample ${sampleId}: GT missing/empty, storing './.'`);
                 debugDetailed(
                   `   Warning: Missing GT value for sample ${sampleId} at ${chrom}:${pos}`
                 );
@@ -216,9 +214,7 @@ async function readVariantsFromVcf(filePath) {
           }
         } else {
           // If no GENOTYPES function or no samples defined in header, store missing
-          debugDetailed(
-            `No GENOTYPES function found on parsed record or no samples in header for ${key}. Storing './.' for all samples.`
-          );
+          debugDetailed(`No genotypes found for ${key}. Using './.' for all samples.`);
           for (const sampleId of samples) {
             genotypes.set(sampleId, './.');
           }
@@ -226,7 +222,7 @@ async function readVariantsFromVcf(filePath) {
 
         // Log the final genotypes Map before storing
         debugDetailed(
-          `Final genotypes Map for key ${key} before storing: ${JSON.stringify(Array.from(genotypes.entries()))}`
+          `Final genotypes for ${key}: ${JSON.stringify(Array.from(genotypes.entries()))}`
         );
 
         // Store original record info with genotypes
