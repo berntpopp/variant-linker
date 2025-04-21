@@ -15,7 +15,7 @@ const { fetchApi } = require('./apiHelper');
 const apiConfig = require('../config/apiConfig.json');
 
 // --- Helper for setImmediate as Promise ---
-const yieldToEventLoop = () => new Promise(resolve => setImmediate(resolve));
+const yieldToEventLoop = () => new Promise((resolve) => setImmediate(resolve));
 // -----------------------------------------
 
 /**
@@ -70,7 +70,9 @@ async function variantRecoderPost(variants, options = {}, cacheEnabled = false) 
     } else {
       // If the number of variants exceeds the chunk size, we need to chunk the requests
       debug(`Chunking ${variants.length} variants into batches of ${chunkSize}`);
-      console.log(`[variantRecoderPost Debug] Starting chunking loop for ${variants.length} variants.`); // DEBUG
+      console.log(
+        `[variantRecoderPost Debug] Starting chunking loop for ${variants.length} variants.`
+      ); // DEBUG
       const allResults = [];
 
       // Process variants in chunks
@@ -87,7 +89,10 @@ async function variantRecoderPost(variants, options = {}, cacheEnabled = false) 
         );
         debugDetailed(`Chunk request body: ${JSON.stringify(requestBody)}`);
 
-        console.log(`[variantRecoderPost Debug] Before await fetchApi for chunk ${Math.floor(i / chunkSize) + 1}`); // DEBUG
+        // Debug log indicating which chunk is about to be processed
+        console.log(
+          `[variantRecoderPost Debug] Before fetchApi chunk ${Math.floor(i / chunkSize) + 1}`
+        );
         const chunkResults = await fetchApi(
           endpoint,
           queryOptions,
@@ -95,7 +100,10 @@ async function variantRecoderPost(variants, options = {}, cacheEnabled = false) 
           'POST',
           requestBody
         );
-        console.log(`[variantRecoderPost Debug] After await fetchApi for chunk ${Math.floor(i / chunkSize) + 1}`); // DEBUG
+        // Debug log indicating which chunk has been processed
+        console.log(
+          `[variantRecoderPost Debug] After fetchApi chunk ${Math.floor(i / chunkSize) + 1}`
+        );
         allResults.push(...chunkResults);
 
         // Add a small delay between chunks to be polite to the API

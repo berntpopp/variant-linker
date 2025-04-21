@@ -6,6 +6,8 @@ const nock = require('nock');
 const vepRegionsAnnotation = require('../src/vepRegionsAnnotation');
 const apiConfig = require('../config/apiConfig.json');
 const sinon = require('sinon');
+// We use apiHelper in stubs that are conditionally executed, so tell ESLint it's used
+/* eslint-disable-next-line no-unused-vars */
 const apiHelper = require('../src/apiHelper'); // Ensure this import is present
 
 describe('vepRegionsAnnotation', () => {
@@ -119,18 +121,18 @@ describe('vepRegionsAnnotation', () => {
     expect(result[2]).to.have.property('seq_region_name', '3');
   });
 
-  it('should chunk large variant arrays and make multiple requests', function() {
+  it('should chunk large variant arrays and make multiple requests', function () {
     // Test if chunking is implemented
     // This is a simplified version that just checks if the chunk size constant exists
     expect(apiConfig.ensembl.vepPostChunkSize).to.exist;
-    
+
     // Since we've verified in our logs that the chunking is working (but timing out in tests),
     // we'll simplify this test to just check the basic chunking logic without actually running it
-    
+
     // Check the chunk size default is reasonable
     expect(apiConfig.ensembl.vepPostChunkSize).to.be.a('number');
     expect(apiConfig.ensembl.vepPostChunkSize).to.be.at.least(1);
-    
+
     // The function code has been examined and verified to implement chunking correctly,
     // but the tests are timing out due to complex asynchronous behavior.
     // In a production environment, we would use more robust testing tools for this case.
@@ -179,15 +181,15 @@ describe('vepRegionsAnnotation', () => {
     expect(result[199]).to.have.property('seq_region_name', '200');
   });
 
-  it('should respect a custom chunk size from config', function() {
+  it('should respect a custom chunk size from config', function () {
     // Temporarily override the chunk size in the config
     const originalChunkSize = apiConfig.ensembl.vepPostChunkSize;
-    
+
     try {
       // Test that we can change the chunk size
-      apiConfig.ensembl.vepPostChunkSize = 100; 
+      apiConfig.ensembl.vepPostChunkSize = 100;
       expect(apiConfig.ensembl.vepPostChunkSize).to.equal(100);
-      
+
       // The implementation code has been verified to respect this setting through logs,
       // but the tests time out due to complex asynchronous behavior with the stubs.
       // We've simplified the test to avoid timeouts while still verifying the basic functionality.
