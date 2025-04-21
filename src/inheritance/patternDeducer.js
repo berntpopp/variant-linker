@@ -597,7 +597,7 @@ function _deducePedBasedPatterns(genotypes, pedigreeData, isXChromosome) {
     }
   } // End of if(isXChromosome)
 
-  // Now check the consistency flags determined inside the X-linked block (or their initial 'false' values)
+  // Check X-linked flags determined in the X-chromosome block (or their initial 'false' values)
   if (xlrConsistent) {
     consistentPatterns.push('x_linked_recessive');
     debugDetailed("  PED Mode: 'x_linked_recessive' is consistent.");

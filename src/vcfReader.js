@@ -199,7 +199,8 @@ async function readVariantsFromVcf(filePath) {
                 `Processing sample ${sampleId}: Extracted GT string = ${JSON.stringify(gtString)}`
               );
 
-              // Check for undefined, null, or empty string representations AFTER potential array access
+              // Check for undefined, null, or empty string representations
+              // AFTER potential array access
               if (
                 gtString !== undefined &&
                 gtString !== null &&
