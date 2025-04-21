@@ -1,7 +1,8 @@
 'use strict';
 
 const { expect } = require('chai');
-const { filterAndFormatResults, _formatResultsToVcf } = require('../src/variantLinkerProcessor');
+const { filterAndFormatResults } = require('../src/variantLinkerProcessor');
+const { formatAnnotationsToVcf } = require('../src/vcfFormatter');
 
 describe('VCF output formatting', () => {
   // Simulated VCF data for testing
@@ -171,10 +172,31 @@ describe('VCF output formatting', () => {
   });
 
   it('should generate proper VL_CSQ format with all fields', () => {
-    const formattedResults = _formatResultsToVcf(
-      vcfTestData,
+    // Define VL_CSQ format fields as in the original implementation
+    const vlCsqFormat = [
+      'Allele',
+      'Consequence',
+      'IMPACT',
+      'SYMBOL',
+      'Gene',
+      'Feature_type',
+      'Feature',
+      'BIOTYPE',
+      'HGVSc',
+      'HGVSp',
+      'Protein_position',
+      'Amino_acids',
+      'Codons',
+      'Existing_variation',
+      'SIFT',
+      'PolyPhen',
+    ];
+
+    const formattedResults = formatAnnotationsToVcf(
+      vcfTestData.annotationData,
       vcfTestData.vcfRecordMap,
-      vcfTestData.vcfHeaderLines
+      vcfTestData.vcfHeaderLines,
+      vlCsqFormat
     );
 
     const lines = formattedResults.split('\n');
