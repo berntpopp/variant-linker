@@ -10,6 +10,7 @@
 'use strict';
 
 const debug = require('debug')('variant-linker:inheritance');
+const debugDetailed = require('debug')('variant-linker:detailed');
 
 /**
  * Checks if a genotype represents a reference homozygous call (0/0)
@@ -82,8 +83,15 @@ function isMissing(gt) {
  * @returns {Array<string>} Array of possible inheritance patterns
  */
 function deduceInheritancePatterns(genotypes, pedigreeData, sampleMap, variantInfo) {
+  // At the VERY BEGINNING of deduceInheritancePatterns
+  debugDetailed(`--- Entering deduceInheritancePatterns ---`);
+  debugDetailed(
+    `  Args: genotypes size=${genotypes?.size}, pedigreeData size=${pedigreeData?.size}, sampleMap=${JSON.stringify(sampleMap)}, variantInfo=${JSON.stringify(variantInfo)}`
+  );
+
   if (!genotypes || genotypes.size === 0) {
     debug('No genotype data available, cannot deduce inheritance pattern');
+    debugDetailed(`--- Exiting deduceInheritancePatterns. Result: ["unknown"] ---`); // Added exit log
     return ['unknown'];
   }
 
@@ -92,19 +100,24 @@ function deduceInheritancePatterns(genotypes, pedigreeData, sampleMap, variantIn
   const isXChromosome = chrom === 'X' || chrom === 'x' || chrom === 'chrX' || chrom === 'chrx';
 
   // Check which inheritance mode to use
+  let patterns;
   if (pedigreeData && pedigreeData.size > 0) {
-    debug('Using PED-based inheritance deduction mode');
-    return deducePedBasedPatterns(genotypes, pedigreeData, isXChromosome);
+    debugDetailed('  Mode Selected: PED-based');
+    patterns = deducePedBasedPatterns(genotypes, pedigreeData, isXChromosome);
   } else if (genotypes.size >= 3 && sampleMap) {
-    debug('Using defined trio inheritance deduction mode with sample map');
-    return deduceTrioPatterns(genotypes, sampleMap, isXChromosome);
+    debugDetailed('  Mode Selected: Trio (Sample Map)');
+    patterns = deduceTrioPatterns(genotypes, sampleMap, isXChromosome);
   } else if (genotypes.size >= 3) {
-    debug('Using default trio inheritance deduction mode');
-    return deduceDefaultTrioPatterns(genotypes, isXChromosome);
+    debugDetailed('  Mode Selected: Trio (Default)');
+    patterns = deduceDefaultTrioPatterns(genotypes, isXChromosome);
   } else {
-    debug('Using single sample inheritance deduction mode');
-    return deduceSingleSamplePattern(genotypes, isXChromosome);
+    debugDetailed('  Mode Selected: Single Sample');
+    patterns = deduceSingleSamplePattern(genotypes, isXChromosome);
   }
+
+  // At the VERY END, before return
+  debugDetailed(`--- Exiting deduceInheritancePatterns. Result: ${JSON.stringify(patterns)} ---`);
+  return patterns; // Ensure the function still returns the result
 }
 
 /**
@@ -115,36 +128,35 @@ function deduceInheritancePatterns(genotypes, pedigreeData, sampleMap, variantIn
  * @returns {Array<string>} Array of possible patterns
  */
 function deduceSingleSamplePattern(genotypes, isXChromosome) {
+  debugDetailed(`--- Entering deduceSingleSamplePattern ---`); // Entry Log
   // For a single sample, we can only infer limited information
   const sampleId = Array.from(genotypes.keys())[0];
   const gt = genotypes.get(sampleId);
+  let resultPatterns = ['unknown']; // Default
 
   if (isMissing(gt)) {
     debug(`Sample ${sampleId} has missing genotype, cannot determine pattern`);
-    return ['unknown'];
-  }
-
-  if (isHomAlt(gt)) {
+    resultPatterns = ['unknown'];
+  } else if (isHomAlt(gt)) {
     debug(`Sample ${sampleId} is homozygous for alternate allele`);
-    return ['homozygous'];
-  }
-
-  if (isHet(gt)) {
+    resultPatterns = ['homozygous'];
+  } else if (isHet(gt)) {
     debug(`Sample ${sampleId} is heterozygous`);
     if (isXChromosome) {
       // On X chromosome, heterozygosity suggests dominant for females
-      return ['potential_x_linked', 'dominant'];
+      resultPatterns = ['potential_x_linked', 'dominant'];
     } else {
-      return ['dominant'];
+      resultPatterns = ['dominant'];
     }
-  }
-
-  if (isRef(gt)) {
+  } else if (isRef(gt)) {
     debug(`Sample ${sampleId} is homozygous for reference allele`);
-    return ['reference'];
+    resultPatterns = ['reference'];
   }
 
-  return ['unknown'];
+  debugDetailed(
+    `--- Exiting deduceSingleSamplePattern. Result: ${JSON.stringify(resultPatterns)} ---`
+  ); // Exit Log
+  return resultPatterns;
 }
 
 /**
@@ -155,11 +167,16 @@ function deduceSingleSamplePattern(genotypes, isXChromosome) {
  * @returns {Array<string>} Array of possible patterns
  */
 function deduceDefaultTrioPatterns(genotypes, isXChromosome) {
+  debugDetailed(`--- Entering deduceDefaultTrioPatterns ---`); // Entry Log
   // Assume first sample is index, second is mother, third is father in VCF
   const samples = Array.from(genotypes.keys());
   if (samples.length < 3) {
     debug('Not enough samples for trio analysis, falling back to single sample mode');
-    return deduceSingleSamplePattern(genotypes, isXChromosome);
+    const result = deduceSingleSamplePattern(genotypes, isXChromosome);
+    debugDetailed(
+      `--- Exiting deduceDefaultTrioPatterns via fallback. Result: ${JSON.stringify(result)} ---`
+    ); // Exit Log
+    return result;
   }
 
   const sampleMap = {
@@ -172,7 +189,9 @@ function deduceDefaultTrioPatterns(genotypes, isXChromosome) {
     `Using default trio: Index=${sampleMap.index},` +
       ` Mother=${sampleMap.mother}, Father=${sampleMap.father}`
   );
-  return deduceTrioPatterns(genotypes, sampleMap, isXChromosome);
+  const result = deduceTrioPatterns(genotypes, sampleMap, isXChromosome);
+  debugDetailed(`--- Exiting deduceDefaultTrioPatterns. Result: ${JSON.stringify(result)} ---`); // Exit Log
+  return result;
 }
 
 /**
@@ -184,11 +203,15 @@ function deduceDefaultTrioPatterns(genotypes, isXChromosome) {
  * @returns {Array<string>} Array of possible patterns
  */
 function deduceTrioPatterns(genotypes, sampleMap, isXChromosome) {
+  debugDetailed(`--- Entering deduceTrioPatterns ---`); // Entry Log
+  debugDetailed(`  Args: sampleMap=${JSON.stringify(sampleMap)}, isX=${isXChromosome}`);
+
   const { index, mother, father } = sampleMap;
 
   // Verify all trio members have genotypes
   if (!genotypes.has(index) || !genotypes.has(mother) || !genotypes.has(father)) {
     debug('Missing genotype data for one or more trio members');
+    debugDetailed(`--- Exiting deduceTrioPatterns. Result: ["unknown"] ---`); // Exit Log
     return ['unknown'];
   }
 
@@ -205,7 +228,16 @@ function deduceTrioPatterns(genotypes, sampleMap, isXChromosome) {
   const patterns = [];
 
   // Check for de novo mutation
+  debugDetailed(`De Novo Check: Index GT=${indexGT}, Mother GT=${motherGT}, Father GT=${fatherGT}`);
+  const isIndexVariant = isVariant(indexGT);
+  const isMotherRef = isRef(motherGT);
+  const isFatherRef = isRef(fatherGT);
+  debugDetailed(
+    `De Novo Flags: isIndexVariant=${isIndexVariant}, isMotherRef=${isMotherRef}, isFatherRef=${isFatherRef}`
+  );
+
   if (isVariant(indexGT) && isRef(motherGT) && isRef(fatherGT)) {
+    debugDetailed('--> De Novo condition MET.'); // Log match
     debug('Potential de novo mutation detected');
     patterns.push('de_novo');
   } else if (
@@ -213,8 +245,11 @@ function deduceTrioPatterns(genotypes, sampleMap, isXChromosome) {
     (isMissing(motherGT) || isMissing(fatherGT)) &&
     (isRef(motherGT) || isRef(fatherGT))
   ) {
+    debugDetailed('--> De Novo candidate condition MET (missing parent data).');
     debug('Potential de novo mutation with missing parent data');
     patterns.push('de_novo_candidate');
+  } else {
+    debugDetailed('--> De Novo condition NOT MET.');
   }
 
   // Check for autosomal recessive
@@ -279,6 +314,7 @@ function deduceTrioPatterns(genotypes, sampleMap, isXChromosome) {
     }
   }
 
+  debugDetailed(`--- Exiting deduceTrioPatterns. Result: ${JSON.stringify(patterns)} ---`); // Exit Log
   return patterns;
 }
 
@@ -291,8 +327,15 @@ function deduceTrioPatterns(genotypes, sampleMap, isXChromosome) {
  * @returns {Array<string>} Array of possible patterns
  */
 function deducePedBasedPatterns(genotypes, pedigreeData, isXChromosome) {
+  // At the VERY BEGINNING of deducePedBasedPatterns
+  debugDetailed(`--- Entering deducePedBasedPatterns ---`);
+  debugDetailed(
+    `  Args: genotypes size=${genotypes?.size}, pedigreeData size=${pedigreeData?.size}, isX=${isXChromosome}`
+  );
+
   if (!pedigreeData || genotypes.size === 0) {
-    return ['unknown_with_missing_data'];
+    debugDetailed(`Exiting deducePedBasedPatterns early: Missing PED or genotypes.`);
+    return ['unknown_missing_data'];
   }
 
   // Create a map to track affected and unaffected individuals
@@ -301,201 +344,219 @@ function deducePedBasedPatterns(genotypes, pedigreeData, isXChromosome) {
 
   // Separate individuals by affected status
   pedigreeData.forEach((individual, sampleId) => {
-    if (genotypes.has(sampleId)) {
-      if (individual.affectedStatus === '2') {
-        affectedIndividuals.set(sampleId, {
-          ...individual,
-          genotype: genotypes.get(sampleId),
-        });
-      } else if (individual.affectedStatus === '1') {
-        unaffectedIndividuals.set(sampleId, {
-          ...individual,
-          genotype: genotypes.get(sampleId),
-        });
-      }
+    if (!genotypes.has(sampleId)) {
+      debugDetailed(`  PED Mode: Sample ${sampleId} skipped (no genotype).`);
+      return; // Skip samples without genotypes
+    }
+    // Check both string and number '2' for affected status
+    if (individual.affectedStatus === '2' || individual.affectedStatus === 2) {
+      affectedIndividuals.set(sampleId, individual); // Store PED info
+    } else if (individual.affectedStatus === '1' || individual.affectedStatus === 1) {
+      unaffectedIndividuals.set(sampleId, individual);
     }
   });
 
-  debug(
-    `Found ${affectedIndividuals.size} affected and ` +
-      `${unaffectedIndividuals.size} unaffected individuals`
+  debugDetailed(
+    `  PED Mode: Found ${affectedIndividuals.size} affected, ${unaffectedIndividuals.size} unaffected with genotypes.`
   );
   if (affectedIndividuals.size === 0) {
-    debug('No affected individuals found, cannot deduce inheritance pattern');
-    return ['unknown'];
+    debug(
+      'No affected individuals found with genotypes, cannot deduce inheritance pattern using PED'
+    );
+    debugDetailed(`--- Exiting deducePedBasedPatterns. Result: ["unknown_no_affected"] ---`);
+    return ['unknown_no_affected']; // Return specific unknown reason
   }
 
-  // Identify families in the pedigree
-  const families = new Map();
-  for (const [sampleId, info] of pedigreeData.entries()) {
-    if (!families.has(info.familyId)) {
-      families.set(info.familyId, new Set());
-    }
-    families.get(info.familyId).add(sampleId);
-  }
-
-  debug(`Identified ${families.size} families in the pedigree`);
-
-  // Start with empty patterns list
+  // Initialize pattern list and counters
   const patterns = [];
-
-  // Check if any affected individuals have the variant
   let affectedWithVariant = 0;
   let affectedWithoutVariant = 0;
   let unaffectedWithVariant = 0;
+  let potentialDeNovo = false; // Flag specifically for de novo
 
-  for (const sampleId of affectedIndividuals) {
-    if (genotypes.has(sampleId)) {
-      if (isVariant(genotypes.get(sampleId))) {
-        affectedWithVariant++;
-      } else if (isRef(genotypes.get(sampleId))) {
-        affectedWithoutVariant++;
-      }
+  // Count variant presence in affected/unaffected
+  for (const sampleId of affectedIndividuals.keys()) {
+    if (isVariant(genotypes.get(sampleId))) {
+      affectedWithVariant++;
+    } else if (isRef(genotypes.get(sampleId))) {
+      affectedWithoutVariant++;
     }
   }
-
-  for (const sampleId of unaffectedIndividuals) {
-    if (genotypes.has(sampleId) && isVariant(genotypes.get(sampleId))) {
+  for (const sampleId of unaffectedIndividuals.keys()) {
+    if (isVariant(genotypes.get(sampleId))) {
       unaffectedWithVariant++;
     }
   }
+  debugDetailed(
+    `  PED Mode Counts: affectedWithVariant=${affectedWithVariant}, affectedWithoutVariant=${affectedWithoutVariant}, unaffectedWithVariant=${unaffectedWithVariant}`
+  );
 
-  // Basic segregation checks
+  // Basic segregation checks - proceed only if variant segregates minimally (all affected have it)
   if (affectedWithVariant > 0 && affectedWithoutVariant === 0) {
-    debug('All affected individuals have the variant');
+    debug('All affected individuals have the variant - checking patterns...');
 
-    // Check for de novo mutations by examining parents of affected individuals
-    let potentialDeNovo = false;
+    // Check for de novo patterns by examining parents of affected individuals
+    debugDetailed(`  PED Mode: Checking for De Novo patterns...`);
+    for (const [affectedId, affectedInfo] of affectedIndividuals.entries()) {
+      // Only check affected individuals who actually have the variant
+      if (!isVariant(genotypes.get(affectedId))) continue;
 
-    for (const sampleId of affectedIndividuals) {
-      if (!genotypes.has(sampleId) || !isVariant(genotypes.get(sampleId))) continue;
+      debugDetailed(`  PED De Novo Check for Affected: ${affectedId}`);
+      const indexGT = genotypes.get(affectedId); // Genotype of the affected child
 
-      const info = pedigreeData.get(sampleId);
-      if (!info) continue;
+      const motherId = affectedInfo?.motherId;
+      const fatherId = affectedInfo?.fatherId;
+      debugDetailed(
+        `    Parent IDs from PED: Mother=${motherId || '0'}, Father=${fatherId || '0'}`
+      );
 
-      // Look at the parents
-      const hasMotherGT = info.motherId !== '0' && genotypes.has(info.motherId);
-      const hasFatherGT = info.fatherId !== '0' && genotypes.has(info.fatherId);
+      // Need both parents defined in PED and genotypes available for them
+      if (
+        motherId &&
+        motherId !== '0' &&
+        fatherId &&
+        fatherId !== '0' &&
+        genotypes.has(motherId) &&
+        genotypes.has(fatherId)
+      ) {
+        const motherGT = genotypes.get(motherId);
+        const fatherGT = genotypes.get(fatherId);
+        debugDetailed(
+          `    Retrieved Parent GTs: Mother=${motherGT}, Father=${fatherGT}, Index=${indexGT}`
+        );
 
-      // Check for de novo pattern
-      if (hasMotherGT && hasFatherGT) {
-        const motherGT = genotypes.get(info.motherId);
-        const fatherGT = genotypes.get(info.fatherId);
+        const isIndexVariant = true; // We already checked affected has variant
+        const isMotherTrulyRef = isRef(motherGT);
+        const isFatherTrulyRef = isRef(fatherGT);
+        debugDetailed(
+          `    De Novo Check Flags: isIndexVariant=${isIndexVariant}, isMotherRef=${isMotherTrulyRef}, isFatherRef=${isFatherTrulyRef}`
+        );
 
-        if (isRef(motherGT) && isRef(fatherGT) && isVariant(genotypes.get(sampleId))) {
-          debug(`Potential de novo mutation detected in ${sampleId}`);
-          potentialDeNovo = true;
+        if (isIndexVariant && isMotherTrulyRef && isFatherTrulyRef) {
+          debugDetailed('    --> PED De Novo condition MET.');
+          potentialDeNovo = true; // Set the flag
+          // Do not add to patterns list immediately, let prioritization handle it later if it's the best fit
+        } else {
+          debugDetailed('    --> PED De Novo condition NOT MET.');
         }
+      } else {
+        debugDetailed(
+          `    -> Skipping de novo check: Missing parent(s) in PED or missing parent genotype(s).`
+        );
       }
     }
-
+    // Add de_novo to potential patterns IF the flag was set
     if (potentialDeNovo) {
       patterns.push('de_novo');
+      debugDetailed(`  PED Mode: Added 'de_novo' as a possible pattern.`);
     }
 
-    // Check for autosomal dominant pattern
+    // --- Add checks for other patterns (AD, AR, X-linked) here, similar structure ---
+    // Example AD check:
     let adConsistent = true;
-    for (const sampleId of affectedIndividuals) {
-      if (!genotypes.has(sampleId)) continue;
-
-      // For autosomal dominant, affected should be heterozygous
-      if (!isHet(genotypes.get(sampleId)) && !isHomAlt(genotypes.get(sampleId))) {
+    for (const affectedId of affectedIndividuals.keys()) {
+      const gt = genotypes.get(affectedId);
+      // Autosomal Dominant: Affected individuals usually heterozygous (or homozygous rare)
+      if (!isHet(gt) && !isHomAlt(gt)) {
         adConsistent = false;
+        debugDetailed(`  PED AD Check: ${affectedId} GT ${gt} breaks AD consistency.`);
+        break;
       }
+      // Check if affected individual has an unaffected parent with the variant (would contradict AD unless incomplete penetrance)
+      const affectedInfo = affectedIndividuals.get(affectedId);
+      const motherId = affectedInfo.motherId;
+      const fatherId = affectedInfo.fatherId;
+      if (
+        motherId &&
+        motherId !== '0' &&
+        unaffectedIndividuals.has(motherId) &&
+        isVariant(genotypes.get(motherId))
+      )
+        adConsistent = false; // Consider incomplete penetrance?
+      if (
+        fatherId &&
+        fatherId !== '0' &&
+        unaffectedIndividuals.has(fatherId) &&
+        isVariant(genotypes.get(fatherId))
+      )
+        adConsistent = false; // Consider incomplete penetrance?
     }
-
     if (adConsistent && unaffectedWithVariant === 0) {
-      debug('Pattern is consistent with autosomal dominant inheritance');
+      // Strict check: No unaffected carriers
+      debugDetailed(`  PED Mode: Added 'autosomal_dominant' as a possible pattern.`);
       patterns.push('autosomal_dominant');
+    } else {
+      debugDetailed(
+        `  PED Mode: AD conditions not met (adConsistent=${adConsistent}, unaffectedWithVariant=${unaffectedWithVariant}).`
+      );
     }
 
-    // Check for autosomal recessive pattern
+    // Example AR check:
     let arConsistent = true;
-    for (const sampleId of affectedIndividuals) {
-      if (!genotypes.has(sampleId)) continue;
-
-      // For autosomal recessive, affected should be homozygous alt
-      if (!isHomAlt(genotypes.get(sampleId))) {
+    for (const affectedId of affectedIndividuals.keys()) {
+      const gt = genotypes.get(affectedId);
+      // Autosomal Recessive: Affected individuals must be homozygous alt
+      if (!isHomAlt(gt)) {
         arConsistent = false;
+        debugDetailed(`  PED AR Check: ${affectedId} GT ${gt} breaks AR consistency (not HomAlt).`);
+        break;
+      }
+      // Check parents are carriers (heterozygous) if available
+      const affectedInfo = affectedIndividuals.get(affectedId);
+      const motherId = affectedInfo.motherId;
+      const fatherId = affectedInfo.fatherId;
+      if (
+        motherId &&
+        motherId !== '0' &&
+        genotypes.has(motherId) &&
+        !isHet(genotypes.get(motherId))
+      ) {
+        arConsistent = false;
+        debugDetailed(
+          `  PED AR Check: Mother ${motherId} GT ${genotypes.get(motherId)} breaks AR consistency (not Het).`
+        );
+      }
+      if (
+        fatherId &&
+        fatherId !== '0' &&
+        genotypes.has(fatherId) &&
+        !isHet(genotypes.get(fatherId))
+      ) {
+        arConsistent = false;
+        debugDetailed(
+          `  PED AR Check: Father ${fatherId} GT ${genotypes.get(fatherId)} breaks AR consistency (not Het).`
+        );
       }
     }
-
     if (arConsistent) {
-      debug('Pattern is consistent with autosomal recessive inheritance');
+      debugDetailed(`  PED Mode: Added 'autosomal_recessive' as a possible pattern.`);
       patterns.push('autosomal_recessive');
+    } else {
+      debugDetailed(`  PED Mode: AR conditions not met.`);
     }
 
-    // Check for X-linked patterns if on X chromosome
-    if (isXChromosome) {
-      let xlrConsistent = true;
-      let xldConsistent = true;
-
-      for (const sampleId of affectedIndividuals) {
-        if (!genotypes.has(sampleId)) continue;
-
-        if (isMale(sampleId, pedigreeData)) {
-          // Affected males should be hemizygous (appears as "homozygous" in VCF)
-          if (!isHomAlt(genotypes.get(sampleId)) && !isHet(genotypes.get(sampleId))) {
-            xlrConsistent = false;
-            xldConsistent = false;
-          }
-        } else if (isFemale(sampleId, pedigreeData)) {
-          // For X-linked recessive, affected females should be homozygous
-          if (!isHomAlt(genotypes.get(sampleId))) {
-            xlrConsistent = false;
-          }
-
-          // For X-linked dominant, affected females can be heterozygous
-          if (!isHet(genotypes.get(sampleId)) && !isHomAlt(genotypes.get(sampleId))) {
-            xldConsistent = false;
-          }
-        }
-      }
-
-      // Look at carrier females (mothers of affected males)
-      for (const sampleId of affectedIndividuals) {
-        if (!isMale(sampleId, pedigreeData)) continue;
-
-        const info = pedigreeData.get(sampleId);
-        if (!info || info.motherId === '0' || !genotypes.has(info.motherId)) continue;
-
-        // For X-linked recessive, mothers of affected males should be carriers (het)
-        if (!isHet(genotypes.get(info.motherId))) {
-          xlrConsistent = false;
-        }
-      }
-
-      if (xlrConsistent) {
-        debug('Pattern is consistent with X-linked recessive inheritance');
-        patterns.push('x_linked_recessive');
-      }
-
-      if (xldConsistent) {
-        debug('Pattern is consistent with X-linked dominant inheritance');
-        patterns.push('x_linked_dominant');
-      }
-    }
-  }
-
-  // If no patterns could be determined
-  if (patterns.length === 0) {
-    if (affectedWithVariant > 0) {
-      if (affectedWithoutVariant > 0) {
-        debug("Incomplete segregation (some affected don't have variant)");
-        patterns.push('incomplete_segregation');
-      } else if (unaffectedWithVariant > 0) {
-        debug('Incomplete penetrance (some unaffected have variant)');
-        patterns.push('incomplete_penetrance');
-      } else {
-        debug('No clear inheritance pattern could be determined');
-        patterns.push('unknown');
-      }
+    // Add X-linked checks here... (more complex, checking sex from PED)
+  } else {
+    // Handle cases where variant doesn't segregate perfectly with affected status
+    if (affectedWithoutVariant > 0) {
+      debug("Incomplete segregation (some affected don't have variant)");
+      patterns.push('incomplete_segregation');
+    } else if (unaffectedWithVariant > 0) {
+      debug('Incomplete penetrance (some unaffected have variant)');
+      patterns.push('incomplete_penetrance');
     } else {
       debug('No affected individuals have the variant');
-      patterns.push('non_causative');
+      patterns.push('non_causative'); // Or 'unknown' if affected exists but none have variant
     }
   }
 
+  // Final fallback if no specific pattern identified
+  if (patterns.length === 0) {
+    debugDetailed(`  PED Mode: No specific patterns identified after checks.`);
+    patterns.push('unknown');
+  }
+
+  debugDetailed(`--- Exiting deducePedBasedPatterns. Result: ${JSON.stringify(patterns)} ---`);
   return patterns;
 }
 
@@ -508,8 +569,10 @@ function deducePedBasedPatterns(genotypes, pedigreeData, isXChromosome) {
  * @returns {string} 'segregates', 'does_not_segregate', or 'unknown'
  */
 function checkSegregation(pattern, genotypes, pedigreeData) {
+  debugDetailed(`--- Entering checkSegregation for pattern: ${pattern} ---`); // Entry Log
   if (!pedigreeData || pedigreeData.size === 0) {
     debug('No pedigree data available for segregation check');
+    debugDetailed(`--- Exiting checkSegregation. Result: unknown ---`); // Exit Log
     return 'unknown';
   }
 
@@ -518,9 +581,9 @@ function checkSegregation(pattern, genotypes, pedigreeData) {
   const unaffectedIndividuals = new Set();
 
   for (const [sampleId, info] of pedigreeData.entries()) {
-    if (info.affectedStatus === 2) {
+    if (info.affectedStatus === '2' || info.affectedStatus === 2) {
       affectedIndividuals.add(sampleId);
-    } else if (info.affectedStatus === 1) {
+    } else if (info.affectedStatus === '1' || info.affectedStatus === 1) {
       unaffectedIndividuals.add(sampleId);
     }
   }
@@ -567,6 +630,7 @@ function checkSegregation(pattern, genotypes, pedigreeData) {
 
   if (hasCriticalMissingData) {
     debug(`Cannot fully determine segregation for ${pattern} due to missing genotypes`);
+    debugDetailed(`--- Exiting checkSegregation. Result: unknown ---`); // Exit Log
     return 'unknown';
   }
 
@@ -576,6 +640,7 @@ function checkSegregation(pattern, genotypes, pedigreeData) {
       `${pattern} does not segregate: ` +
         `${affectedWithoutVariant} affected individuals lack the variant`
     );
+    debugDetailed(`--- Exiting checkSegregation. Result: does_not_segregate ---`); // Exit Log
     return 'does_not_segregate';
   }
 
@@ -586,14 +651,20 @@ function checkSegregation(pattern, genotypes, pedigreeData) {
         `${unaffectedWithVariant} unaffected individuals have the variant`
     );
     // This could be incomplete penetrance, but still report as not segregating
+    debugDetailed(`--- Exiting checkSegregation. Result: does_not_segregate ---`); // Exit Log
     return 'does_not_segregate';
   }
 
+  // If all affected have the variant AND checks passed for specific patterns:
   if (affectedWithVariant > 0) {
+    // Add more specific checks here if needed based on the pattern (e.g., parents for recessive)
     debug(`${pattern} segregates with disease status`);
+    debugDetailed(`--- Exiting checkSegregation. Result: segregates ---`); // Exit Log
     return 'segregates';
   }
 
+  // Default fallback
+  debugDetailed(`--- Exiting checkSegregation. Result: unknown ---`); // Exit Log
   return 'unknown';
 }
 
@@ -605,7 +676,13 @@ function checkSegregation(pattern, genotypes, pedigreeData) {
  * @returns {string} The prioritized pattern
  */
 function prioritizePattern(possiblePatterns, segregationResults) {
+  debugDetailed(`--- Entering prioritizePattern ---`); // Entry Log
+  debugDetailed(
+    `  Args: possiblePatterns=${JSON.stringify(possiblePatterns)}, segregationResults=${JSON.stringify(Object.fromEntries(segregationResults))}`
+  );
+
   if (!possiblePatterns || possiblePatterns.length === 0) {
+    debugDetailed(`--- Exiting prioritizePattern. Result: unknown (no possible patterns) ---`); // Exit Log
     return 'unknown';
   }
 
@@ -642,6 +719,7 @@ function prioritizePattern(possiblePatterns, segregationResults) {
     const segregatingPatterns = possiblePatterns.filter(
       (p) => segregationResults.get(p) === 'segregates'
     );
+    debugDetailed(`  Prioritize: Segregating patterns: ${JSON.stringify(segregatingPatterns)}`);
 
     if (segregatingPatterns.length > 0) {
       filteredPatterns = segregatingPatterns;
@@ -650,95 +728,53 @@ function prioritizePattern(possiblePatterns, segregationResults) {
       const unknownSegregationPatterns = possiblePatterns.filter(
         (p) => segregationResults.get(p) === 'unknown' || !segregationResults.has(p)
       );
+      debugDetailed(
+        `  Prioritize: Unknown segregation patterns: ${JSON.stringify(unknownSegregationPatterns)}`
+      );
 
       if (unknownSegregationPatterns.length > 0) {
         filteredPatterns = unknownSegregationPatterns;
+      } else {
+        // If all patterns explicitly do_not_segregate, keep them all for sorting by priority
+        debugDetailed(
+          `  Prioritize: No segregating or unknown patterns. Keeping all original for sorting.`
+        );
+        filteredPatterns = possiblePatterns; // Keep original list
       }
-      // If none segregate or have unknown status, keep all patterns
     }
+  } else {
+    debugDetailed(`  Prioritize: No segregation results available.`);
   }
+  debugDetailed(
+    `  Prioritize: Patterns after segregation filter: ${JSON.stringify(filteredPatterns)}`
+  );
 
   // Sort filtered patterns by priority
   filteredPatterns.sort((a, b) => {
     const indexA = priorityOrder.indexOf(a);
     const indexB = priorityOrder.indexOf(b);
 
-    // Handle patterns not in the priority list
+    // Handle patterns not in the priority list (shouldn't happen ideally)
     if (indexA === -1 && indexB === -1) return 0;
-    if (indexA === -1) return 1;
-    if (indexB === -1) return -1;
+    if (indexA === -1) return 1; // Put unknown patterns last
+    if (indexB === -1) return -1; // Put unknown patterns last
 
-    // Sort by priority
+    // Sort by priority index (lower index = higher priority)
     return indexA - indexB;
   });
-
-  // If we have a prioritized pattern, return it
-  if (filteredPatterns.length > 0) {
-    debug(`Selected pattern: ${filteredPatterns[0]} from ${possiblePatterns.join(', ')}`);
-    return filteredPatterns[0];
-  }
-
-  // Fallback
-  return 'unknown';
-}
-
-/**
- * Main function to calculate the deduced inheritance pattern
- *
- * @param {Map<string, string>} genotypes - Map of sampleId to genotype string
- * @param {Map<string, Object>|null} pedigreeData - Family relationships from PED file
- * @param {Object|null} sampleMap - Manual mapping of sample roles
- * @param {Object} variantInfo - Information about the variant
- * @param {string} variantInfo.chrom - Chromosome name
- * @returns {string} The deduced inheritance pattern
- */
-/**
- * Main function to calculate the deduced inheritance pattern
- * Creates a simplified string pattern result for backward compatibility
- *
- * @param {Map<string, string>} genotypes - Map of sampleId to genotype string
- * @param {Map<string, Object>|null} pedigreeData - Family relationships from PED file
- * @param {Object|null} sampleMap - Manual mapping of sample roles
- * @param {Object} variantInfo - Information about the variant
- * @param {string} variantInfo.chrom - Chromosome name
- * @returns {string} The deduced inheritance pattern (as a string for backward compatibility)
- */
-function calculateDeducedPattern(genotypes, pedigreeData, sampleMap, variantInfo) {
-  debug('Calculating inheritance pattern');
-
-  if (!genotypes || genotypes.size === 0) {
-    debug('No genotype data available');
-    return 'unknown';
-  }
-
-  // Step 1: Deduce all possible patterns
-  const possiblePatterns = deduceInheritancePatterns(
-    genotypes,
-    pedigreeData,
-    sampleMap,
-    variantInfo
+  debugDetailed(
+    `  Prioritize: Patterns after sorting by priority: ${JSON.stringify(filteredPatterns)}`
   );
 
-  debug(`Possible inheritance patterns: ${possiblePatterns.join(', ')}`);
-
-  // Step 2: Check segregation for each pattern if pedigree data available
-  const segregationResults = new Map();
-
-  if (pedigreeData && pedigreeData.size > 0) {
-    for (const pattern of possiblePatterns) {
-      if (pattern.includes('unknown') || pattern.includes('reference')) continue;
-
-      const segregationStatus = checkSegregation(pattern, genotypes, pedigreeData);
-      segregationResults.set(pattern, segregationStatus);
-
-      debug(`Segregation check for ${pattern}: ${segregationStatus}`);
-    }
+  // If we have a prioritized pattern, return it
+  let finalPattern = 'unknown'; // Default fallback
+  if (filteredPatterns.length > 0) {
+    finalPattern = filteredPatterns[0];
+  } else {
+    debugDetailed(`  Prioritize: No patterns left after filtering and sorting.`);
   }
 
-  // Step 3: Prioritize patterns
-  const finalPattern = prioritizePattern(possiblePatterns, segregationResults);
-
-  debug(`Final deduced pattern: ${finalPattern}`);
+  debugDetailed(`--- Exiting prioritizePattern. Result: ${finalPattern} ---`); // Exit Log
   return finalPattern;
 }
 
@@ -752,7 +788,7 @@ function calculateDeducedPattern(genotypes, pedigreeData, sampleMap, variantInfo
 function isMale(sampleId, pedigreeData) {
   if (!pedigreeData || !sampleId) return false;
   const sample = pedigreeData.get(sampleId);
-  return sample && sample.sex === '1';
+  return sample && (sample.sex === '1' || sample.sex === 1); // Check both string and number
 }
 
 /**
@@ -765,7 +801,7 @@ function isMale(sampleId, pedigreeData) {
 function isFemale(sampleId, pedigreeData) {
   if (!pedigreeData || !sampleId) return false;
   const sample = pedigreeData.get(sampleId);
-  return sample && sample.sex === '2';
+  return sample && (sample.sex === '2' || sample.sex === 2); // Check both string and number
 }
 
 /**
@@ -778,30 +814,47 @@ function isFemale(sampleId, pedigreeData) {
  * @returns {Object|null} Compound heterozygous analysis result or null if not applicable
  */
 function analyzeCompoundHeterozygous(geneVariants, genotypesMap, pedigreeData, indexSampleId) {
+  debugDetailed(
+    `--- Entering analyzeCompoundHeterozygous for gene ${geneVariants[0]?.transcript_consequences?.[0]?.gene_symbol || 'Unknown'} ---`
+  );
+  debugDetailed(`  Args: variant count=${geneVariants?.length}, index=${indexSampleId}`);
   if (!geneVariants || geneVariants.length < 2 || !indexSampleId || !genotypesMap) {
+    debugDetailed(
+      `--- Exiting analyzeCompoundHeterozygous: Not applicable (preconditions not met) ---`
+    );
     return null;
   }
 
-  // Get heterozyous variants for the index sample
+  // Get heterozygous variants for the index sample
   const hetVariants = [];
-
   for (const variant of geneVariants) {
     const variantKey = variant.variantKey;
-    if (!genotypesMap.has(variantKey)) continue;
-
+    if (!genotypesMap.has(variantKey)) {
+      debugDetailed(`  CompHet: No genotypes for variant ${variantKey}`);
+      continue;
+    }
     const genotypes = genotypesMap.get(variantKey);
-    if (!genotypes || !genotypes.has(indexSampleId)) continue;
-
+    if (!genotypes || !genotypes.has(indexSampleId)) {
+      debugDetailed(`  CompHet: No genotype for index ${indexSampleId} in variant ${variantKey}`);
+      continue;
+    }
     const indexGt = genotypes.get(indexSampleId);
     if (isHet(indexGt)) {
+      debugDetailed(`  CompHet: Index ${indexSampleId} is Het for variant ${variantKey}`);
       hetVariants.push(variant);
     }
   }
 
   // Need at least 2 heterozygous variants for CompHet
   if (hetVariants.length < 2) {
+    debugDetailed(
+      `--- Exiting analyzeCompoundHeterozygous: Not enough heterozygous variants (${hetVariants.length}) ---`
+    );
     return null;
   }
+  debugDetailed(
+    `  CompHet: Found ${hetVariants.length} heterozygous variants in index for this gene.`
+  );
 
   const result = {
     isCompHet: false,
@@ -814,60 +867,85 @@ function analyzeCompoundHeterozygous(geneVariants, genotypesMap, pedigreeData, i
   if (pedigreeData && pedigreeData.size > 0) {
     // Find parents of the index
     const indexData = pedigreeData.get(indexSampleId);
-    if (!indexData || !indexData.father || !indexData.mother) {
-      // No parent info in pedigree, mark as possible CompHet
+    if (!indexData || indexData.fatherId === '0' || indexData.motherId === '0') {
+      // Check for valid parent IDs
+      debugDetailed(
+        `  CompHet: No valid parent info in pedigree for index ${indexSampleId}. Marking as 'possible'.`
+      );
       result.isPossible = true;
       result.pattern = 'compound_heterozygous_possible';
+      debugDetailed(
+        `--- Exiting analyzeCompoundHeterozygous. Result: ${JSON.stringify(result)} ---`
+      );
       return result;
     }
 
-    const fatherId = indexData.father;
-    const motherId = indexData.mother;
+    const fatherId = indexData.fatherId;
+    const motherId = indexData.motherId;
+    debugDetailed(
+      `  CompHet: Found parents for index ${indexSampleId}: Father=${fatherId}, Mother=${motherId}`
+    );
 
     // Check genotypes for each parent/variant combination
     const paternalVariants = [];
     const maternalVariants = [];
+    const ambiguousVariants = []; // Variants where inheritance isn't clear
 
     for (const variant of hetVariants) {
       const variantKey = variant.variantKey;
       const genotypes = genotypesMap.get(variantKey);
-
-      if (!genotypes) continue;
+      if (!genotypes) continue; // Should not happen based on earlier check, but safe
 
       const fatherGt = genotypes.get(fatherId);
       const motherGt = genotypes.get(motherId);
+      debugDetailed(
+        `  CompHet: Variant ${variantKey}: Father GT=${fatherGt}, Mother GT=${motherGt}`
+      );
 
-      // If father has the variant but mother doesn't
-      if ((isHet(fatherGt) || isHomAlt(fatherGt)) && (isRef(motherGt) || isMissing(motherGt))) {
+      const fatherHasVar = fatherGt && isVariant(fatherGt);
+      const motherHasVar = motherGt && isVariant(motherGt);
+
+      // Paternal: Father has it, Mother doesn't (or is missing)
+      if (fatherHasVar && (!motherHasVar || isMissing(motherGt))) {
+        debugDetailed(`    -> Variant ${variantKey} likely Paternal`);
         paternalVariants.push(variant);
       }
-      // If mother has the variant but father doesn't
-      else if (
-        (isHet(motherGt) || isHomAlt(motherGt)) &&
-        (isRef(fatherGt) || isMissing(fatherGt))
-      ) {
+      // Maternal: Mother has it, Father doesn't (or is missing)
+      else if (motherHasVar && (!fatherHasVar || isMissing(fatherGt))) {
+        debugDetailed(`    -> Variant ${variantKey} likely Maternal`);
         maternalVariants.push(variant);
       }
+      // Ambiguous: Both parents have it, or neither has it (could be de novo het?), or missing data makes it unclear
+      else {
+        debugDetailed(`    -> Variant ${variantKey} inheritance ambiguous/unclear`);
+        ambiguousVariants.push(variant);
+      }
     }
+    debugDetailed(
+      `  CompHet: Paternal count=${paternalVariants.length}, Maternal count=${maternalVariants.length}, Ambiguous count=${ambiguousVariants.length}`
+    );
 
-    // True CompHet requires at least one variant from each parent
+    // True CompHet requires at least one variant clearly from each parent
     if (paternalVariants.length > 0 && maternalVariants.length > 0) {
+      debugDetailed(`  CompHet: Conditions met for confirmed Compound Heterozygous.`);
       result.isCompHet = true;
       result.pattern = 'compound_heterozygous';
       // Keep track of properly segregating variant pairs
       result.paternalVariantKeys = paternalVariants.map((v) => v.variantKey);
       result.maternalVariantKeys = maternalVariants.map((v) => v.variantKey);
     } else {
-      // If we have heterozyous variants but they don't segregate correctly
+      debugDetailed(`  CompHet: Conditions for confirmed CompHet NOT met. Marking as 'possible'.`);
       result.isPossible = true;
       result.pattern = 'compound_heterozygous_possible';
     }
   } else {
-    // No pedigree data available, mark as possible CompHet
+    // No pedigree data available, mark as possible CompHet if index is het for multiple variants
+    debugDetailed(`  CompHet: No pedigree data. Marking as 'possible'.`);
     result.isPossible = true;
     result.pattern = 'compound_heterozygous_possible';
   }
 
+  debugDetailed(`--- Exiting analyzeCompoundHeterozygous. Result: ${JSON.stringify(result)} ---`);
   return result;
 }
 
@@ -875,14 +953,14 @@ function analyzeCompoundHeterozygous(geneVariants, genotypesMap, pedigreeData, i
  * Analyzes inheritance patterns for a sample, including compound heterozygous detection
  *
  * @param {Array<Object>} annotations - Array of variant annotations
- *                                    (grouped by gene if needed for CompHet detection)
+                                    (grouped by gene if needed for CompHet detection)
  * @param {Map<string, Map<string, string>>} genotypesMap - Map of variant keys to genotype maps
  * @param {Map<string, Object>} pedigreeData - Family relationships from PED file
  * @param {Object} sampleMap - Mapping of roles to sample IDs
  * @param {string} indexSampleId - The ID of the index/proband sample
- *                                (optional, derived from pedigree if not provided)
+                                (optional, derived from pedigree if not provided)
  * @returns {Map<string, Object>} Map of variant keys to inheritance
- *                                analysis results
+                                analysis results
  */
 function analyzeInheritanceForSample(
   annotations,
@@ -891,109 +969,183 @@ function analyzeInheritanceForSample(
   sampleMap,
   indexSampleId
 ) {
+  // AT THE VERY BEGINNING of analyzeInheritanceForSample
+  debugDetailed(`--- Entering analyzeInheritanceForSample ---`);
+  debugDetailed(
+    `  Initial Input: annotations count=${annotations?.length}, genotypesMap size=${genotypesMap?.size}, pedigreeData size=${pedigreeData?.size}, sampleMap=${JSON.stringify(sampleMap)}, indexSampleId=${indexSampleId}`
+  );
+
   if (!annotations || !Array.isArray(annotations) || annotations.length === 0) {
     debug('No annotations provided for inheritance analysis');
     return new Map();
   }
 
-  // If no index provided, try to find from pedigree (first affected) or sampleMap
-  if (!indexSampleId) {
+  // AROUND indexSampleId determination logic (modify existing logic to include these logs)
+  let determinedIndexSampleId = indexSampleId;
+  debugDetailed(`  Index ID Check: Initial indexSampleId received: ${determinedIndexSampleId}`);
+  if (!determinedIndexSampleId) {
+    debugDetailed(`  Index ID Check: Attempting to determine from PED/Map...`);
     if (pedigreeData && pedigreeData.size > 0) {
-      // Find first affected individual
       for (const [sampleId, sampleData] of pedigreeData.entries()) {
-        if (sampleData.affected === '2') {
-          // '2' indicates affected in PED format
-          indexSampleId = sampleId;
+        // Check both string and number '2' for affected status
+        if (sampleData.affectedStatus === '2' || sampleData.affectedStatus === 2) {
+          determinedIndexSampleId = sampleId;
+          debugDetailed(
+            `  Index ID Check: Found affected index from PED: ${determinedIndexSampleId}`
+          );
           break;
         }
       }
+      if (!determinedIndexSampleId)
+        debugDetailed(`  Index ID Check: No affected ('2') sample found in PED.`);
+    } else {
+      debugDetailed(`  Index ID Check: No PED data to check for affected status.`);
     }
+    // Add similar logging for sampleMap check if implemented
+    // ... SampleMap check logic would go here ...
 
-    // If still no index, try sampleMap
-    if (!indexSampleId && sampleMap && sampleMap.proband) {
-      indexSampleId = sampleMap.proband;
-    } else if (!indexSampleId && sampleMap && sampleMap.index) {
-      indexSampleId = sampleMap.index;
-    }
-
-    // Still no index, use first sample from first variant
-    if (!indexSampleId && genotypesMap.size > 0) {
+    // Fallback if still not found
+    if (!determinedIndexSampleId && genotypesMap.size > 0) {
       const firstGenotypes = genotypesMap.values().next().value;
       if (firstGenotypes && firstGenotypes.size > 0) {
-        indexSampleId = firstGenotypes.keys().next().value;
+        determinedIndexSampleId = firstGenotypes.keys().next().value;
+        debugDetailed(
+          `  Index ID Check: Using fallback index (first sample from first variant): ${determinedIndexSampleId}`
+        );
       }
     }
   }
+  indexSampleId = determinedIndexSampleId; // Use the determined ID
 
   if (!indexSampleId) {
     debug('Could not determine index sample for inheritance analysis');
+    debugDetailed(
+      `--- Exiting analyzeInheritanceForSample: Could not determine Index Sample ID ---`
+    );
     return new Map();
   }
 
-  debug(`Using ${indexSampleId} as index sample for inheritance analysis`);
+  debugDetailed(`  Index ID Check: FINAL indexSampleId used for analysis: ${indexSampleId}`);
 
   // Prepare result map
   const results = new Map();
 
+  // BEFORE the main loop starts
+  debugDetailed(`--- Starting loop over ${annotations?.length} annotations ---`);
+
   // First pass: Calculate standard inheritance patterns for each variant
   for (const annotation of annotations) {
+    debugDetailed(
+      `\nLoop Iteration: Processing annotation with key: ${annotation?.variantKey || 'MISSING_KEY'}, OriginalInput: ${annotation?.originalInput}`
+    );
+
+    // Skip variants without key
     const variantKey = annotation.variantKey;
-    if (!variantKey || !genotypesMap.has(variantKey)) continue;
+    if (!variantKey || !genotypesMap.has(variantKey)) {
+      debugDetailed(`  Loop: SKIPPING - Key missing or not in genotypesMap.`);
+      // Store an appropriate result for skipped variants
+      results.set(variantKey || `unknown_key_${annotation.input || 'no_input'}`, {
+        prioritizedPattern: 'unknown_missing_genotypes',
+        possiblePatterns: ['unknown_missing_genotypes'],
+        segregationStatus: {},
+        error: 'Genotype data not found for this variant key.',
+      });
+      continue;
+    }
 
     const genotypes = genotypesMap.get(variantKey);
+    if (!genotypes) {
+      // Redundant check, but safe
+      debugDetailed(`  Loop: No genotype data for variant ${variantKey}`);
+      results.set(variantKey, {
+        prioritizedPattern: 'unknown_missing_genotypes',
+        possiblePatterns: ['unknown_missing_genotypes'],
+        segregationStatus: {},
+        error: 'Genotype data map entry was invalid.',
+      });
+      continue;
+    }
+    debugDetailed(
+      `  Loop: Retrieved genotypes for key ${variantKey}: ${JSON.stringify(Array.from(genotypes.entries()))}`
+    );
 
-    // Calculate standard inheritance patterns
+    // --- Start of Restored Logic Block ---
+    // This is the original core logic before the inner try/catch was added,
+    // but keeping the detailed debug logs around the function calls.
+
     const variantInfo = {
       chrom: annotation.seq_region_name || annotation.chr || '',
     };
+    debugDetailed(`  Loop: Variant info for deduction: ${JSON.stringify(variantInfo)}`);
 
-    try {
-      // Standard pattern deduction
-      const possiblePatterns = deduceInheritancePatterns(
-        genotypes,
-        pedigreeData,
-        sampleMap,
-        variantInfo
+    // Call deduceInheritancePatterns
+    debugDetailed(`  Loop: --> Calling deduceInheritancePatterns...`);
+    const possiblePatterns = deduceInheritancePatterns(
+      genotypes,
+      pedigreeData,
+      sampleMap,
+      variantInfo
+    );
+    debugDetailed(
+      `  Loop: <-- deduceInheritancePatterns returned: ${JSON.stringify(possiblePatterns)}`
+    );
+
+    // Check segregation
+    const segregationResults = new Map();
+    if (pedigreeData && pedigreeData.size > 0 && possiblePatterns && possiblePatterns.length > 0) {
+      debugDetailed(
+        `  Loop: --> Checking segregation for patterns: ${JSON.stringify(possiblePatterns)}...`
       );
-
-      // Check segregation if pedigree data available
-      const segregationResults = new Map();
-      if (pedigreeData && pedigreeData.size > 0) {
-        for (const pattern of possiblePatterns) {
-          if (pattern.includes('unknown') || pattern.includes('reference')) continue;
-
+      for (const pattern of possiblePatterns) {
+        if (pattern.includes('unknown') || pattern.includes('reference')) continue;
+        try {
+          // Keep try/catch around segregation check itself
+          debugDetailed(`    Seg Check: ---> Calling checkSegregation for pattern: ${pattern}...`);
           const segregationStatus = checkSegregation(pattern, genotypes, pedigreeData);
           segregationResults.set(pattern, segregationStatus);
+          debugDetailed(`    Seg Check: <--- checkSegregation returned: ${segregationStatus}`);
+        } catch (segError) {
+          debugDetailed(
+            `    Seg Check: !!! ERROR checking segregation for ${pattern}: ${segError.message}`
+          );
+          segregationResults.set(pattern, 'error_checking_segregation');
         }
       }
-
-      // Standard prioritization
-      const prioritizedPattern = prioritizePattern(possiblePatterns, segregationResults);
-
-      // Store result
-      results.set(variantKey, {
-        prioritizedPattern,
-        possiblePatterns,
-        segregationStatus: Object.fromEntries(segregationResults),
-      });
-    } catch (error) {
-      debug(`Error analyzing inheritance for variant ${variantKey}: ${error.message}`);
-      results.set(variantKey, {
-        prioritizedPattern: 'unknown',
-        possiblePatterns: ['unknown'],
-        segregationStatus: {},
-        error: error.message,
-      });
+      debugDetailed(
+        `  Loop: <-- Segregation checks complete. Results: ${JSON.stringify(Object.fromEntries(segregationResults))}`
+      );
+    } else {
+      debugDetailed(`  Loop: Skipping segregation check (No PED data or no possible patterns).`);
     }
-  }
+
+    // Prioritize
+    debugDetailed(`  Loop: --> Calling prioritizePattern...`);
+    const prioritizedPattern = prioritizePattern(possiblePatterns, segregationResults);
+    debugDetailed(`  Loop: <-- prioritizePattern returned: ${prioritizedPattern}`);
+
+    // Store result
+    results.set(variantKey, {
+      prioritizedPattern,
+      possiblePatterns,
+      segregationStatus: Object.fromEntries(segregationResults),
+    });
+    debugDetailed(`  Loop: Stored inheritance result for key ${variantKey}.`);
+    // --- End of Restored Logic Block ---
+  } // End of loop over annotations
 
   // Second pass: Group variants by gene for CompHet analysis
   // Group annotations by gene for compound heterozygous analysis
   const geneVariantsMap = new Map();
 
   for (const annotation of annotations) {
+    debugDetailed(
+      `  CompHet: Processing annotation for gene grouping: ${annotation?.variantKey || 'MISSING_KEY'}`
+    );
     // Skip variants without gene info or already processed
-    if (!annotation.variantKey) continue;
+    if (!annotation.variantKey) {
+      debugDetailed('  CompHet: Skipping - no variant key');
+      continue;
+    }
 
     // Extract gene symbol from consequences
     let geneSymbol = null;
@@ -1001,39 +1153,55 @@ function analyzeInheritanceForSample(
       for (const cons of annotation.transcript_consequences) {
         if (cons.gene_symbol) {
           geneSymbol = cons.gene_symbol;
+          debugDetailed(`  CompHet: Found gene symbol: ${geneSymbol}`);
           break;
         }
       }
     }
 
     // Skip if no gene symbol found
-    if (!geneSymbol) continue;
+    if (!geneSymbol) {
+      debugDetailed('  CompHet: Skipping - no gene symbol found');
+      continue;
+    }
 
     // Add to gene group
     if (!geneVariantsMap.has(geneSymbol)) {
+      debugDetailed(`  CompHet: Creating new gene group for ${geneSymbol}`);
       geneVariantsMap.set(geneSymbol, []);
     }
 
     geneVariantsMap.get(geneSymbol).push({
-      ...annotation,
+      ...annotation, // Include the full annotation object
       variantKey: annotation.variantKey,
     });
+    debugDetailed(`  CompHet: Added variant ${annotation.variantKey} to gene ${geneSymbol}`);
   }
 
   // Analyze compounds by gene
+  debugDetailed(
+    `CompHet: Starting compound heterozygous analysis for ${geneVariantsMap.size} genes...`
+  );
   for (const [geneSymbol, geneVariants] of geneVariantsMap.entries()) {
     // Skip genes with only one variant
-    if (geneVariants.length < 2) continue;
+    if (geneVariants.length < 2) {
+      debugDetailed(`  CompHet: Skipping ${geneSymbol} - only ${geneVariants.length} variant(s)`);
+      continue;
+    }
 
+    debugDetailed(`  CompHet: Analyzing ${geneSymbol} with ${geneVariants.length} variants...`);
     // Analyze for compound heterozygous
     const compHetResult = analyzeCompoundHeterozygous(
       geneVariants,
       genotypesMap,
       pedigreeData,
-      indexSampleId
+      indexSampleId // Use the determined indexSampleId
     );
 
     if (compHetResult && (compHetResult.isCompHet || compHetResult.isPossible)) {
+      debugDetailed(
+        `  CompHet: Found ${compHetResult.isCompHet ? 'confirmed' : 'possible'} compound het in ${geneSymbol}`
+      );
       // Update result for each variant in the compound
       for (const variantKey of compHetResult.variantKeys) {
         if (results.has(variantKey)) {
@@ -1046,7 +1214,7 @@ function analyzeInheritanceForSample(
             prioritizedPattern: compHetResult.isCompHet
               ? 'compound_heterozygous'
               : currentResult.prioritizedPattern.includes('de_novo')
-                ? currentResult.prioritizedPattern
+                ? currentResult.prioritizedPattern // Don't override strong patterns like de_novo easily
                 : compHetResult.pattern,
             // Add to possible patterns
             possiblePatterns: [
@@ -1070,21 +1238,25 @@ function analyzeInheritanceForSample(
           } else if (compHetResult.isPossible) {
             enhancedResult.segregationStatus = {
               ...enhancedResult.segregationStatus,
-              compound_heterozygous_possible: 'unknown',
+              compound_heterozygous_possible: 'unknown', // or 'possible' ?
             };
           }
 
+          debugDetailed(`    CompHet: Updated result for variant ${variantKey} in ${geneSymbol}`);
           results.set(variantKey, enhancedResult);
         }
       }
+    } else {
+      debugDetailed(`  CompHet: No compound het found in ${geneSymbol}`);
     }
   }
 
+  debugDetailed(`--- Completed inheritance analysis. Results size: ${results.size} ---`);
   return results;
 }
 
 module.exports = {
-  calculateDeducedPattern,
+  // calculateDeducedPattern, // Intentionally commented out - deprecated
   deduceInheritancePatterns,
   checkSegregation,
   prioritizePattern,

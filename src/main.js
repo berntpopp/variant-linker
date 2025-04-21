@@ -533,6 +533,23 @@ async function main() {
       debug('Added inheritance pattern calculation parameters to analysis');
     }
 
+    // Add detailed debug logging before calling analyzeVariant
+    debugDetailed(
+      `Passing to analyzeVariant - analysisParams.variants (${analysisParams.variants ? analysisParams.variants.length : 0}): ${JSON.stringify(analysisParams.variants)}`
+    );
+    debugDetailed(
+      `Passing to analyzeVariant - analysisParams.vcfRecordMap size: ${analysisParams.vcfRecordMap ? analysisParams.vcfRecordMap.size : 'N/A'}`
+    );
+    debugDetailed(
+      `Passing to analyzeVariant - analysisParams.vcfHeaderLines count: ${analysisParams.vcfHeaderLines ? analysisParams.vcfHeaderLines.length : 'N/A'}`
+    );
+    debugDetailed(
+      `Passing to analyzeVariant - analysisParams.pedigreeData keys: ${analysisParams.pedigreeData ? JSON.stringify(Array.from(analysisParams.pedigreeData.keys())) : 'N/A'}`
+    );
+    debugDetailed(
+      `Passing to analyzeVariant - analysisParams.calculateInheritance: ${analysisParams.calculateInheritance}`
+    );
+
     // Get the results by analyzing variants
     const result = await analyzeVariant(analysisParams);
 

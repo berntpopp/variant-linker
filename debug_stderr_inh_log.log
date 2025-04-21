@@ -1,0 +1,231 @@
+2025-04-21T16:19:28.202Z variant-linker:main Starting variant analysis process
+2025-04-21T16:19:28.217Z variant-linker:main Processing VCF file: test/fixtures/inheritance/trio_denovo.vcf
+2025-04-21T16:19:28.232Z variant-linker:detailed Parsed VCF Record (1:1000000): Samples property exists = true
+2025-04-21T16:19:28.233Z variant-linker:detailed Parsed Record SAMPLES object: undefined
+2025-04-21T16:19:28.233Z variant-linker:detailed Parsed Genotypes object for 1:1000000:A:G: {"PROBAND":"0/1","FATHER":"0/0","MOTHER":"0/0"}
+2025-04-21T16:19:28.234Z variant-linker:detailed Processing sample PROBAND: Extracted GT string = "0/1"
+2025-04-21T16:19:28.235Z variant-linker:detailed  -> Storing GT '0/1' for sample PROBAND
+2025-04-21T16:19:28.236Z variant-linker:detailed Processing sample FATHER: Extracted GT string = "0/0"
+2025-04-21T16:19:28.237Z variant-linker:detailed  -> Storing GT '0/0' for sample FATHER
+2025-04-21T16:19:28.237Z variant-linker:detailed Processing sample MOTHER: Extracted GT string = "0/0"
+2025-04-21T16:19:28.238Z variant-linker:detailed  -> Storing GT '0/0' for sample MOTHER
+2025-04-21T16:19:28.238Z variant-linker:detailed Final genotypes Map for key 1:1000000:A:G before storing: [["PROBAND","0/1"],["FATHER","0/0"],["MOTHER","0/0"]]
+2025-04-21T16:19:28.239Z variant-linker:detailed Parsed VCF Record (2:2000000): Samples property exists = true
+2025-04-21T16:19:28.239Z variant-linker:detailed Parsed Record SAMPLES object: undefined
+2025-04-21T16:19:28.240Z variant-linker:detailed Parsed Genotypes object for 2:2000000:C:T: {"PROBAND":"0/1","FATHER":"0/0","MOTHER":"0/0"}
+2025-04-21T16:19:28.240Z variant-linker:detailed Processing sample PROBAND: Extracted GT string = "0/1"
+2025-04-21T16:19:28.241Z variant-linker:detailed  -> Storing GT '0/1' for sample PROBAND
+2025-04-21T16:19:28.242Z variant-linker:detailed Processing sample FATHER: Extracted GT string = "0/0"
+2025-04-21T16:19:28.242Z variant-linker:detailed  -> Storing GT '0/0' for sample FATHER
+2025-04-21T16:19:28.243Z variant-linker:detailed Processing sample MOTHER: Extracted GT string = "0/0"
+2025-04-21T16:19:28.243Z variant-linker:detailed  -> Storing GT '0/0' for sample MOTHER
+2025-04-21T16:19:28.244Z variant-linker:detailed Final genotypes Map for key 2:2000000:C:T before storing: [["PROBAND","0/1"],["FATHER","0/0"],["MOTHER","0/0"]]
+2025-04-21T16:19:28.245Z variant-linker:detailed Parsed VCF Record (3:3000000): Samples property exists = true
+2025-04-21T16:19:28.245Z variant-linker:detailed Parsed Record SAMPLES object: undefined
+2025-04-21T16:19:28.246Z variant-linker:detailed Parsed Genotypes object for 3:3000000:G:A: {"PROBAND":"0/1","FATHER":"0/0","MOTHER":"0/0"}
+2025-04-21T16:19:28.246Z variant-linker:detailed Processing sample PROBAND: Extracted GT string = "0/1"
+2025-04-21T16:19:28.247Z variant-linker:detailed  -> Storing GT '0/1' for sample PROBAND
+2025-04-21T16:19:28.248Z variant-linker:detailed Processing sample FATHER: Extracted GT string = "0/0"
+2025-04-21T16:19:28.248Z variant-linker:detailed  -> Storing GT '0/0' for sample FATHER
+2025-04-21T16:19:28.249Z variant-linker:detailed Processing sample MOTHER: Extracted GT string = "0/0"
+2025-04-21T16:19:28.250Z variant-linker:detailed  -> Storing GT '0/0' for sample MOTHER
+2025-04-21T16:19:28.250Z variant-linker:detailed Final genotypes Map for key 3:3000000:G:A before storing: [["PROBAND","0/1"],["FATHER","0/0"],["MOTHER","0/0"]]
+2025-04-21T16:19:28.251Z variant-linker:main Extracted 3 variant(s) from VCF file
+2025-04-21T16:19:28.252Z variant-linker:main Captured VCF header with 5 lines
+2025-04-21T16:19:28.253Z variant-linker:main Created VCF record map with data for 3 variants
+2025-04-21T16:19:28.253Z variant-linker:main VCF file contains 3 samples: PROBAND, FATHER, MOTHER
+2025-04-21T16:19:28.254Z variant-linker:main Processing 0 variants
+2025-04-21T16:19:28.254Z variant-linker:detailed Variants: []
+2025-04-21T16:19:28.255Z variant-linker:main Reading pedigree data from PED file: test/fixtures/inheritance/trio_denovo.ped
+2025-04-21T16:19:28.268Z variant-linker:main Parsed pedigree data for 3 samples
+2025-04-21T16:19:28.269Z variant-linker:main Inheritance pattern calculation is enabled
+2025-04-21T16:19:28.270Z variant-linker:detailed Parsed options: recoderOptions={"vcf_string":"1"}, vepOptions={"CADD":"1","hgvs":"1","merged":"1","mane":"1"}
+2025-04-21T16:19:28.270Z variant-linker:main Added inheritance pattern calculation parameters to analysis
+2025-04-21T16:19:28.271Z variant-linker:detailed Passing to analyzeVariant - analysisParams.variants (3): ["1-1000000-A-G","2-2000000-C-T","3-3000000-G-A"]
+2025-04-21T16:19:28.272Z variant-linker:detailed Passing to analyzeVariant - analysisParams.vcfRecordMap size: 3
+2025-04-21T16:19:28.273Z variant-linker:detailed Passing to analyzeVariant - analysisParams.vcfHeaderLines count: 5
+2025-04-21T16:19:28.273Z variant-linker:detailed Passing to analyzeVariant - analysisParams.pedigreeData keys: ["PROBAND","FATHER","MOTHER"]
+2025-04-21T16:19:28.274Z variant-linker:detailed Passing to analyzeVariant - analysisParams.calculateInheritance: true
+2025-04-21T16:19:28.276Z variant-linker:detailed analyzeVariant received params.variants (3): ["1-1000000-A-G","2-2000000-C-T","3-3000000-G-A"]
+2025-04-21T16:19:28.276Z variant-linker:detailed analyzeVariant received params.vcfRecordMap size: 3
+2025-04-21T16:19:28.277Z variant-linker:detailed analyzeVariant received params.pedigreeData keys: ["PROBAND","FATHER","MOTHER"]
+2025-04-21T16:19:28.277Z variant-linker:detailed analyzeVariant received params.calculateInheritance: true
+2025-04-21T16:19:28.279Z variant-linker:main Requesting VEP Annotation for 3 variants
+2025-04-21T16:19:28.279Z variant-linker:detailed Using endpoint: /vep/homo_sapiens/region
+2025-04-21T16:19:28.280Z variant-linker:detailed Query options: {}
+2025-04-21T16:19:28.280Z variant-linker:detailed Request body: {"variants":["1 1000000 . A G . . .","2 2000000 . C T . . .","3 3000000 . G A . . ."]}
+2025-04-21T16:19:28.281Z variant-linker:detailed Constructed API URL: https://rest.ensembl.org/vep/homo_sapiens/region
+2025-04-21T16:19:29.434Z variant-linker:detailed Response data: [{"assembly_name":"GRCh38","allele_string":"A/G","start":1000000,"end":1000000,"seq_region_name":"1","transcript_consequences":[{"gene_id":"ENSG00000188290","strand":-1,"variant_allele":"G","gene_symbol":"HES4","transcript_id":"ENST00000304952","consequence_terms":["5_prime_UTR_variant"],"hgnc_id":"HGNC:24149","cdna_end":98,"cdna_start":98,"impact":"MODIFIER","gene_symbol_source":"HGNC","biotype":"protein_coding"},{"gene_symbol":"HES4","transcript_id":"ENST00000428771","consequence_terms":["5_prime_UTR_variant"],"cdna_end":173,"hgnc_id":"HGNC:24149","cdna_start":173,"impact":"MODIFIER","gene_symbol_source":"HGNC","biotype":"protein_coding","gene_id":"ENSG00000188290","strand":-1,"variant_allele":"G"},{"gene_id":"ENSG00000188290","strand":-1,"variant_allele":"G","gene_symbol":"HES4","transcript_id":"ENST00000481869","consequence_terms":["non_coding_transcript_exon_variant"],"cdna_end":97,"hgnc_id":"HGNC:24149","impact":"MODIFIER","cdna_start":97,"gene_symbol_source":"HGNC","biotype":"retained_intron"},{"distance":19,"variant_allele":"G","gene_id":"ENSG00000188290","strand":-1,"hgnc_id":"HGNC:24149","impact":"MODIFIER","biotype":"protein_coding","gene_symbol_source":"HGNC","gene_symbol":"HES4","consequence_terms":["upstream_gene_variant"],"transcript_id":"ENST00000484667"},{"distance":1949,"variant_allele":"G","gene_id":"ENSG00000272512","strand":-1,"impact":"MODIFIER","biotype":"lncRNA","transcript_id":"ENST00000606034","consequence_terms":["upstream_gene_variant"]},{"transcript_id":"ENST00000624652","consequence_terms":["upstream_gene_variant"],"gene_symbol":"ISG15","gene_symbol_source":"HGNC","biotype":"protein_coding","flags":["cds_end_NF"],"hgnc_id":"HGNC:4053","impact":"MODIFIER","strand":1,"gene_id":"ENSG00000187608","variant_allele":"G","distance":1145},{"gene_symbol":"ISG15","consequence_terms":["upstream_gene_variant"],"transcript_id":"ENST00000624697","hgnc_id":"HGNC:4053","impact":"MODIFIER","biotype":"protein_coding","gene_symbol_source":"HGNC","gene_id":"ENSG00000187608","strand":1,"distance":1138,"variant_allele":"G"},{"gene_id":"ENSG00000303614","strand":-1,"distance":4058,"variant_allele":"G","consequence_terms":["downstream_gene_variant"],"transcript_id":"ENST00000796077","impact":"MODIFIER","biotype":"lncRNA"},{"gene_id":"ENSG00000303623","strand":1,"distance":715,"variant_allele":"G","consequence_terms":["upstream_gene_variant"],"transcript_id":"ENST00000796159","impact":"MODIFIER","biotype":"lncRNA"}],"strand":1,"most_severe_consequence":"5_prime_UTR_variant","id":".","input":"1 1000000 . A G . . .","regulatory_feature_consequences":[{"regulatory_feature_id":"ENSR1_C4ND","consequence_terms":["regulatory_region_variant"],"impact":"MODIFIER","variant_allele":"G","biotype":"promoter"}]},{"seq_region_name":"2","transcript_consequences":[{"gene_symbol_source":"HGNC","biotype":"protein_coding","impact":"MODIFIER","hgnc_id":"HGNC:7623","transcript_id":"ENST00000399161","consequence_terms":["intron_variant"],"gene_symbol":"MYT1L","variant_allele":"T","strand":-1,"gene_id":"ENSG00000186487"},{"variant_allele":"T","strand":-1,"gene_id":"ENSG00000186487","gene_symbol_source":"HGNC","biotype":"protein_coding","hgnc_id":"HGNC:7623","impact":"MODIFIER","transcript_id":"ENST00000428368","consequence_terms":["intron_variant"],"gene_symbol":"MYT1L"},{"transcript_id":"ENST00000476547","consequence_terms":["intron_variant","non_coding_transcript_variant"],"gene_symbol":"MYT1L","gene_symbol_source":"HGNC","biotype":"retained_intron","hgnc_id":"HGNC:7623","impact":"MODIFIER","strand":-1,"gene_id":"ENSG00000186487","variant_allele":"T"},{"transcript_id":"ENST00000479156","consequence_terms":["intron_variant","non_coding_transcript_variant"],"gene_symbol":"MYT1L","gene_symbol_source":"HGNC","biotype":"retained_intron","hgnc_id":"HGNC:7623","impact":"MODIFIER","strand":-1,"gene_id":"ENSG00000186487","variant_allele":"T"},{"gene_symbol":"MYT1L","transcript_id":"ENST00000644820","consequence_terms":["intron_variant"],"hgnc_id":"HGNC:7623","impact":"MODIFIER","gene_symbol_source":"HGNC","biotype":"protein_coding","gene_id":"ENSG00000186487","strand":-1,"variant_allele":"T"},{"strand":-1,"gene_id":"ENSG00000186487","variant_allele":"T","consequence_terms":["intron_variant","non_coding_transcript_variant"],"transcript_id":"ENST00000647604","gene_symbol":"MYT1L","biotype":"retained_intron","gene_symbol_source":"HGNC","impact":"MODIFIER","hgnc_id":"HGNC:7623"},{"gene_id":"ENSG00000186487","strand":-1,"variant_allele":"T","gene_symbol":"MYT1L","consequence_terms":["intron_variant"],"transcript_id":"ENST00000647618","impact":"MODIFIER","hgnc_id":"HGNC:7623","biotype":"protein_coding","gene_symbol_source":"HGNC"},{"biotype":"protein_coding","gene_symbol_source":"HGNC","impact":"MODIFIER","hgnc_id":"HGNC:7623","consequence_terms":["intron_variant"],"transcript_id":"ENST00000647694","gene_symbol":"MYT1L","variant_allele":"T","strand":-1,"gene_id":"ENSG00000186487"},{"transcript_id":"ENST00000647738","consequence_terms":["intron_variant"],"gene_symbol":"MYT1L","gene_symbol_source":"HGNC","biotype":"protein_coding","hgnc_id":"HGNC:7623","impact":"MODIFIER","strand":-1,"gene_id":"ENSG00000186487","variant_allele":"T"},{"variant_allele":"T","strand":-1,"gene_id":"ENSG00000186487","biotype":"protein_coding","gene_symbol_source":"HGNC","hgnc_id":"HGNC:7623","impact":"MODIFIER","consequence_terms":["intron_variant"],"transcript_id":"ENST00000647755","gene_symbol":"MYT1L"},{"gene_id":"ENSG00000186487","strand":-1,"variant_allele":"T","gene_symbol":"MYT1L","transcript_id":"ENST00000648148","consequence_terms":["intron_variant","non_coding_transcript_variant"],"hgnc_id":"HGNC:7623","impact":"MODIFIER","gene_symbol_source":"HGNC","biotype":"retained_intron"},{"variant_allele":"T","strand":-1,"gene_id":"ENSG00000186487","gene_symbol_source":"HGNC","biotype":"protein_coding","hgnc_id":"HGNC:7623","impact":"MODIFIER","transcript_id":"ENST00000648316","consequence_terms":["intron_variant"],"gene_symbol":"MYT1L"},{"gene_symbol":"MYT1L","transcript_id":"ENST00000648318","consequence_terms":["intron_variant"],"hgnc_id":"HGNC:7623","impact":"MODIFIER","gene_symbol_source":"HGNC","biotype":"protein_coding","gene_id":"ENSG00000186487","strand":-1,"variant_allele":"T"},{"consequence_terms":["intron_variant"],"transcript_id":"ENST00000648339","gene_symbol":"MYT1L","biotype":"protein_coding","gene_symbol_source":"HGNC","hgnc_id":"HGNC:7623","impact":"MODIFIER","strand":-1,"gene_id":"ENSG00000186487","variant_allele":"T"},{"variant_allele":"T","strand":-1,"gene_id":"ENSG00000186487","biotype":"protein_coding","gene_symbol_source":"HGNC","hgnc_id":"HGNC:7623","impact":"MODIFIER","consequence_terms":["intron_variant"],"transcript_id":"ENST00000648627","gene_symbol":"MYT1L"},{"gene_symbol_source":"HGNC","biotype":"protein_coding","hgnc_id":"HGNC:7623","impact":"MODIFIER","transcript_id":"ENST00000648665","consequence_terms":["intron_variant"],"gene_symbol":"MYT1L","variant_allele":"T","strand":-1,"gene_id":"ENSG00000186487"},{"hgnc_id":"HGNC:7623","impact":"MODIFIER","gene_symbol_source":"HGNC","biotype":"protein_coding","gene_symbol":"MYT1L","transcript_id":"ENST00000648928","consequence_terms":["intron_variant"],"variant_allele":"T","gene_id":"ENSG00000186487","strand":-1},{"gene_symbol_source":"HGNC","biotype":"protein_coding","hgnc_id":"HGNC:7623","impact":"MODIFIER","transcript_id":"ENST00000648933","consequence_terms":["intron_variant"],"gene_symbol":"MYT1L","variant_allele":"T","strand":-1,"gene_id":"ENSG00000186487"},{"variant_allele":"T","strand":-1,"gene_id":"ENSG00000186487","gene_symbol_source":"HGNC","biotype":"protein_coding","hgnc_id":"HGNC:7623","impact":"MODIFIER","transcript_id":"ENST00000649207","consequence_terms":["intron_variant"],"gene_symbol":"MYT1L"},{"gene_symbol":"MYT1L","consequence_terms":["intron_variant"],"transcript_id":"ENST00000649313","flags":["cds_end_NF"],"impact":"MODIFIER","hgnc_id":"HGNC:7623","biotype":"protein_coding","gene_symbol_source":"HGNC","gene_id":"ENSG00000186487","strand":-1,"variant_allele":"T"},{"variant_allele":"T","strand":-1,"gene_id":"ENSG00000186487","biotype":"protein_coding","gene_symbol_source":"HGNC","impact":"MODIFIER","flags":["cds_end_NF"],"hgnc_id":"HGNC:7623","consequence_terms":["intron_variant"],"transcript_id":"ENST00000649641","gene_symbol":"MYT1L"},{"variant_allele":"T","strand":-1,"gene_id":"ENSG00000186487","gene_symbol_source":"HGNC","biotype":"protein_coding","impact":"MODIFIER","hgnc_id":"HGNC:7623","transcript_id":"ENST00000649663","consequence_terms":["intron_variant"],"gene_symbol":"MYT1L"},{"biotype":"protein_coding","gene_symbol_source":"HGNC","flags":["cds_end_NF"],"impact":"MODIFIER","hgnc_id":"HGNC:7623","consequence_terms":["intron_variant"],"transcript_id":"ENST00000649709","gene_symbol":"MYT1L","variant_allele":"T","strand":-1,"gene_id":"ENSG00000186487"},{"gene_symbol_source":"HGNC","biotype":"protein_coding","hgnc_id":"HGNC:7623","impact":"MODIFIER","transcript_id":"ENST00000649810","consequence_terms":["intron_variant"],"gene_symbol":"MYT1L","variant_allele":"T","strand":-1,"gene_id":"ENSG00000186487"},{"gene_symbol":"MYT1L","consequence_terms":["intron_variant","NMD_transcript_variant"],"transcript_id":"ENST00000650081","impact":"MODIFIER","hgnc_id":"HGNC:7623","biotype":"nonsense_mediated_decay","gene_symbol_source":"HGNC","gene_id":"ENSG00000186487","strand":-1,"variant_allele":"T"},{"gene_symbol_source":"HGNC","biotype":"protein_coding","hgnc_id":"HGNC:7623","impact":"MODIFIER","transcript_id":"ENST00000650485","consequence_terms":["intron_variant"],"gene_symbol":"MYT1L","variant_allele":"T","strand":-1,"gene_id":"ENSG00000186487"},{"gene_symbol":"MYT1L","transcript_id":"ENST00000650560","consequence_terms":["intron_variant"],"hgnc_id":"HGNC:7623","impact":"MODIFIER","gene_symbol_source":"HGNC","biotype":"protein_coding","gene_id":"ENSG00000186487","strand":-1,"variant_allele":"T"}],"strand":1,"most_severe_consequence":"intron_variant","input":"2 2000000 . C T . . .","id":".","assembly_name":"GRCh38","allele_string":"C/T","end":2000000,"start":2000000},{"start":3000000,"end":3000000,"allele_string":"G/A","assembly_name":"GRCh38","input":"3 3000000 . G A . . .","id":".","most_severe_consequence":"intron_variant","transcript_consequences":[{"gene_id":"ENSG00000144619","strand":1,"variant_allele":"A","gene_symbol":"CNTN4","transcript_id":"ENST00000397459","consequence_terms":["intron_variant"],"hgnc_id":"HGNC:2174","impact":"MODIFIER","gene_symbol_source":"HGNC","biotype":"protein_coding"},{"gene_symbol":"CNTN4","transcript_id":"ENST00000397461","consequence_terms":["intron_variant"],"hgnc_id":"HGNC:2174","impact":"MODIFIER","gene_symbol_source":"HGNC","biotype":"protein_coding","gene_id":"ENSG00000144619","strand":1,"variant_allele":"A"},{"gene_id":"ENSG00000144619","strand":1,"variant_allele":"A","gene_symbol":"CNTN4","consequence_terms":["intron_variant"],"transcript_id":"ENST00000418658","impact":"MODIFIER","hgnc_id":"HGNC:2174","biotype":"protein_coding","gene_symbol_source":"HGNC"},{"variant_allele":"A","strand":1,"gene_id":"ENSG00000144619","gene_symbol_source":"HGNC","biotype":"protein_coding","impact":"MODIFIER","hgnc_id":"HGNC:2174","transcript_id":"ENST00000427331","consequence_terms":["intron_variant"],"gene_symbol":"CNTN4"},{"variant_allele":"A","strand":1,"gene_id":"ENSG00000144619","biotype":"nonsense_mediated_decay","gene_symbol_source":"HGNC","hgnc_id":"HGNC:2174","impact":"MODIFIER","consequence_terms":["intron_variant","NMD_transcript_variant"],"transcript_id":"ENST00000427741","gene_symbol":"CNTN4"},{"gene_id":"ENSG00000144619","strand":1,"variant_allele":"A","gene_symbol":"CNTN4","transcript_id":"ENST00000430505","consequence_terms":["intron_variant","non_coding_transcript_variant"],"hgnc_id":"HGNC:2174","impact":"MODIFIER","gene_symbol_source":"HGNC","biotype":"retained_intron"},{"gene_id":"ENSG00000144619","strand":1,"distance":856,"variant_allele":"A","gene_symbol":"CNTN4","consequence_terms":["downstream_gene_variant"],"transcript_id":"ENST00000475817","hgnc_id":"HGNC:2174","impact":"MODIFIER","biotype":"protein_coding_CDS_not_defined","gene_symbol_source":"HGNC"}],"strand":1,"seq_region_name":"3"}]
+2025-04-21T16:19:29.435Z variant-linker:detailed Starting to build genotypesMap for inheritance...
+2025-04-21T16:19:29.436Z variant-linker:detailed Iterating through 3 annotations to build genotypesMap.
+2025-04-21T16:19:29.437Z variant-linker:detailed Generated key from annotation: 1:1000000:A:G. Annotation input: 1 1000000 . A G . . ., OriginalInput: 1-1000000-A-G
+2025-04-21T16:19:29.437Z variant-linker:detailed Found VCF record for key 1:1000000:A:G: Genotypes present = true
+2025-04-21T16:19:29.438Z variant-linker:detailed -> Added genotypes for key 1:1000000:A:G: [["PROBAND","0/1"],["FATHER","0/0"],["MOTHER","0/0"]]
+2025-04-21T16:19:29.439Z variant-linker:detailed Generated key from annotation: 2:2000000:C:T. Annotation input: 2 2000000 . C T . . ., OriginalInput: 2-2000000-C-T
+2025-04-21T16:19:29.439Z variant-linker:detailed Found VCF record for key 2:2000000:C:T: Genotypes present = true
+2025-04-21T16:19:29.440Z variant-linker:detailed -> Added genotypes for key 2:2000000:C:T: [["PROBAND","0/1"],["FATHER","0/0"],["MOTHER","0/0"]]
+2025-04-21T16:19:29.441Z variant-linker:detailed Generated key from annotation: 3:3000000:G:A. Annotation input: 3 3000000 . G A . . ., OriginalInput: 3-3000000-G-A
+2025-04-21T16:19:29.442Z variant-linker:detailed Found VCF record for key 3:3000000:G:A: Genotypes present = true
+2025-04-21T16:19:29.443Z variant-linker:detailed -> Added genotypes for key 3:3000000:G:A: [["PROBAND","0/1"],["FATHER","0/0"],["MOTHER","0/0"]]
+2025-04-21T16:19:29.444Z variant-linker:detailed Finished building genotypesMap. Final Size: 3
+2025-04-21T16:19:29.445Z variant-linker:detailed Inheritance Core: Attempting to require inheritanceCalculator...
+2025-04-21T16:19:29.476Z variant-linker:detailed Inheritance Core: Successfully required inheritanceCalculator.
+2025-04-21T16:19:29.477Z variant-linker:detailed Inheritance Core: Determined indexSampleId (passed to calculator): PROBAND
+2025-04-21T16:19:29.477Z variant-linker:detailed Inheritance Core: Preparing to call analyzeInheritanceForSample...
+2025-04-21T16:19:29.479Z variant-linker:detailed --- Entering analyzeInheritanceForSample ---
+2025-04-21T16:19:29.479Z variant-linker:detailed   Initial Input: annotations count=3, genotypesMap size=3, pedigreeData size=3, sampleMap=null, indexSampleId=PROBAND
+2025-04-21T16:19:29.480Z variant-linker:detailed   Index ID Check: Initial indexSampleId received: PROBAND
+2025-04-21T16:19:29.480Z variant-linker:detailed   Index ID Check: FINAL indexSampleId used for analysis: PROBAND
+2025-04-21T16:19:29.481Z variant-linker:detailed --- Starting loop over 3 annotations ---
+2025-04-21T16:19:29.482Z variant-linker:detailed 
+Loop Iteration: Processing annotation with key: 1:1000000:A:G, OriginalInput: 1-1000000-A-G
+2025-04-21T16:19:29.482Z variant-linker:detailed   Loop: Retrieved genotypes for key 1:1000000:A:G: [["PROBAND","0/1"],["FATHER","0/0"],["MOTHER","0/0"]]
+2025-04-21T16:19:29.483Z variant-linker:detailed   Loop: Variant info for deduction: {"chrom":"1"}
+2025-04-21T16:19:29.483Z variant-linker:detailed   Loop: --> Calling deduceInheritancePatterns...
+2025-04-21T16:19:29.484Z variant-linker:detailed --- Entering deduceInheritancePatterns ---
+2025-04-21T16:19:29.485Z variant-linker:detailed   Args: genotypes size=3, pedigreeData size=3, sampleMap=null, variantInfo={"chrom":"1"}
+2025-04-21T16:19:29.485Z variant-linker:detailed   Mode Selected: PED-based
+2025-04-21T16:19:29.486Z variant-linker:detailed --- Entering deducePedBasedPatterns ---
+2025-04-21T16:19:29.487Z variant-linker:detailed   Args: genotypes size=3, pedigreeData size=3, isX=false
+2025-04-21T16:19:29.488Z variant-linker:detailed   PED Mode: Found 1 affected, 2 unaffected with genotypes.
+2025-04-21T16:19:29.489Z variant-linker:detailed   PED Mode Counts: affectedWithVariant=1, affectedWithoutVariant=0, unaffectedWithVariant=0
+2025-04-21T16:19:29.490Z variant-linker:detailed   PED Mode: Checking for De Novo patterns...
+2025-04-21T16:19:29.490Z variant-linker:detailed   PED De Novo Check for Affected: PROBAND
+2025-04-21T16:19:29.491Z variant-linker:detailed     Parent IDs from PED: Mother=MOTHER, Father=FATHER
+2025-04-21T16:19:29.491Z variant-linker:detailed     Retrieved Parent GTs: Mother=0/0, Father=0/0, Index=0/1
+2025-04-21T16:19:29.492Z variant-linker:detailed     De Novo Check Flags: isIndexVariant=true, isMotherRef=true, isFatherRef=true
+2025-04-21T16:19:29.493Z variant-linker:detailed     --> PED De Novo condition MET.
+2025-04-21T16:19:29.493Z variant-linker:detailed   PED Mode: Added 'de_novo' as a possible pattern.
+2025-04-21T16:19:29.494Z variant-linker:detailed   PED Mode: Added 'autosomal_dominant' as a possible pattern.
+2025-04-21T16:19:29.494Z variant-linker:detailed   PED AR Check: PROBAND GT 0/1 breaks AR consistency (not HomAlt).
+2025-04-21T16:19:29.495Z variant-linker:detailed   PED Mode: AR conditions not met.
+2025-04-21T16:19:29.495Z variant-linker:detailed --- Exiting deducePedBasedPatterns. Result: ["de_novo","autosomal_dominant"] ---
+2025-04-21T16:19:29.496Z variant-linker:detailed --- Exiting deduceInheritancePatterns. Result: ["de_novo","autosomal_dominant"] ---
+2025-04-21T16:19:29.497Z variant-linker:detailed   Loop: <-- deduceInheritancePatterns returned: ["de_novo","autosomal_dominant"]
+2025-04-21T16:19:29.497Z variant-linker:detailed   Loop: --> Checking segregation for patterns: ["de_novo","autosomal_dominant"]...
+2025-04-21T16:19:29.498Z variant-linker:detailed     Seg Check: ---> Calling checkSegregation for pattern: de_novo...
+2025-04-21T16:19:29.499Z variant-linker:detailed --- Entering checkSegregation for pattern: de_novo ---
+2025-04-21T16:19:29.499Z variant-linker:detailed --- Exiting checkSegregation. Result: segregates ---
+2025-04-21T16:19:29.500Z variant-linker:detailed     Seg Check: <--- checkSegregation returned: segregates
+2025-04-21T16:19:29.501Z variant-linker:detailed     Seg Check: ---> Calling checkSegregation for pattern: autosomal_dominant...
+2025-04-21T16:19:29.502Z variant-linker:detailed --- Entering checkSegregation for pattern: autosomal_dominant ---
+2025-04-21T16:19:29.503Z variant-linker:detailed --- Exiting checkSegregation. Result: segregates ---
+2025-04-21T16:19:29.504Z variant-linker:detailed     Seg Check: <--- checkSegregation returned: segregates
+2025-04-21T16:19:29.504Z variant-linker:detailed   Loop: <-- Segregation checks complete. Results: {"de_novo":"segregates","autosomal_dominant":"segregates"}
+2025-04-21T16:19:29.505Z variant-linker:detailed   Loop: --> Calling prioritizePattern...
+2025-04-21T16:19:29.506Z variant-linker:detailed --- Entering prioritizePattern ---
+2025-04-21T16:19:29.507Z variant-linker:detailed   Args: possiblePatterns=["de_novo","autosomal_dominant"], segregationResults={"de_novo":"segregates","autosomal_dominant":"segregates"}
+2025-04-21T16:19:29.507Z variant-linker:detailed   Prioritize: Segregating patterns: ["de_novo","autosomal_dominant"]
+2025-04-21T16:19:29.508Z variant-linker:detailed   Prioritize: Patterns after segregation filter: ["de_novo","autosomal_dominant"]
+2025-04-21T16:19:29.509Z variant-linker:detailed   Prioritize: Patterns after sorting by priority: ["de_novo","autosomal_dominant"]
+2025-04-21T16:19:29.509Z variant-linker:detailed --- Exiting prioritizePattern. Result: de_novo ---
+2025-04-21T16:19:29.510Z variant-linker:detailed   Loop: <-- prioritizePattern returned: de_novo
+2025-04-21T16:19:29.510Z variant-linker:detailed   Loop: Stored inheritance result for key 1:1000000:A:G.
+2025-04-21T16:19:29.511Z variant-linker:detailed 
+Loop Iteration: Processing annotation with key: 2:2000000:C:T, OriginalInput: 2-2000000-C-T
+2025-04-21T16:19:29.511Z variant-linker:detailed   Loop: Retrieved genotypes for key 2:2000000:C:T: [["PROBAND","0/1"],["FATHER","0/0"],["MOTHER","0/0"]]
+2025-04-21T16:19:29.512Z variant-linker:detailed   Loop: Variant info for deduction: {"chrom":"2"}
+2025-04-21T16:19:29.512Z variant-linker:detailed   Loop: --> Calling deduceInheritancePatterns...
+2025-04-21T16:19:29.513Z variant-linker:detailed --- Entering deduceInheritancePatterns ---
+2025-04-21T16:19:29.513Z variant-linker:detailed   Args: genotypes size=3, pedigreeData size=3, sampleMap=null, variantInfo={"chrom":"2"}
+2025-04-21T16:19:29.514Z variant-linker:detailed   Mode Selected: PED-based
+2025-04-21T16:19:29.514Z variant-linker:detailed --- Entering deducePedBasedPatterns ---
+2025-04-21T16:19:29.515Z variant-linker:detailed   Args: genotypes size=3, pedigreeData size=3, isX=false
+2025-04-21T16:19:29.515Z variant-linker:detailed   PED Mode: Found 1 affected, 2 unaffected with genotypes.
+2025-04-21T16:19:29.516Z variant-linker:detailed   PED Mode Counts: affectedWithVariant=1, affectedWithoutVariant=0, unaffectedWithVariant=0
+2025-04-21T16:19:29.517Z variant-linker:detailed   PED Mode: Checking for De Novo patterns...
+2025-04-21T16:19:29.517Z variant-linker:detailed   PED De Novo Check for Affected: PROBAND
+2025-04-21T16:19:29.518Z variant-linker:detailed     Parent IDs from PED: Mother=MOTHER, Father=FATHER
+2025-04-21T16:19:29.519Z variant-linker:detailed     Retrieved Parent GTs: Mother=0/0, Father=0/0, Index=0/1
+2025-04-21T16:19:29.519Z variant-linker:detailed     De Novo Check Flags: isIndexVariant=true, isMotherRef=true, isFatherRef=true
+2025-04-21T16:19:29.520Z variant-linker:detailed     --> PED De Novo condition MET.
+2025-04-21T16:19:29.520Z variant-linker:detailed   PED Mode: Added 'de_novo' as a possible pattern.
+2025-04-21T16:19:29.521Z variant-linker:detailed   PED Mode: Added 'autosomal_dominant' as a possible pattern.
+2025-04-21T16:19:29.522Z variant-linker:detailed   PED AR Check: PROBAND GT 0/1 breaks AR consistency (not HomAlt).
+2025-04-21T16:19:29.522Z variant-linker:detailed   PED Mode: AR conditions not met.
+2025-04-21T16:19:29.523Z variant-linker:detailed --- Exiting deducePedBasedPatterns. Result: ["de_novo","autosomal_dominant"] ---
+2025-04-21T16:19:29.523Z variant-linker:detailed --- Exiting deduceInheritancePatterns. Result: ["de_novo","autosomal_dominant"] ---
+2025-04-21T16:19:29.524Z variant-linker:detailed   Loop: <-- deduceInheritancePatterns returned: ["de_novo","autosomal_dominant"]
+2025-04-21T16:19:29.524Z variant-linker:detailed   Loop: --> Checking segregation for patterns: ["de_novo","autosomal_dominant"]...
+2025-04-21T16:19:29.525Z variant-linker:detailed     Seg Check: ---> Calling checkSegregation for pattern: de_novo...
+2025-04-21T16:19:29.526Z variant-linker:detailed --- Entering checkSegregation for pattern: de_novo ---
+2025-04-21T16:19:29.527Z variant-linker:detailed --- Exiting checkSegregation. Result: segregates ---
+2025-04-21T16:19:29.528Z variant-linker:detailed     Seg Check: <--- checkSegregation returned: segregates
+2025-04-21T16:19:29.529Z variant-linker:detailed     Seg Check: ---> Calling checkSegregation for pattern: autosomal_dominant...
+2025-04-21T16:19:29.530Z variant-linker:detailed --- Entering checkSegregation for pattern: autosomal_dominant ---
+2025-04-21T16:19:29.531Z variant-linker:detailed --- Exiting checkSegregation. Result: segregates ---
+2025-04-21T16:19:29.532Z variant-linker:detailed     Seg Check: <--- checkSegregation returned: segregates
+2025-04-21T16:19:29.534Z variant-linker:detailed   Loop: <-- Segregation checks complete. Results: {"de_novo":"segregates","autosomal_dominant":"segregates"}
+2025-04-21T16:19:29.535Z variant-linker:detailed   Loop: --> Calling prioritizePattern...
+2025-04-21T16:19:29.536Z variant-linker:detailed --- Entering prioritizePattern ---
+2025-04-21T16:19:29.537Z variant-linker:detailed   Args: possiblePatterns=["de_novo","autosomal_dominant"], segregationResults={"de_novo":"segregates","autosomal_dominant":"segregates"}
+2025-04-21T16:19:29.538Z variant-linker:detailed   Prioritize: Segregating patterns: ["de_novo","autosomal_dominant"]
+2025-04-21T16:19:29.539Z variant-linker:detailed   Prioritize: Patterns after segregation filter: ["de_novo","autosomal_dominant"]
+2025-04-21T16:19:29.539Z variant-linker:detailed   Prioritize: Patterns after sorting by priority: ["de_novo","autosomal_dominant"]
+2025-04-21T16:19:29.540Z variant-linker:detailed --- Exiting prioritizePattern. Result: de_novo ---
+2025-04-21T16:19:29.541Z variant-linker:detailed   Loop: <-- prioritizePattern returned: de_novo
+2025-04-21T16:19:29.541Z variant-linker:detailed   Loop: Stored inheritance result for key 2:2000000:C:T.
+2025-04-21T16:19:29.542Z variant-linker:detailed 
+Loop Iteration: Processing annotation with key: 3:3000000:G:A, OriginalInput: 3-3000000-G-A
+2025-04-21T16:19:29.543Z variant-linker:detailed   Loop: Retrieved genotypes for key 3:3000000:G:A: [["PROBAND","0/1"],["FATHER","0/0"],["MOTHER","0/0"]]
+2025-04-21T16:19:29.543Z variant-linker:detailed   Loop: Variant info for deduction: {"chrom":"3"}
+2025-04-21T16:19:29.544Z variant-linker:detailed   Loop: --> Calling deduceInheritancePatterns...
+2025-04-21T16:19:29.544Z variant-linker:detailed --- Entering deduceInheritancePatterns ---
+2025-04-21T16:19:29.545Z variant-linker:detailed   Args: genotypes size=3, pedigreeData size=3, sampleMap=null, variantInfo={"chrom":"3"}
+2025-04-21T16:19:29.545Z variant-linker:detailed   Mode Selected: PED-based
+2025-04-21T16:19:29.546Z variant-linker:detailed --- Entering deducePedBasedPatterns ---
+2025-04-21T16:19:29.546Z variant-linker:detailed   Args: genotypes size=3, pedigreeData size=3, isX=false
+2025-04-21T16:19:29.547Z variant-linker:detailed   PED Mode: Found 1 affected, 2 unaffected with genotypes.
+2025-04-21T16:19:29.547Z variant-linker:detailed   PED Mode Counts: affectedWithVariant=1, affectedWithoutVariant=0, unaffectedWithVariant=0
+2025-04-21T16:19:29.548Z variant-linker:detailed   PED Mode: Checking for De Novo patterns...
+2025-04-21T16:19:29.548Z variant-linker:detailed   PED De Novo Check for Affected: PROBAND
+2025-04-21T16:19:29.549Z variant-linker:detailed     Parent IDs from PED: Mother=MOTHER, Father=FATHER
+2025-04-21T16:19:29.549Z variant-linker:detailed     Retrieved Parent GTs: Mother=0/0, Father=0/0, Index=0/1
+2025-04-21T16:19:29.550Z variant-linker:detailed     De Novo Check Flags: isIndexVariant=true, isMotherRef=true, isFatherRef=true
+2025-04-21T16:19:29.551Z variant-linker:detailed     --> PED De Novo condition MET.
+2025-04-21T16:19:29.551Z variant-linker:detailed   PED Mode: Added 'de_novo' as a possible pattern.
+2025-04-21T16:19:29.552Z variant-linker:detailed   PED Mode: Added 'autosomal_dominant' as a possible pattern.
+2025-04-21T16:19:29.553Z variant-linker:detailed   PED AR Check: PROBAND GT 0/1 breaks AR consistency (not HomAlt).
+2025-04-21T16:19:29.554Z variant-linker:detailed   PED Mode: AR conditions not met.
+2025-04-21T16:19:29.554Z variant-linker:detailed --- Exiting deducePedBasedPatterns. Result: ["de_novo","autosomal_dominant"] ---
+2025-04-21T16:19:29.555Z variant-linker:detailed --- Exiting deduceInheritancePatterns. Result: ["de_novo","autosomal_dominant"] ---
+2025-04-21T16:19:29.556Z variant-linker:detailed   Loop: <-- deduceInheritancePatterns returned: ["de_novo","autosomal_dominant"]
+2025-04-21T16:19:29.556Z variant-linker:detailed   Loop: --> Checking segregation for patterns: ["de_novo","autosomal_dominant"]...
+2025-04-21T16:19:29.557Z variant-linker:detailed     Seg Check: ---> Calling checkSegregation for pattern: de_novo...
+2025-04-21T16:19:29.557Z variant-linker:detailed --- Entering checkSegregation for pattern: de_novo ---
+2025-04-21T16:19:29.558Z variant-linker:detailed --- Exiting checkSegregation. Result: segregates ---
+2025-04-21T16:19:29.559Z variant-linker:detailed     Seg Check: <--- checkSegregation returned: segregates
+2025-04-21T16:19:29.559Z variant-linker:detailed     Seg Check: ---> Calling checkSegregation for pattern: autosomal_dominant...
+2025-04-21T16:19:29.560Z variant-linker:detailed --- Entering checkSegregation for pattern: autosomal_dominant ---
+2025-04-21T16:19:29.560Z variant-linker:detailed --- Exiting checkSegregation. Result: segregates ---
+2025-04-21T16:19:29.561Z variant-linker:detailed     Seg Check: <--- checkSegregation returned: segregates
+2025-04-21T16:19:29.561Z variant-linker:detailed   Loop: <-- Segregation checks complete. Results: {"de_novo":"segregates","autosomal_dominant":"segregates"}
+2025-04-21T16:19:29.562Z variant-linker:detailed   Loop: --> Calling prioritizePattern...
+2025-04-21T16:19:29.563Z variant-linker:detailed --- Entering prioritizePattern ---
+2025-04-21T16:19:29.564Z variant-linker:detailed   Args: possiblePatterns=["de_novo","autosomal_dominant"], segregationResults={"de_novo":"segregates","autosomal_dominant":"segregates"}
+2025-04-21T16:19:29.565Z variant-linker:detailed   Prioritize: Segregating patterns: ["de_novo","autosomal_dominant"]
+2025-04-21T16:19:29.566Z variant-linker:detailed   Prioritize: Patterns after segregation filter: ["de_novo","autosomal_dominant"]
+2025-04-21T16:19:29.567Z variant-linker:detailed   Prioritize: Patterns after sorting by priority: ["de_novo","autosomal_dominant"]
+2025-04-21T16:19:29.568Z variant-linker:detailed --- Exiting prioritizePattern. Result: de_novo ---
+2025-04-21T16:19:29.570Z variant-linker:detailed   Loop: <-- prioritizePattern returned: de_novo
+2025-04-21T16:19:29.571Z variant-linker:detailed   Loop: Stored inheritance result for key 3:3000000:G:A.
+2025-04-21T16:19:29.572Z variant-linker:detailed   CompHet: Processing annotation for gene grouping: 1:1000000:A:G
+2025-04-21T16:19:29.572Z variant-linker:detailed   CompHet: Found gene symbol: HES4
+2025-04-21T16:19:29.573Z variant-linker:detailed   CompHet: Creating new gene group for HES4
+2025-04-21T16:19:29.574Z variant-linker:detailed   CompHet: Added variant 1:1000000:A:G to gene HES4
+2025-04-21T16:19:29.574Z variant-linker:detailed   CompHet: Processing annotation for gene grouping: 2:2000000:C:T
+2025-04-21T16:19:29.575Z variant-linker:detailed   CompHet: Found gene symbol: MYT1L
+2025-04-21T16:19:29.575Z variant-linker:detailed   CompHet: Creating new gene group for MYT1L
+2025-04-21T16:19:29.576Z variant-linker:detailed   CompHet: Added variant 2:2000000:C:T to gene MYT1L
+2025-04-21T16:19:29.577Z variant-linker:detailed   CompHet: Processing annotation for gene grouping: 3:3000000:G:A
+2025-04-21T16:19:29.577Z variant-linker:detailed   CompHet: Found gene symbol: CNTN4
+2025-04-21T16:19:29.578Z variant-linker:detailed   CompHet: Creating new gene group for CNTN4
+2025-04-21T16:19:29.578Z variant-linker:detailed   CompHet: Added variant 3:3000000:G:A to gene CNTN4
+2025-04-21T16:19:29.579Z variant-linker:detailed CompHet: Starting compound heterozygous analysis for 3 genes...
+2025-04-21T16:19:29.580Z variant-linker:detailed   CompHet: Skipping HES4 - only 1 variant(s)
+2025-04-21T16:19:29.580Z variant-linker:detailed   CompHet: Skipping MYT1L - only 1 variant(s)
+2025-04-21T16:19:29.581Z variant-linker:detailed   CompHet: Skipping CNTN4 - only 1 variant(s)
+2025-04-21T16:19:29.581Z variant-linker:detailed --- Completed inheritance analysis. Results size: 3 ---
+2025-04-21T16:19:29.582Z variant-linker:detailed Inheritance Core: analyzeInheritanceForSample call completed. Result map size: 3
+2025-04-21T16:19:29.583Z variant-linker:detailed Inheritance Core: Updated 3 annotations with results.
+2025-04-21T16:19:29.585Z variant-linker:main Variant analysis process completed successfully
