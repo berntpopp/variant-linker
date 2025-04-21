@@ -179,6 +179,200 @@ describe('vcfFormatter', () => {
       });
     });
 
+    describe('VL_CSQ Tag Handling Tests', () => {
+      it('should omit VL_CSQ tag when no consequences', () => {
+        const mockAnnotationData = [
+          {
+            originalInput: '1:100:A:T',
+            vcfString: '1-100-A-T',
+            seq_region_name: '1',
+            start: 100,
+            end: 100,
+            allele_string: 'A/T',
+            // No transcript_consequences or most_severe_consequence
+          },
+        ];
+
+        const mockVcfRecordMap = new Map([
+          [
+            '1:100:A:T',
+            {
+              originalRecord: {
+                CHROM: '1',
+                POS: 100,
+                ID: null,
+                REF: 'A',
+                ALT: ['T'],
+                QUAL: null,
+                FILTER: ['PASS'],
+                INFO: { DP: 30 },
+              },
+              alt: 'T',
+            },
+          ],
+        ]);
+
+        const output = formatAnnotationsToVcf(
+          mockAnnotationData,
+          mockVcfRecordMap,
+          undefined,
+          mockVlCsqFormatFields
+        );
+
+        const dataLines = getDataLines(output);
+        expect(dataLines).to.have.lengthOf(1);
+        const info = extractInfoField(dataLines[0]);
+        expect(info).to.equal('DP=30'); // Only original INFO, no VL_CSQ
+      });
+
+      it('should return "." for INFO when no fields present', () => {
+        const mockAnnotationData = [
+          {
+            originalInput: '1:100:A:T',
+            vcfString: '1-100-A-T',
+            seq_region_name: '1',
+            start: 100,
+            end: 100,
+            allele_string: 'A/T',
+            // No consequences or original INFO
+          },
+        ];
+
+        const output = formatAnnotationsToVcf(
+          mockAnnotationData,
+          undefined,
+          undefined,
+          mockVlCsqFormatFields
+        );
+
+        const dataLines = getDataLines(output);
+        expect(dataLines).to.have.lengthOf(1);
+        const info = extractInfoField(dataLines[0]);
+        expect(info).to.equal('.'); // No INFO fields = '.'
+      });
+
+      it('should merge multiple CSQ strings with commas', () => {
+        const mockAnnotationData = [
+          {
+            originalInput: '1:100:A:T',
+            vcfString: '1-100-A-T',
+            seq_region_name: '1',
+            start: 100,
+            end: 100,
+            allele_string: 'A/T',
+            most_severe_consequence: 'missense_variant',
+            transcript_consequences: [
+              {
+                impact: 'MODERATE',
+                gene_symbol: 'GENE1',
+                gene_id: 'ENSG001',
+                feature_type: 'Transcript',
+                transcript_id: 'ENST001',
+                consequence_terms: ['missense_variant'],
+                biotype: 'protein_coding',
+                hgvsc: 'c.123A>T',
+                hgvsp: 'p.Met1?',
+              },
+              {
+                impact: 'LOW',
+                gene_symbol: 'GENE1',
+                gene_id: 'ENSG001',
+                feature_type: 'Transcript',
+                transcript_id: 'ENST002',
+                consequence_terms: ['synonymous_variant'],
+                biotype: 'protein_coding',
+                hgvsc: 'c.456A>T',
+                hgvsp: 'p.Leu2=',
+              },
+            ],
+          },
+        ];
+
+        const output = formatAnnotationsToVcf(
+          mockAnnotationData,
+          undefined,
+          undefined,
+          mockVlCsqFormatFields
+        );
+
+        const dataLines = getDataLines(output);
+        expect(dataLines).to.have.lengthOf(1);
+        const info = extractInfoField(dataLines[0]);
+        const csqSection = info.split(';').find((s) => s.startsWith('VL_CSQ='));
+        expect(csqSection).to.exist;
+        const csqValues = csqSection.split('=')[1].split(',');
+        expect(csqValues).to.have.lengthOf(2); // Should have two CSQ entries
+        expect(csqValues[0]).to.include('missense_variant');
+        expect(csqValues[1]).to.include('synonymous_variant');
+      });
+
+      it('should preserve order: original INFO, VL_CSQ, VL_DED_INH, VL_COMPHET', () => {
+        const mockAnnotationData = [
+          {
+            originalInput: '1:100:A:T',
+            vcfString: '1-100-A-T',
+            seq_region_name: '1',
+            start: 100,
+            allele_string: 'A/T',
+            most_severe_consequence: 'missense_variant',
+            transcript_consequences: [
+              {
+                impact: 'MODERATE',
+                gene_symbol: 'GENE1',
+                consequence_terms: ['missense_variant'],
+                biotype: 'protein_coding',
+              },
+            ],
+            deducedInheritancePattern: {
+              prioritizedPattern: 'AR',
+              compHetDetails: {
+                isCandidate: true,
+                partnerVariantKeys: ['2:200:G:A'],
+                geneSymbol: 'GENE1',
+              },
+            },
+          },
+        ];
+
+        const mockVcfRecordMap = new Map([
+          [
+            '1:100:A:T',
+            {
+              originalRecord: {
+                CHROM: '1',
+                POS: 100,
+                REF: 'A',
+                ALT: ['T'],
+                INFO: { DP: 30, AF: 0.5, VL_CSQ: 'OLD_CSQ' },
+              },
+              alt: 'T',
+            },
+          ],
+        ]);
+
+        const output = formatAnnotationsToVcf(
+          mockAnnotationData,
+          mockVcfRecordMap,
+          undefined,
+          mockVlCsqFormatFields
+        );
+
+        const dataLines = getDataLines(output);
+        const info = extractInfoField(dataLines[0]);
+        const parts = info.split(';');
+
+        // Check order of parts
+        expect(parts[0]).to.equal('DP=30');
+        expect(parts[1]).to.equal('AF=0.5');
+        expect(parts[2]).to.include('VL_CSQ=');
+        expect(parts[3]).to.equal('VL_DED_INH=AR');
+        expect(parts[4]).to.include('VL_COMPHET=');
+
+        // Verify old VL_CSQ was excluded
+        expect(info).to.not.include('OLD_CSQ');
+      });
+    });
+
     describe('Basic VCF Input Tests', () => {
       it('should preserve original VCF header and record info, merging VL_CSQ', () => {
         const mockAnnotationData = [

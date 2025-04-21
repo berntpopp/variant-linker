@@ -11,7 +11,6 @@ const variantRecoder = require('./variantRecoder');
 const variantRecoderPost = require('./variantRecoderPost');
 const vepRegionsAnnotation = require('./vepRegionsAnnotation');
 const { applyScoring } = require('./scoring');
-const { calculateDeducedPattern } = require('./inheritanceCalculator');
 const {
   mapOutputToSchemaOrg,
   validateSchemaOrgOutput,
@@ -391,9 +390,10 @@ async function analyzeVariant(params) {
   if (params.calculateInheritance) {
     debug('Calculating inheritance patterns for variant annotations');
 
-    // Iterate through each annotation and calculate the inheritance pattern
-    let calculatedPatternsCount = 0;
+    // Create a map of variant keys to genotype data
+    const genotypesMap = new Map();
 
+    // Add variant keys to each annotation for easier reference
     for (const annotation of finalOutput.annotationData) {
       try {
         // Construct a key to look up the VCF record
@@ -405,24 +405,16 @@ async function analyzeVariant(params) {
         // Build the variant key in the same format used in vcfReader
         const key = `${chrom}:${pos}:${ref}:${alt}`;
 
+        // Store the key on the annotation for easy reference
+        annotation.variantKey = key;
+
         // Look up genotype information from the VCF record map
         if (params.vcfRecordMap && params.vcfRecordMap.has(key)) {
           const vcfRecord = params.vcfRecordMap.get(key);
 
           if (vcfRecord.genotypes && vcfRecord.genotypes.size > 0) {
-            // We have genotype data - calculate the inheritance pattern
-            const variantInfo = { chrom };
-
-            const pattern = calculateDeducedPattern(
-              vcfRecord.genotypes,
-              params.pedigreeData,
-              params.sampleMap,
-              variantInfo
-            );
-
-            // Add the deduced pattern to the annotation
-            annotation.deducedInheritancePattern = pattern;
-            calculatedPatternsCount++;
+            // Store genotypes for later use
+            genotypesMap.set(key, vcfRecord.genotypes);
           } else {
             debug(`No genotype data found for variant ${key}`);
           }
@@ -430,15 +422,60 @@ async function analyzeVariant(params) {
           debug(`VCF record not found for variant ${key}`);
         }
       } catch (error) {
-        debug(`Error calculating inheritance pattern: ${error.message}`);
+        debug(`Error preparing variant key: ${error.message}`);
         // Continue with next annotation
       }
     }
 
-    if (calculatedPatternsCount > 0) {
-      stepsPerformed.push(
-        `Calculated inheritance patterns for ${calculatedPatternsCount} variants.`
-      );
+    // Only proceed if we have genotype data for at least one variant
+    if (genotypesMap.size > 0) {
+      debug(`Found genotype data for ${genotypesMap.size} variants`);
+
+      try {
+        // Use the enhanced inheritance analysis that handles compound heterozygous detection
+        const { analyzeInheritanceForSample } = require('./inheritanceCalculator');
+
+        // Determine the index/proband sample from parameters or pedigree
+        let indexSampleId = null;
+        if (params.sampleMap && params.sampleMap.proband) {
+          indexSampleId = params.sampleMap.proband;
+        } else if (params.sampleMap && params.sampleMap.index) {
+          indexSampleId = params.sampleMap.index;
+        }
+
+        // Analyze all variants, including gene-level grouping for Compound Het detection
+        const inheritanceResults = analyzeInheritanceForSample(
+          finalOutput.annotationData,
+          genotypesMap,
+          params.pedigreeData,
+          params.sampleMap,
+          indexSampleId
+        );
+
+        // Update annotations with inheritance results
+        let calculatedPatternsCount = 0;
+        for (const annotation of finalOutput.annotationData) {
+          if (annotation.variantKey && inheritanceResults.has(annotation.variantKey)) {
+            // Store the full inheritance results object
+            annotation.deducedInheritancePattern = inheritanceResults.get(annotation.variantKey);
+            calculatedPatternsCount++;
+          }
+        }
+
+        if (calculatedPatternsCount > 0) {
+          stepsPerformed.push(
+            `Calculated inheritance patterns for ${calculatedPatternsCount} variants,
+             including compound heterozygous detection.`
+          );
+        } else {
+          stepsPerformed.push(
+            'No inheritance patterns could be calculated (missing genotype data).'
+          );
+        }
+      } catch (error) {
+        debug(`Error analyzing inheritance patterns: ${error.message}`);
+        stepsPerformed.push('Error during inheritance pattern calculation. See logs for details.');
+      }
     } else {
       stepsPerformed.push('No inheritance patterns could be calculated (missing genotype data).');
     }

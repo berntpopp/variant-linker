@@ -13,7 +13,11 @@
 // Use fs only if in a Node environment.
 const fs = typeof window === 'undefined' ? require('fs') : null;
 const debug = require('debug')('variant-linker:processor');
-const { flattenAnnotationData, formatToTabular, defaultColumnConfig } = require('./dataExtractor');
+const {
+  flattenAnnotationData,
+  formatToTabular,
+  getDefaultColumnConfig,
+} = require('./dataExtractor');
 const { formatAnnotationsToVcf } = require('./vcfFormatter');
 
 /**
@@ -327,10 +331,12 @@ function filterAndFormatResults(results, filterParam, format) {
         : [];
 
       // Flatten the nested annotation data using the "flatten by consequence" strategy
-      const flatRows = flattenAnnotationData(annotationToUse, defaultColumnConfig);
+      // Don't include inheritance columns for backward compatibility with tests
+      const columnConfig = getDefaultColumnConfig({ includeInheritance: false });
+      const flatRows = flattenAnnotationData(annotationToUse, columnConfig);
 
       // Format the flattened data as CSV/TSV
-      formattedResults = formatToTabular(flatRows, defaultColumnConfig, delimiter, true);
+      formattedResults = formatToTabular(flatRows, columnConfig, delimiter, true);
 
       filteredResults.meta.stepsPerformed.push(
         `Formatted output as ${format.toUpperCase()} using flatten-by-consequence strategy` +

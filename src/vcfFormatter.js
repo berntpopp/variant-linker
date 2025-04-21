@@ -58,6 +58,39 @@ function _prepareVcfHeader(originalHeaderLines, vlCsqFormatFields) {
     debugOutput('Added missing VL_CSQ header line.');
   }
 
+  // Add headers for inheritance pattern fields
+  const dedInhHeader =
+    '##INFO=<ID=VL_DED_INH,Number=1,Type=String,Description="Deduced inheritance pattern (VariantLinker)">';
+  const compHetHeader =
+    '##INFO=<ID=VL_COMPHET,Number=.,Type=String,Description="Compound Het details (partner variant keys and gene)">';
+
+  // Check if headers already exist
+  const hasDedInhHeader = finalVcfHeaderLines.some((line) => line.includes('ID=VL_DED_INH'));
+  const hasCompHetHeader = finalVcfHeaderLines.some((line) => line.includes('ID=VL_COMPHET'));
+
+  // Add headers if not present
+  if (!hasDedInhHeader || !hasCompHetHeader) {
+    const chromLineIdx = finalVcfHeaderLines.findIndex((line) => line.startsWith('#CHROM'));
+    if (chromLineIdx >= 0) {
+      if (!hasDedInhHeader) {
+        finalVcfHeaderLines.splice(chromLineIdx, 0, dedInhHeader);
+        debugOutput('Added missing VL_DED_INH header line.');
+      }
+      if (!hasCompHetHeader) {
+        finalVcfHeaderLines.splice(chromLineIdx, 0, compHetHeader);
+        debugOutput('Added missing VL_COMPHET header line.');
+      }
+    } else {
+      // If #CHROM is missing (shouldn't happen with default header), add at the end before data
+      if (!hasDedInhHeader) {
+        finalVcfHeaderLines.push(dedInhHeader);
+      }
+      if (!hasCompHetHeader) {
+        finalVcfHeaderLines.push(compHetHeader);
+      }
+    }
+  }
+
   return finalVcfHeaderLines;
 }
 
@@ -258,51 +291,87 @@ function _groupAnnotationsByPosition(annotationData, vcfRecordMap) {
  * @private
  */
 function _formatVcfInfoField(positionGroupData, vlCsqFormatFields) {
-  const infoFields = [];
-  let firstAltData = null; // Used for original INFO if from VCF input
+  const allCsqStringsForLine = [];
+  let firstAltData = positionGroupData.alts?.values().next().value; // For original INFO
+  let inheritanceInfoFound = false; // Flag to take inheritance only once per line
+  let dedInhPattern = null;
+  let compHetDetails = null;
 
-  // Generate VL_CSQ field by combining annotations for all ALTs at this position
-  const allCsqStrings = [];
+  // --- Collect CSQ strings for all ALTs/annotations ---
   for (const [altAllele, altData] of positionGroupData.alts.entries()) {
-    if (!firstAltData) firstAltData = altData; // Capture data from the first ALT processed
+    // Capture firstAltData reliably
+    if (!firstAltData) firstAltData = altData;
+
     if (altData.annotations && altData.annotations.length > 0) {
       for (const annotation of altData.annotations) {
-        // Pass the specific ALT allele this annotation corresponds to
+        // Generate CSQ for this annotation/ALT pair
         const csqString = formatVcfCsqString(annotation, vlCsqFormatFields, altAllele);
         if (csqString) {
-          allCsqStrings.push(csqString);
+          allCsqStringsForLine.push(csqString);
         }
+
+        // --- Extract Inheritance Info ONCE per VCF line---
+        if (!inheritanceInfoFound && annotation.deducedInheritancePattern) {
+          if (typeof annotation.deducedInheritancePattern === 'object') {
+            dedInhPattern = annotation.deducedInheritancePattern.prioritizedPattern;
+            if (annotation.deducedInheritancePattern.compHetDetails) {
+              const details = annotation.deducedInheritancePattern.compHetDetails;
+              if (
+                (details.isCandidate || details.isPossible) &&
+                details.partnerVariantKeys?.length > 0
+              ) {
+                compHetDetails = {
+                  partners: details.partnerVariantKeys.join(','),
+                  gene: details.geneSymbol || '',
+                };
+              }
+            }
+          } else {
+            // Backward compatibility
+            dedInhPattern = annotation.deducedInheritancePattern;
+          }
+          inheritanceInfoFound = true; // Mark as found
+        }
+        // --- End Inheritance Info Extraction ---
       }
     }
   }
 
-  if (allCsqStrings.length > 0) {
-    infoFields.push(`VL_CSQ=${allCsqStrings.join(',')}`);
-  }
+  // --- Prepare INFO parts ---
+  const infoParts = [];
 
-  // Add original INFO fields if input was VCF, merging carefully
-  // For simplicity here, we just take INFO from the *first* ALT encountered for the position
-  // A more sophisticated merge might be needed for complex VCF inputs
-  let originalInfoString = '.';
-  if (firstAltData && firstAltData.originalInfo) {
-    // Avoid duplicating VL_CSQ if it somehow existed in original INFO
-    originalInfoString = Object.entries(firstAltData.originalInfo)
-      .filter(([key]) => key !== 'VL_CSQ')
+  // Add original INFO fields first (excluding managed tags)
+  if (firstAltData?.originalInfo) {
+    const originalInfoString = Object.entries(firstAltData.originalInfo)
+      .filter(([key]) => !['VL_CSQ', 'VL_DED_INH', 'VL_COMPHET'].includes(key))
       .map(([key, value]) => (value === true ? key : `${key}=${value}`))
       .join(';');
-  }
-
-  // Combine original INFO (if any) and new VL_CSQ
-  let finalInfoString = infoFields.join(';');
-  if (originalInfoString && originalInfoString !== '.') {
-    if (finalInfoString) {
-      finalInfoString = `${originalInfoString};${finalInfoString}`;
-    } else {
-      finalInfoString = originalInfoString;
+    if (originalInfoString) {
+      infoParts.push(originalInfoString);
     }
   }
 
-  return finalInfoString || '.'; // VCF requires '.' if INFO is empty
+  // Add VL_CSQ tag if there were consequences
+  if (allCsqStringsForLine.length > 0) {
+    infoParts.push(`VL_CSQ=${allCsqStringsForLine.join(',')}`);
+  }
+  // *** NOTE: If no CSQ strings, the tag is omitted entirely ***
+
+  // Add inheritance pattern if available and not 'unknown'
+  if (dedInhPattern && dedInhPattern !== 'unknown') {
+    infoParts.push(`VL_DED_INH=${encodeURIComponent(dedInhPattern)}`);
+  }
+
+  // Add compound heterozygous details if available
+  if (compHetDetails) {
+    infoParts.push(
+      `VL_COMPHET=${encodeURIComponent(compHetDetails.partners)}|\
+${encodeURIComponent(compHetDetails.gene)}`
+    );
+  }
+
+  // --- Join and Return ---
+  return infoParts.length > 0 ? infoParts.join(';') : '.';
 }
 
 /**
@@ -366,6 +435,8 @@ function _generateDefaultVcfHeader() {
     `##fileDate=${new Date().toISOString().slice(0, 10).replace(/-/g, '')}`,
     '##source=variant-linker',
     '##INFO=<ID=VL_CSQ,Number=.,Type=String,Description="Consequence annotations from variant-linker. Format: Allele|Consequence|IMPACT|SYMBOL|Gene|Feature_type|Feature|BIOTYPE|HGVSc|HGVSp|Protein_position|Amino_acids|Codons|SIFT|PolyPhen">',
+    '##INFO=<ID=VL_DED_INH,Number=1,Type=String,Description="Deduced inheritance pattern (VariantLinker)">',
+    '##INFO=<ID=VL_COMPHET,Number=.,Type=String,Description="Compound Het details (partner variant keys and gene)">',
     '##INFO=<ID=VARIANT_LINKER,Number=0,Type=Flag,Description="Variant processed by variant-linker">',
     '#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO',
   ];

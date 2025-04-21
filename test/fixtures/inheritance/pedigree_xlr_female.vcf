@@ -1,0 +1,8 @@
+##fileformat=VCFv4.2
+##FILTER=<ID=PASS,Description="All filters passed">
+##INFO=<ID=GENE,Number=1,Type=String,Description="Gene symbol">
+##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	PROBAND	FATHER	MOTHER
+X	100000	.	A	G	.	PASS	GENE=F8	GT	1/1	1/1	0/1
+X	200000	.	C	T	.	PASS	GENE=DMD	GT	0/0	0/0	0/0
+X	300000	.	G	A	.	PASS	GENE=F9	GT	1/1	1/1	0/1

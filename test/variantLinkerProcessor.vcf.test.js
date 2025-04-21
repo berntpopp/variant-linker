@@ -2,7 +2,6 @@
 
 const { expect } = require('chai');
 const { filterAndFormatResults } = require('../src/variantLinkerProcessor');
-const { formatAnnotationsToVcf } = require('../src/vcfFormatter');
 
 describe('VCF output formatting', () => {
   // Simulated VCF data for testing
@@ -171,70 +170,5 @@ describe('VCF output formatting', () => {
     expect(lines[0]).to.equal('##fileformat=VCFv4.2');
   });
 
-  it('should generate proper VL_CSQ format with all fields', () => {
-    // Define VL_CSQ format fields as in the original implementation
-    const vlCsqFormat = [
-      'Allele',
-      'Consequence',
-      'IMPACT',
-      'SYMBOL',
-      'Gene',
-      'Feature_type',
-      'Feature',
-      'BIOTYPE',
-      'HGVSc',
-      'HGVSp',
-      'Protein_position',
-      'Amino_acids',
-      'Codons',
-      'Existing_variation',
-      'SIFT',
-      'PolyPhen',
-    ];
-
-    const formattedResults = formatAnnotationsToVcf(
-      vcfTestData.annotationData,
-      vcfTestData.vcfRecordMap,
-      vcfTestData.vcfHeaderLines,
-      vlCsqFormat
-    );
-
-    const lines = formattedResults.split('\n');
-
-    // Find the VL_CSQ definition line
-    const csqDefLine = lines.find((line) => line.includes('##INFO=<ID=VL_CSQ'));
-    expect(csqDefLine).to.exist;
-
-    // Should include all expected fields in the format definition
-    const expectedFields = [
-      'Allele',
-      'Consequence',
-      'IMPACT',
-      'SYMBOL',
-      'Gene',
-      'Feature_type',
-      'Feature',
-      'BIOTYPE',
-      'HGVSc',
-      'HGVSp',
-    ];
-
-    expectedFields.forEach((field) => {
-      expect(csqDefLine).to.include(field);
-    });
-
-    // Check that the first variant's VL_CSQ contains the missense_variant consequence
-    const firstDataLine = lines.find((line) => line.startsWith('1\t12345'));
-    expect(firstDataLine).to.exist;
-    expect(firstDataLine).to.include('missense_variant');
-    expect(firstDataLine).to.include('MODERATE');
-    expect(firstDataLine).to.include('GENE1');
-
-    // Check that the second variant's VL_CSQ contains the synonymous_variant consequence
-    const secondDataLine = lines.find((line) => line.startsWith('2\t23456'));
-    expect(secondDataLine).to.exist;
-    expect(secondDataLine).to.include('synonymous_variant');
-    expect(secondDataLine).to.include('LOW');
-    expect(secondDataLine).to.include('GENE2');
-  });
+  // Note: Detailed VL_CSQ format testing has been moved to test/vcfFormatter.test.js
 });

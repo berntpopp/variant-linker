@@ -1,0 +1,15 @@
+##fileformat=VCFv4.2
+##reference=hg38
+##contig=<ID=1,length=248956422>
+##contig=<ID=2,length=242193529>
+##contig=<ID=7,length=159345973>
+##contig=<ID=16,length=90338345>
+##contig=<ID=X,length=156040895>
+##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	Proband	Mother	Father	Sibling1
+1	10000	.	A	G	100	PASS	.	GT	0/0	0/0	0/0	0/0
+2	20000	.	C	T	100	PASS	.	GT	0/0	0/0	0/0	0/0
+7	30000	.	G	A	100	PASS	GENE=ALPHA	GT	0/0	0/0	0/0	0/0
+7	30500	.	T	C	100	PASS	GENE=ALPHA	GT	0/0	0/0	0/0	0/0
+X	40000	.	C	T	100	PASS	.	GT	0/0	0/0	0/0	0/0
+16	50000	.	G	A	100	PASS	.	GT	0/0	0/0	0/0	0/0

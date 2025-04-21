@@ -2,6 +2,8 @@
  * @fileoverview Inheritance pattern calculator for variant-linker.
  * This module provides functions to deduce likely inheritance patterns based on
  * genotype data and family relationships.
+ * Supports detection of autosomal dominant/recessive, X-linked dominant/recessive,
+ * compound heterozygous, and de novo inheritance patterns.
  * @module inheritanceCalculator
  */
 
@@ -289,6 +291,10 @@ function deduceTrioPatterns(genotypes, sampleMap, isXChromosome) {
  * @returns {Array<string>} Array of possible patterns
  */
 function deducePedBasedPatterns(genotypes, pedigreeData, isXChromosome) {
+  if (!pedigreeData || genotypes.size === 0) {
+    return ['unknown_with_missing_data'];
+  }
+
   // Create a map to track affected and unaffected individuals
   const affectedIndividuals = new Map();
   const unaffectedIndividuals = new Map();
@@ -427,13 +433,13 @@ function deducePedBasedPatterns(genotypes, pedigreeData, isXChromosome) {
       for (const sampleId of affectedIndividuals) {
         if (!genotypes.has(sampleId)) continue;
 
-        if (maleIndividuals.has(sampleId)) {
+        if (isMale(sampleId, pedigreeData)) {
           // Affected males should be hemizygous (appears as "homozygous" in VCF)
           if (!isHomAlt(genotypes.get(sampleId)) && !isHet(genotypes.get(sampleId))) {
             xlrConsistent = false;
             xldConsistent = false;
           }
-        } else if (femaleIndividuals.has(sampleId)) {
+        } else if (isFemale(sampleId, pedigreeData)) {
           // For X-linked recessive, affected females should be homozygous
           if (!isHomAlt(genotypes.get(sampleId))) {
             xlrConsistent = false;
@@ -448,7 +454,7 @@ function deducePedBasedPatterns(genotypes, pedigreeData, isXChromosome) {
 
       // Look at carrier females (mothers of affected males)
       for (const sampleId of affectedIndividuals) {
-        if (!maleIndividuals.has(sampleId)) continue;
+        if (!isMale(sampleId, pedigreeData)) continue;
 
         const info = pedigreeData.get(sampleId);
         if (!info || info.motherId === '0' || !genotypes.has(info.motherId)) continue;
@@ -607,11 +613,14 @@ function prioritizePattern(possiblePatterns, segregationResults) {
   const priorityOrder = [
     'de_novo',
     'de_novo_possible',
+    'compound_heterozygous',
+    'compound_heterozygous_possible',
     'autosomal_recessive',
     'autosomal_recessive_possible',
     'x_linked_recessive',
     'x_linked_recessive_possible',
     'x_linked_dominant',
+    'x_linked_dominant_possible',
     'autosomal_dominant',
     'autosomal_dominant_possible',
     'homozygous',
@@ -683,6 +692,17 @@ function prioritizePattern(possiblePatterns, segregationResults) {
  * @param {string} variantInfo.chrom - Chromosome name
  * @returns {string} The deduced inheritance pattern
  */
+/**
+ * Main function to calculate the deduced inheritance pattern
+ * Creates a simplified string pattern result for backward compatibility
+ *
+ * @param {Map<string, string>} genotypes - Map of sampleId to genotype string
+ * @param {Map<string, Object>|null} pedigreeData - Family relationships from PED file
+ * @param {Object|null} sampleMap - Manual mapping of sample roles
+ * @param {Object} variantInfo - Information about the variant
+ * @param {string} variantInfo.chrom - Chromosome name
+ * @returns {string} The deduced inheritance pattern (as a string for backward compatibility)
+ */
 function calculateDeducedPattern(genotypes, pedigreeData, sampleMap, variantInfo) {
   debug('Calculating inheritance pattern');
 
@@ -722,14 +742,359 @@ function calculateDeducedPattern(genotypes, pedigreeData, sampleMap, variantInfo
   return finalPattern;
 }
 
+/**
+ * Determines if a sample is male based on sex information in pedigree data
+ *
+ * @param {string} sampleId - The sample ID to check
+ * @param {Map<string, Object>} pedigreeData - Family relationships from PED file
+ * @returns {boolean} True if the sample is male (sex=1), false otherwise
+ */
+function isMale(sampleId, pedigreeData) {
+  if (!pedigreeData || !sampleId) return false;
+  const sample = pedigreeData.get(sampleId);
+  return sample && sample.sex === '1';
+}
+
+/**
+ * Determines if a sample is female based on sex information in pedigree data
+ *
+ * @param {string} sampleId - The sample ID to check
+ * @param {Map<string, Object>} pedigreeData - Family relationships from PED file
+ * @returns {boolean} True if the sample is female (sex=2), false otherwise
+ */
+function isFemale(sampleId, pedigreeData) {
+  if (!pedigreeData || !sampleId) return false;
+  const sample = pedigreeData.get(sampleId);
+  return sample && sample.sex === '2';
+}
+
+/**
+ * Analyzes a set of variants grouped by gene to detect compound heterozygous inheritance
+ *
+ * @param {Array<Object>} geneVariants - Array of variants with the same gene symbol
+ * @param {Map<string, Map<string, string>>} genotypesMap - Map of variant keys to genotype maps
+ * @param {Map<string, Object>} pedigreeData - Family relationships from PED file
+ * @param {string} indexSampleId - The ID of the index/proband sample
+ * @returns {Object|null} Compound heterozygous analysis result or null if not applicable
+ */
+function analyzeCompoundHeterozygous(geneVariants, genotypesMap, pedigreeData, indexSampleId) {
+  if (!geneVariants || geneVariants.length < 2 || !indexSampleId || !genotypesMap) {
+    return null;
+  }
+
+  // Get heterozyous variants for the index sample
+  const hetVariants = [];
+
+  for (const variant of geneVariants) {
+    const variantKey = variant.variantKey;
+    if (!genotypesMap.has(variantKey)) continue;
+
+    const genotypes = genotypesMap.get(variantKey);
+    if (!genotypes || !genotypes.has(indexSampleId)) continue;
+
+    const indexGt = genotypes.get(indexSampleId);
+    if (isHet(indexGt)) {
+      hetVariants.push(variant);
+    }
+  }
+
+  // Need at least 2 heterozygous variants for CompHet
+  if (hetVariants.length < 2) {
+    return null;
+  }
+
+  const result = {
+    isCompHet: false,
+    isPossible: false,
+    variantKeys: hetVariants.map((v) => v.variantKey),
+    pattern: 'unknown',
+  };
+
+  // Check for parent data if available
+  if (pedigreeData && pedigreeData.size > 0) {
+    // Find parents of the index
+    const indexData = pedigreeData.get(indexSampleId);
+    if (!indexData || !indexData.father || !indexData.mother) {
+      // No parent info in pedigree, mark as possible CompHet
+      result.isPossible = true;
+      result.pattern = 'compound_heterozygous_possible';
+      return result;
+    }
+
+    const fatherId = indexData.father;
+    const motherId = indexData.mother;
+
+    // Check genotypes for each parent/variant combination
+    const paternalVariants = [];
+    const maternalVariants = [];
+
+    for (const variant of hetVariants) {
+      const variantKey = variant.variantKey;
+      const genotypes = genotypesMap.get(variantKey);
+
+      if (!genotypes) continue;
+
+      const fatherGt = genotypes.get(fatherId);
+      const motherGt = genotypes.get(motherId);
+
+      // If father has the variant but mother doesn't
+      if ((isHet(fatherGt) || isHomAlt(fatherGt)) && (isRef(motherGt) || isMissing(motherGt))) {
+        paternalVariants.push(variant);
+      }
+      // If mother has the variant but father doesn't
+      else if (
+        (isHet(motherGt) || isHomAlt(motherGt)) &&
+        (isRef(fatherGt) || isMissing(fatherGt))
+      ) {
+        maternalVariants.push(variant);
+      }
+    }
+
+    // True CompHet requires at least one variant from each parent
+    if (paternalVariants.length > 0 && maternalVariants.length > 0) {
+      result.isCompHet = true;
+      result.pattern = 'compound_heterozygous';
+      // Keep track of properly segregating variant pairs
+      result.paternalVariantKeys = paternalVariants.map((v) => v.variantKey);
+      result.maternalVariantKeys = maternalVariants.map((v) => v.variantKey);
+    } else {
+      // If we have heterozyous variants but they don't segregate correctly
+      result.isPossible = true;
+      result.pattern = 'compound_heterozygous_possible';
+    }
+  } else {
+    // No pedigree data available, mark as possible CompHet
+    result.isPossible = true;
+    result.pattern = 'compound_heterozygous_possible';
+  }
+
+  return result;
+}
+
+/**
+ * Analyzes inheritance patterns for a sample, including compound heterozygous detection
+ *
+ * @param {Array<Object>} annotations - Array of variant annotations
+ *                                    (grouped by gene if needed for CompHet detection)
+ * @param {Map<string, Map<string, string>>} genotypesMap - Map of variant keys to genotype maps
+ * @param {Map<string, Object>} pedigreeData - Family relationships from PED file
+ * @param {Object} sampleMap - Mapping of roles to sample IDs
+ * @param {string} indexSampleId - The ID of the index/proband sample
+ *                                (optional, derived from pedigree if not provided)
+ * @returns {Map<string, Object>} Map of variant keys to inheritance
+ *                                analysis results
+ */
+function analyzeInheritanceForSample(
+  annotations,
+  genotypesMap,
+  pedigreeData,
+  sampleMap,
+  indexSampleId
+) {
+  if (!annotations || !Array.isArray(annotations) || annotations.length === 0) {
+    debug('No annotations provided for inheritance analysis');
+    return new Map();
+  }
+
+  // If no index provided, try to find from pedigree (first affected) or sampleMap
+  if (!indexSampleId) {
+    if (pedigreeData && pedigreeData.size > 0) {
+      // Find first affected individual
+      for (const [sampleId, sampleData] of pedigreeData.entries()) {
+        if (sampleData.affected === '2') {
+          // '2' indicates affected in PED format
+          indexSampleId = sampleId;
+          break;
+        }
+      }
+    }
+
+    // If still no index, try sampleMap
+    if (!indexSampleId && sampleMap && sampleMap.proband) {
+      indexSampleId = sampleMap.proband;
+    } else if (!indexSampleId && sampleMap && sampleMap.index) {
+      indexSampleId = sampleMap.index;
+    }
+
+    // Still no index, use first sample from first variant
+    if (!indexSampleId && genotypesMap.size > 0) {
+      const firstGenotypes = genotypesMap.values().next().value;
+      if (firstGenotypes && firstGenotypes.size > 0) {
+        indexSampleId = firstGenotypes.keys().next().value;
+      }
+    }
+  }
+
+  if (!indexSampleId) {
+    debug('Could not determine index sample for inheritance analysis');
+    return new Map();
+  }
+
+  debug(`Using ${indexSampleId} as index sample for inheritance analysis`);
+
+  // Prepare result map
+  const results = new Map();
+
+  // First pass: Calculate standard inheritance patterns for each variant
+  for (const annotation of annotations) {
+    const variantKey = annotation.variantKey;
+    if (!variantKey || !genotypesMap.has(variantKey)) continue;
+
+    const genotypes = genotypesMap.get(variantKey);
+
+    // Calculate standard inheritance patterns
+    const variantInfo = {
+      chrom: annotation.seq_region_name || annotation.chr || '',
+    };
+
+    try {
+      // Standard pattern deduction
+      const possiblePatterns = deduceInheritancePatterns(
+        genotypes,
+        pedigreeData,
+        sampleMap,
+        variantInfo
+      );
+
+      // Check segregation if pedigree data available
+      const segregationResults = new Map();
+      if (pedigreeData && pedigreeData.size > 0) {
+        for (const pattern of possiblePatterns) {
+          if (pattern.includes('unknown') || pattern.includes('reference')) continue;
+
+          const segregationStatus = checkSegregation(pattern, genotypes, pedigreeData);
+          segregationResults.set(pattern, segregationStatus);
+        }
+      }
+
+      // Standard prioritization
+      const prioritizedPattern = prioritizePattern(possiblePatterns, segregationResults);
+
+      // Store result
+      results.set(variantKey, {
+        prioritizedPattern,
+        possiblePatterns,
+        segregationStatus: Object.fromEntries(segregationResults),
+      });
+    } catch (error) {
+      debug(`Error analyzing inheritance for variant ${variantKey}: ${error.message}`);
+      results.set(variantKey, {
+        prioritizedPattern: 'unknown',
+        possiblePatterns: ['unknown'],
+        segregationStatus: {},
+        error: error.message,
+      });
+    }
+  }
+
+  // Second pass: Group variants by gene for CompHet analysis
+  // Group annotations by gene for compound heterozygous analysis
+  const geneVariantsMap = new Map();
+
+  for (const annotation of annotations) {
+    // Skip variants without gene info or already processed
+    if (!annotation.variantKey) continue;
+
+    // Extract gene symbol from consequences
+    let geneSymbol = null;
+    if (annotation.transcript_consequences && annotation.transcript_consequences.length > 0) {
+      for (const cons of annotation.transcript_consequences) {
+        if (cons.gene_symbol) {
+          geneSymbol = cons.gene_symbol;
+          break;
+        }
+      }
+    }
+
+    // Skip if no gene symbol found
+    if (!geneSymbol) continue;
+
+    // Add to gene group
+    if (!geneVariantsMap.has(geneSymbol)) {
+      geneVariantsMap.set(geneSymbol, []);
+    }
+
+    geneVariantsMap.get(geneSymbol).push({
+      ...annotation,
+      variantKey: annotation.variantKey,
+    });
+  }
+
+  // Analyze compounds by gene
+  for (const [geneSymbol, geneVariants] of geneVariantsMap.entries()) {
+    // Skip genes with only one variant
+    if (geneVariants.length < 2) continue;
+
+    // Analyze for compound heterozygous
+    const compHetResult = analyzeCompoundHeterozygous(
+      geneVariants,
+      genotypesMap,
+      pedigreeData,
+      indexSampleId
+    );
+
+    if (compHetResult && (compHetResult.isCompHet || compHetResult.isPossible)) {
+      // Update result for each variant in the compound
+      for (const variantKey of compHetResult.variantKeys) {
+        if (results.has(variantKey)) {
+          const currentResult = results.get(variantKey);
+
+          // Enhance the result with compound heterozygous information
+          const enhancedResult = {
+            ...currentResult,
+            // Only override the pattern if CompHet is confirmed or no strong pattern exists
+            prioritizedPattern: compHetResult.isCompHet
+              ? 'compound_heterozygous'
+              : currentResult.prioritizedPattern.includes('de_novo')
+                ? currentResult.prioritizedPattern
+                : compHetResult.pattern,
+            // Add to possible patterns
+            possiblePatterns: [
+              ...new Set([...(currentResult.possiblePatterns || []), compHetResult.pattern]),
+            ],
+            // Add CompHet details
+            compHetDetails: {
+              isCandidate: compHetResult.isCompHet,
+              isPossible: compHetResult.isPossible,
+              geneSymbol,
+              partnerVariantKeys: compHetResult.variantKeys.filter((k) => k !== variantKey),
+            },
+          };
+
+          // Update segregation status if needed
+          if (compHetResult.isCompHet) {
+            enhancedResult.segregationStatus = {
+              ...enhancedResult.segregationStatus,
+              compound_heterozygous: 'segregates',
+            };
+          } else if (compHetResult.isPossible) {
+            enhancedResult.segregationStatus = {
+              ...enhancedResult.segregationStatus,
+              compound_heterozygous_possible: 'unknown',
+            };
+          }
+
+          results.set(variantKey, enhancedResult);
+        }
+      }
+    }
+  }
+
+  return results;
+}
+
 module.exports = {
   calculateDeducedPattern,
   deduceInheritancePatterns,
   checkSegregation,
   prioritizePattern,
+  analyzeInheritanceForSample,
+  analyzeCompoundHeterozygous,
   isRef,
   isHet,
   isHomAlt,
   isVariant,
   isMissing,
+  isMale,
+  isFemale,
 };

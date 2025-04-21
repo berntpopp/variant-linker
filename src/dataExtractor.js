@@ -17,148 +17,190 @@ const debug = require('debug')('variant-linker:data-extractor');
  * - defaultValue: Value to use if the path is not found
  * - formatter: Optional function to format the extracted value
  */
-const defaultColumnConfig = [
-  {
-    header: 'OriginalInput',
-    path: 'input',
-    isConsequenceLevel: false,
-    defaultValue: '',
-  },
-  {
-    header: 'VEPInput',
-    path: 'id',
-    isConsequenceLevel: false,
-    defaultValue: '',
-  },
-  {
-    header: 'Location',
-    path: 'seq_region_name',
-    isConsequenceLevel: false,
-    defaultValue: '',
-    formatter: (value, obj) => {
-      if (!value) return '';
-      const start = obj.start || '';
-      const end = obj.end || '';
-      const strand = obj.strand || '';
-      return `${value}:${start}-${end}(${strand})`;
+/**
+ * Gets the default column configuration for data extraction.
+ * @param {Object} options - Optional settings for column generation
+ * @param {boolean} options.includeInheritance - Whether to include inheritance pattern columns
+ * @returns {Array} Array of column configuration objects
+ */
+function getDefaultColumnConfig(options = {}) {
+  const { includeInheritance = false } = options;
+
+  // Start with core columns that are always included
+  const defaultColumns = [
+    {
+      header: 'OriginalInput',
+      path: 'input',
+      isConsequenceLevel: false,
+      defaultValue: '',
     },
-  },
-  {
-    header: 'Allele',
-    path: 'allele_string',
-    isConsequenceLevel: false,
-    defaultValue: '',
-  },
-  {
-    header: 'MostSevereConsequence',
-    path: 'most_severe_consequence',
-    isConsequenceLevel: false,
-    defaultValue: '',
-  },
-  {
-    header: 'Impact',
-    path: 'impact',
-    isConsequenceLevel: true,
-    defaultValue: '',
-  },
-  {
-    header: 'GeneSymbol',
-    path: 'gene_symbol',
-    isConsequenceLevel: true,
-    defaultValue: '',
-  },
-  {
-    header: 'GeneID',
-    path: 'gene_id',
-    isConsequenceLevel: true,
-    defaultValue: '',
-  },
-  {
-    header: 'FeatureType',
-    path: 'feature_type',
-    isConsequenceLevel: true,
-    defaultValue: '',
-  },
-  {
-    header: 'TranscriptID',
-    path: 'transcript_id',
-    isConsequenceLevel: true,
-    defaultValue: '',
-  },
-  {
-    header: 'ConsequenceTerms',
-    path: 'consequence_terms',
-    isConsequenceLevel: true,
-    defaultValue: '',
-    formatter: (value) => (Array.isArray(value) ? value.join('&') : value),
-  },
-  {
-    header: 'MANE',
-    path: 'mane',
-    isConsequenceLevel: true,
-    defaultValue: '',
-  },
-  {
-    header: 'HGVSc',
-    path: 'hgvsc',
-    isConsequenceLevel: true,
-    defaultValue: '',
-  },
-  {
-    header: 'HGVSp',
-    path: 'hgvsp',
-    isConsequenceLevel: true,
-    defaultValue: '',
-  },
-  {
-    header: 'ProteinPosition',
-    path: 'protein_start',
-    isConsequenceLevel: true,
-    defaultValue: '',
-    formatter: (value, obj) => {
-      if (!value) return '';
-      const end = obj.protein_end || value;
-      return `${value}-${end}`;
+  ];
+
+  // Add inheritance pattern columns if requested
+  if (includeInheritance) {
+    defaultColumns.push(
+      {
+        header: 'DeducedInheritancePattern',
+        path: 'deducedInheritancePattern.prioritizedPattern',
+        isConsequenceLevel: false,
+        defaultValue: '',
+      },
+      {
+        header: 'CompHetPartner',
+        path: 'deducedInheritancePattern.compHetDetails.partnerVariantKeys',
+        isConsequenceLevel: false,
+        defaultValue: '',
+        formatter: (value) => (Array.isArray(value) ? value.join(',') : value),
+      },
+      {
+        header: 'CompHetGene',
+        path: 'deducedInheritancePattern.compHetDetails.geneSymbol',
+        isConsequenceLevel: false,
+        defaultValue: '',
+      }
+    );
+  }
+
+  // Add remaining standard columns
+  defaultColumns.push(
+    {
+      header: 'VEPInput',
+      path: 'id',
+      isConsequenceLevel: false,
+      defaultValue: '',
     },
-  },
-  {
-    header: 'Amino_acids',
-    path: 'amino_acids',
-    isConsequenceLevel: true,
-    defaultValue: '',
-  },
-  {
-    header: 'Codons',
-    path: 'codons',
-    isConsequenceLevel: true,
-    defaultValue: '',
-  },
-  {
-    header: 'ExistingVariation',
-    path: 'existing_variation',
-    isConsequenceLevel: false,
-    defaultValue: '',
-    formatter: (value) => (Array.isArray(value) ? value.join('&') : value),
-  },
-  {
-    header: 'CADD',
-    path: 'cadd_phred',
-    isConsequenceLevel: false,
-    defaultValue: '',
-  },
-  {
-    header: 'SIFT',
-    path: 'transcript_consequences.*.sift_prediction',
-    isConsequenceLevel: true,
-    defaultValue: '',
-  },
-  {
-    header: 'PolyPhen',
-    path: 'transcript_consequences.*.polyphen_prediction',
-    isConsequenceLevel: true,
-    defaultValue: '',
-  },
-];
+    {
+      header: 'Location',
+      path: 'seq_region_name',
+      isConsequenceLevel: false,
+      defaultValue: '',
+      formatter: (value, obj) => {
+        if (!value) return '';
+        const start = obj.start || '';
+        const end = obj.end || '';
+        const strand = obj.strand || '';
+        return `${value}:${start}-${end}(${strand})`;
+      },
+    },
+    {
+      header: 'Allele',
+      path: 'allele_string',
+      isConsequenceLevel: false,
+      defaultValue: '',
+    },
+    {
+      header: 'MostSevereConsequence',
+      path: 'most_severe_consequence',
+      isConsequenceLevel: false,
+      defaultValue: '',
+    },
+    {
+      header: 'Impact',
+      path: 'impact',
+      isConsequenceLevel: true,
+      defaultValue: '',
+    },
+    {
+      header: 'GeneSymbol',
+      path: 'gene_symbol',
+      isConsequenceLevel: true,
+      defaultValue: '',
+    },
+    {
+      header: 'GeneID',
+      path: 'gene_id',
+      isConsequenceLevel: true,
+      defaultValue: '',
+    },
+    {
+      header: 'FeatureType',
+      path: 'feature_type',
+      isConsequenceLevel: true,
+      defaultValue: '',
+    },
+    {
+      header: 'TranscriptID',
+      path: 'transcript_id',
+      isConsequenceLevel: true,
+      defaultValue: '',
+    },
+    {
+      header: 'ConsequenceTerms',
+      path: 'consequence_terms',
+      isConsequenceLevel: true,
+      defaultValue: '',
+      formatter: (value) => (Array.isArray(value) ? value.join('&') : value),
+    },
+    {
+      header: 'MANE',
+      path: 'mane',
+      isConsequenceLevel: true,
+      defaultValue: '',
+    },
+    {
+      header: 'HGVSc',
+      path: 'hgvsc',
+      isConsequenceLevel: true,
+      defaultValue: '',
+    },
+    {
+      header: 'HGVSp',
+      path: 'hgvsp',
+      isConsequenceLevel: true,
+      defaultValue: '',
+    },
+    {
+      header: 'ProteinPosition',
+      path: 'protein_start',
+      isConsequenceLevel: true,
+      defaultValue: '',
+      formatter: (value, obj) => {
+        if (!value) return '';
+        const end = obj.protein_end || value;
+        return `${value}-${end}`;
+      },
+    },
+    {
+      header: 'Amino_acids',
+      path: 'amino_acids',
+      isConsequenceLevel: true,
+      defaultValue: '',
+    },
+    {
+      header: 'Codons',
+      path: 'codons',
+      isConsequenceLevel: true,
+      defaultValue: '',
+    },
+    {
+      header: 'ExistingVariation',
+      path: 'existing_variation',
+      isConsequenceLevel: false,
+      defaultValue: '',
+      formatter: (value) => (Array.isArray(value) ? value.join('&') : value),
+    },
+    {
+      header: 'CADD',
+      path: 'cadd_phred',
+      isConsequenceLevel: false,
+      defaultValue: '',
+    },
+    {
+      header: 'SIFT',
+      path: 'transcript_consequences.*.sift_prediction',
+      isConsequenceLevel: true,
+      defaultValue: '',
+    },
+    {
+      header: 'PolyPhen',
+      path: 'transcript_consequences.*.polyphen_prediction',
+      isConsequenceLevel: true,
+      defaultValue: '',
+    }
+  );
+
+  return defaultColumns;
+}
 
 /**
  * Extracts a field value from an object based on field configuration.
@@ -256,7 +298,7 @@ function extractField(dataObject, fieldConfig) {
  * @param {Array<Object>} columnConfig - Configuration for columns to extract
  * @returns {Array<Object>} Flattened array of row objects
  */
-function flattenAnnotationData(annotationData, columnConfig = defaultColumnConfig) {
+function flattenAnnotationData(annotationData, columnConfig = getDefaultColumnConfig()) {
   if (!Array.isArray(annotationData)) {
     debug('Warning: annotationData is not an array');
     return [];
@@ -324,7 +366,7 @@ function flattenAnnotationData(annotationData, columnConfig = defaultColumnConfi
  */
 function formatToTabular(
   flatRows,
-  columnConfig = defaultColumnConfig,
+  columnConfig = getDefaultColumnConfig(),
   delimiter,
   includeHeader = true
 ) {
@@ -375,11 +417,19 @@ function formatToTabular(
 /**
  * Maps VCF CSQ field names (VEP style) to paths within the annotation object
  * or provides special handling logic.
- * Uses defaultColumnConfig as a base where possible.
+ * Uses getDefaultColumnConfig() as a base where possible.
  */
 const csqFieldMapping = {
   Allele: (ann, alt) => alt || '', // Special case: Use provided ALT
-  Consequence: (ann) => ann?.most_severe_consequence || '', // Direct mapping
+  Consequence: (ann) => {
+    // Get consequence terms from the first transcript consequence
+    const cons = ann?.transcript_consequences?.[0];
+    if (cons?.consequence_terms?.length > 0) {
+      return cons.consequence_terms.join('&');
+    }
+    // Fallback to most_severe_consequence if no transcript consequences
+    return ann?.most_severe_consequence || '';
+  },
   IMPACT: (ann) => {
     // Find impact from the most severe consequence within the transcript_consequences array
     const cons = ann?.transcript_consequences?.find((c) =>
@@ -461,33 +511,43 @@ function formatVcfCsqString(annotation, csqFormatFields, altAllele) {
     return '';
   }
 
-  const values = csqFormatFields.map((fieldName) => {
-    const handler = csqFieldMapping[fieldName];
-    let value = '';
-    if (typeof handler === 'function') {
-      value = handler(annotation, altAllele); // Pass annotation and altAllele
-    } else {
-      // Basic fallback: Look for a direct property match (lowercase)
-      value = annotation[fieldName.toLowerCase()] || '';
-      debug(
-        `Warning: No specific CSQ handler for field '${fieldName}'. ` +
-          'Using direct property lookup.'
-      );
-    }
+  // Check if there are any consequences before generating CSQ string
+  if (!annotation.transcript_consequences || annotation.transcript_consequences.length === 0) {
+    return '';
+  }
 
-    // Sanitize value: replace pipes, semicolons, commas, equals, spaces with underscore or encode?
-    // VEP uses URL encoding for problematic characters within fields.
-    // Simple approach: replace common delimiters. More robust: URL encode.
-    // For now, just ensure it's a string and handle null/undefined.
-    value = value === null || value === undefined ? '' : String(value);
+  // Generate a CSQ string for each transcript consequence
+  const csqStrings = annotation.transcript_consequences.map((consequence) => {
+    const values = csqFormatFields.map((fieldName) => {
+      const handler = csqFieldMapping[fieldName];
+      let value = '';
+      if (typeof handler === 'function') {
+        // Create a modified annotation with just this consequence
+        const annotationWithSingleConsequence = {
+          ...annotation,
+          transcript_consequences: [consequence],
+        };
+        value = handler(annotationWithSingleConsequence, altAllele);
+      } else {
+        // Basic fallback: Look for a direct property match (lowercase)
+        value = annotation[fieldName.toLowerCase()] || '';
+        debug(
+          `Warning: No specific CSQ handler for field '${fieldName}'. ` +
+            'Using direct property lookup.'
+        );
+      }
 
-    // Replace problematic characters (simple approach)
-    // return value.replace(/[|;,=\s]/g, '_');
-    // VEP standard: URL-encode
-    return encodeURIComponent(value);
+      // Ensure value is a string and handle null/undefined
+      value = value === null || value === undefined ? '' : String(value);
+
+      // VEP standard: URL-encode
+      return encodeURIComponent(value);
+    });
+
+    return values.join('|');
   });
 
-  return values.join('|');
+  return csqStrings.join(',');
 }
 
 module.exports = {
@@ -495,5 +555,5 @@ module.exports = {
   flattenAnnotationData,
   formatToTabular,
   formatVcfCsqString, // Export the new function
-  defaultColumnConfig,
+  getDefaultColumnConfig, // Export the function instead of the static array
 };

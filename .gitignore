@@ -50,3 +50,8 @@ clinvar_*.txt
 !examples/*.vcf
 !examples/benchmark_data/*.vcf
 !test/fixtures/*.vcf
+!test/fixtures/inheritance/*.vcf
+
+# Allow PED files in test fixtures for inheritance testing
+*.ped
+!test/fixtures/inheritance/*.ped
