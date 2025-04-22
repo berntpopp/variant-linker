@@ -428,6 +428,7 @@ async function analyzeVariant(params) {
   const batchProcessing = variants.length > 1 || Boolean(params.vcfInput); // vcfInput flag makes it batch
 
   let result;
+  let inheritanceCalculated = false; // Flag to track if inheritance was run
 
   // If input is VCF, VEP is called directly, no need for separate recoding step
   if (params.vcfInput) {
@@ -498,54 +499,10 @@ async function analyzeVariant(params) {
     }
   }
 
-  const processEndTime = new Date();
-  // ** FIX: Use the correctly calculated batchProcessing variable **
-
-  // *** Add Debugging right before metaInfo creation ***
-  debugDetailed(`analyzeVariant: Before metaInfo creation - batchProcessing = ${batchProcessing}`);
-
-  const metaInfo = {
-    input: batchProcessing ? variants : variants[0],
-    batchSize: variants.length,
-    stepsPerformed,
-    startTime: processStartTime.toISOString(),
-    endTime: processEndTime.toISOString(),
-    durationMs: processEndTime - processStartTime,
-    batchProcessing, // Use the calculated flag
-  };
-
-  // *** Add Debugging right after metaInfo creation ***
-  debugDetailed(`analyzeVariant: metaInfo object created: ${JSON.stringify(metaInfo)}`);
-
-  // ** FIX: Construct finalOutput ensuring metaInfo overwrites any previous meta **
-  let finalOutput = {
-    ...result, // Spread the result from processing (contains annotationData, potentially variantData)
-    meta: metaInfo, // Explicitly set the correct meta object
-  };
-
-  // Ensure annotationData exists if result didn't provide it (shouldn't happen, but defensive)
-  finalOutput.annotationData = finalOutput.annotationData || [];
-
-  // Add VCF data to finalOutput if present in params
-  if (params.vcfRecordMap && params.vcfHeaderLines) {
-    finalOutput.vcfRecordMap = params.vcfRecordMap;
-    finalOutput.vcfHeaderLines = params.vcfHeaderLines;
-  }
-
-  // Add pedigree data to finalOutput if present in params
-  if (params.pedigreeData) {
-    // Convert Map to a serializable object for the output
-    const pedigreeObject = {};
-    params.pedigreeData.forEach((value, key) => {
-      pedigreeObject[key] = value;
-    });
-    finalOutput.pedigreeData = pedigreeObject;
-    stepsPerformed.push('Added pedigree data from PED file.');
-  }
-
   // Calculate inheritance patterns if enabled
   if (params.calculateInheritance) {
     debug('Calculating inheritance patterns for variant annotations');
+    inheritanceCalculated = true; // Mark that we attempted calculation
 
     // Create a map of variant keys to genotype data
     const genotypesMap = new Map();
@@ -564,12 +521,12 @@ async function analyzeVariant(params) {
     } else {
       // Fallback attempt (might be less reliable if keys aren't standardized yet)
       debugDetailed(`Attempting to build genotypesMap from annotationData (fallback)...`);
-      if (!finalOutput || !Array.isArray(finalOutput.annotationData)) {
+      if (!result || !Array.isArray(result.annotationData)) { // Use result here
         debugDetailed(
-          'Error: finalOutput.annotationData is not available or not an array before building genotypesMap (fallback).'
+          'Error: result.annotationData is not available or not an array before building genotypesMap (fallback).'
         );
       } else {
-        for (const annotation of finalOutput.annotationData) {
+        for (const annotation of result.annotationData) {
           const key = annotation.variantKey; // Use the key assigned earlier
           if (key && annotation.genotypes && annotation.genotypes.size > 0) {
             // Assuming genotypes might be attached directly (less likely now)
@@ -603,6 +560,7 @@ async function analyzeVariant(params) {
         stepsPerformed.push('CRITICAL ERROR: Failed to load inheritance module.');
         // Skip further inheritance processing if require failed
         inheritance = null; // Ensure it's null
+        inheritanceCalculated = false; // Mark calculation as failed/skipped
       }
 
       if (inheritance && inheritance.analyzeInheritanceForSample) {
@@ -612,7 +570,7 @@ async function analyzeVariant(params) {
         debugDetailed('Inheritance Core: Preparing to call analyzeInheritanceForSample...');
         try {
           const inheritanceResults = inheritance.analyzeInheritanceForSample(
-            finalOutput.annotationData, // Pass annotations which now should have variantKey
+            result.annotationData, // Pass annotations which now should have variantKey
             genotypesMap, // Pass the map built from vcfRecordMap
             params.pedigreeData,
             params.sampleMap
@@ -627,9 +585,9 @@ async function analyzeVariant(params) {
           if (inheritanceResults instanceof Map) {
             // *** DEBUG POINT 12: Merging Inheritance Results ***
             debugDetailed(
-              `analyzeVariant: Merging inheritance results into ${finalOutput.annotationData?.length} annotations...`
+              `analyzeVariant: Merging inheritance results into ${result.annotationData?.length} annotations...`
             );
-            for (const annotation of finalOutput.annotationData) {
+            for (const annotation of result.annotationData) {
               const keyToLookup = annotation.variantKey; // Use the key assigned earlier
               if (keyToLookup && inheritanceResults.has(keyToLookup)) {
                 const inheritanceData = inheritanceResults.get(keyToLookup);
@@ -651,9 +609,9 @@ async function analyzeVariant(params) {
             }
             if (calculatedPatternsCount > 0) {
               stepsPerformed.push(
-                `Analyzed ${calculatedPatternsCount} variants (including compound heterozygous).`
+                `Analyzed inheritance for ${calculatedPatternsCount} variants (including compound heterozygous).`
               );
-            } else if (finalOutput.annotationData.length > 0) {
+            } else if (result.annotationData.length > 0) {
               stepsPerformed.push(
                 'Inheritance patterns calculated, but no results matched annotations.'
               );
@@ -663,7 +621,8 @@ async function analyzeVariant(params) {
             stepsPerformed.push(
               'Error: Inheritance analysis function returned unexpected data type.'
             );
-            for (const annotation of finalOutput.annotationData) {
+            inheritanceCalculated = false; // Mark as failed
+            for (const annotation of result.annotationData) {
               annotation.deducedInheritancePattern = {
                 prioritizedPattern: 'error_unexpected_result_type',
                 possiblePatterns: [],
@@ -675,7 +634,8 @@ async function analyzeVariant(params) {
           console.error('Error during inheritance analysis:', analysisError);
           debugDetailed(`Inheritance analysis error: ${analysisError.message}`);
           stepsPerformed.push('Error during inheritance pattern analysis.');
-          for (const annotation of finalOutput.annotationData) {
+          inheritanceCalculated = false; // Mark as failed
+          for (const annotation of result.annotationData) {
             annotation.deducedInheritancePattern = {
               prioritizedPattern: 'error_analysis_failed',
               possiblePatterns: [],
@@ -689,11 +649,51 @@ async function analyzeVariant(params) {
           '!!! ERROR: inheritance module loaded, but analyzeInheritanceForSample function not found!'
         );
         stepsPerformed.push('CRITICAL ERROR: Inheritance analysis function missing.');
+        inheritanceCalculated = false; // Mark as failed
       }
     } else {
       stepsPerformed.push('No inheritance patterns could be calculated (missing genotype data).');
+      inheritanceCalculated = false; // Mark calculation as skipped/failed
     }
   }
+
+  const processEndTime = new Date();
+  const metaInfo = {
+    input: batchProcessing ? variants : variants[0],
+    batchSize: variants.length,
+    stepsPerformed,
+    startTime: processStartTime.toISOString(),
+    endTime: processEndTime.toISOString(),
+    durationMs: processEndTime - processStartTime,
+    batchProcessing, // Use the calculated flag
+    inheritanceCalculated, // Add the flag here
+  };
+
+  let finalOutput = {
+    ...result, // Spread the result from processing (contains annotationData, potentially variantData)
+    meta: metaInfo, // Explicitly set the correct meta object
+  };
+
+  // Ensure annotationData exists if result didn't provide it
+  finalOutput.annotationData = finalOutput.annotationData || [];
+
+  // Add VCF data to finalOutput if present in params
+  if (params.vcfRecordMap && params.vcfHeaderLines) {
+    finalOutput.vcfRecordMap = params.vcfRecordMap;
+    finalOutput.vcfHeaderLines = params.vcfHeaderLines;
+  }
+
+  // Add pedigree data to finalOutput if present in params
+  if (params.pedigreeData) {
+    // Convert Map to a serializable object for the output
+    const pedigreeObject = {};
+    params.pedigreeData.forEach((value, key) => {
+      pedigreeObject[key] = value;
+    });
+    finalOutput.pedigreeData = pedigreeObject;
+    // stepsPerformed already includes PED message from main.js
+  }
+
 
   // *** DEBUG POINT 13: Final Annotation Data Before Formatting ***
   debugDetailed(
@@ -736,7 +736,7 @@ async function analyzeVariant(params) {
 
   // *** Add Debugging right before returning finalOutput ***
   debugDetailed(
-    `analyzeVariant: Returning finalOutput. meta.batchProcessing = ${finalOutput?.meta?.batchProcessing}`
+    `analyzeVariant: Returning finalOutput. meta.inheritanceCalculated = ${finalOutput?.meta?.inheritanceCalculated}, meta.batchProcessing = ${finalOutput?.meta?.batchProcessing}`
   );
   return finalOutput;
 }

@@ -330,16 +330,21 @@ function filterAndFormatResults(results, filterParam, format) {
         ? filteredResults.annotationData
         : [];
 
-      // Flatten the nested annotation data using the "flatten by consequence" strategy
-      // Don't include inheritance columns for backward compatibility with tests
-      const columnConfig = getDefaultColumnConfig({ includeInheritance: false });
+      // *** FIX: Conditionally include inheritance columns ***
+      // Check the flag set in variantLinkerCore.js
+      const includeInheritanceCols = Boolean(filteredResults.meta?.inheritanceCalculated);
+      debug(`Include inheritance columns in ${format.toUpperCase()}: ${includeInheritanceCols}`);
+      const columnConfig = getDefaultColumnConfig({ includeInheritance: includeInheritanceCols });
+
       const flatRows = flattenAnnotationData(annotationToUse, columnConfig);
 
       // Format the flattened data as CSV/TSV
       formattedResults = formatToTabular(flatRows, columnConfig, delimiter, true);
 
+      // Update meta message
+      const inheritanceMsg = includeInheritanceCols ? ' with inheritance columns' : '';
       filteredResults.meta.stepsPerformed.push(
-        `Formatted output as ${format.toUpperCase()} using flatten-by-consequence strategy` +
+        `Formatted output as ${format.toUpperCase()}${inheritanceMsg} using flatten-by-consequence strategy` +
           ` with ${flatRows.length} rows`
       );
       break;
