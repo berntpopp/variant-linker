@@ -110,7 +110,7 @@ function validateParams(params) {
     throw new Error('Missing required parameter: output');
   }
 
-  if (!validOutputs.includes(params.output)) {
+  if (!validOutputs.includes(params.output.toUpperCase())) { // Convert to uppercase for comparison
     throw new Error(
       `Invalid output format: ${params.output}. Valid formats are ${validOutputs.join(', ')}`
     );
@@ -133,12 +133,17 @@ function validateParams(params) {
  */
 function mergeParams(configParams, cliParams) {
   const merged = { ...configParams, ...cliParams };
-  const shortOptions = ['c', 'v', 'vf', 'vs', 'o', 's', 'd', 'vp', 'rp', 'scp', 'lf', 'sv', 'f'];
+  // Ensure all short options used in yargs are removed
+  const shortOptions = ['c', 'v', 'vf', 'vs', 'o', 's', 'd', 'vp', 'rp', 'scp', 'lf', 'sv', 'f', 'p', 'ci', 'sm', 'vi', 'C', 'of', 'h', 'V'];
   shortOptions.forEach((option) => {
     delete merged[option];
   });
+  // Also remove placeholder args often added by yargs
+  delete merged['_'];
+  delete merged['$0'];
   return merged;
 }
+
 
 /**
  * Enables debug logging according to the specified debug level.
@@ -151,13 +156,19 @@ function enableDebugging(debugLevel, logFilePath) {
   if (debugLevel >= 3) namespaces += ',variant-linker:all';
   require('debug').enable(namespaces);
   if (logFilePath) {
-    const logStream = fs.createWriteStream(logFilePath, { flags: 'w' });
-    const overrideLog = (msg) => {
-      logStream.write(`[${new Date().toISOString()}] ${msg.replace(/\x1b\[[0-9;]*m/g, '')}\n`);
-    };
-    debug.log = overrideLog;
-    debugDetailed.log = overrideLog;
-    debugAll.log = overrideLog;
+    try {
+      const logStream = fs.createWriteStream(logFilePath, { flags: 'w' });
+      const overrideLog = (msg) => {
+        // Basic sanitization to remove ANSI color codes before writing
+        logStream.write(`[${new Date().toISOString()}] ${msg.replace(/\x1b\[[0-9;]*m/g, '')}\n`);
+      };
+      debug.log = overrideLog;
+      debugDetailed.log = overrideLog;
+      debugAll.log = overrideLog;
+    } catch (err) {
+        console.error(`Error creating log file '${logFilePath}': ${err.message}`);
+        // Continue without file logging if stream creation fails
+    }
   }
   debug('Debug mode enabled');
 }
@@ -169,19 +180,25 @@ function enableDebugging(debugLevel, logFilePath) {
  * @return {Object} The parsed parameters object with defaults applied
  */
 function parseOptionalParameters(paramString, defaultParams) {
-  const options = { ...defaultParams };
+  const options = { ...defaultParams }; // Start with defaults
   if (paramString) {
     const paramsArray = paramString.split(',');
     paramsArray.forEach((param) => {
       const [key, value] = param.split('=');
-      if (key && value) options[key] = value;
+      const trimmedKey = key.trim();
+      if (trimmedKey && value !== undefined) { // Check value is not undefined
+         options[trimmedKey] = value.trim(); // Trim key/value
+      } else if (trimmedKey) {
+         // Handle flags (parameters without '=value') - Set to '1' as per VEP convention
+         options[trimmedKey] = '1';
+      }
     });
   }
-  return options;
+  return options; // Return merged options
 }
 
 // Set up CLI options using yargs.
-const argv = yargs
+const argv = yargs(process.argv.slice(2)) // Use process.argv.slice(2) for better compatibility
   .option('config', { alias: 'c', description: 'Path to configuration file', type: 'string' })
   .option('variant', {
     alias: 'v',
@@ -200,21 +217,20 @@ const argv = yargs
   })
   .option('output', {
     alias: 'o',
-    description: 'Output format (JSON, CSV, SCHEMA)',
+    description: 'Output format (JSON, CSV, TSV, SCHEMA, VCF)',
     type: 'string',
     default: 'JSON',
   })
   .option('output-file', {
     alias: 'of',
-    description: 'Output file path',
+    description: 'Output file path (alternative to --save)', // Clarified description
     type: 'string',
   })
   .option('save', { alias: 's', description: 'Filename to save the results', type: 'string' })
   .option('debug', {
     alias: 'd',
-    description: 'Enable debug mode (multiple -d increase level)',
-    count: true,
-    type: 'number',
+    description: 'Enable debug mode (level 1=basic, 2=detailed, 3=all)', // Clarified description
+    type: 'count', // Keep as count
   })
   .option('vep_params', {
     alias: 'vp',
@@ -231,7 +247,7 @@ const argv = yargs
     description: 'Path to scoring configuration directory',
     type: 'string',
   })
-  .option('log_file', {
+  .option('log_file', { // Keep snake_case for consistency with README example
     alias: 'lf',
     description: 'Path to log file for debug info',
     type: 'string',
@@ -291,6 +307,10 @@ const argv = yargs
     'variant-linker --variants "rs123,ENST00000366667:c.803C>T" --output JSON',
     'Process multiple variants from a comma-separated list'
   )
+  .example(
+      'variant-linker --vcf-input input.vcf --output VCF --save output.vcf',
+      'Annotate a VCF file and save the output'
+   )
   .epilogue('For more information, see https://github.com/berntpopp/variant-linker')
   .help()
   .alias('help', 'h')
@@ -298,105 +318,133 @@ const argv = yargs
   .alias('version', 'V')
   .showHelpOnFail(true)
   .check((argv) => {
-    // Show help if no parameters provided
-    if (process.argv.length <= 2) {
+    // Show help if no parameters provided and not called with specific flags like --version or --help
+    const helpOrVersionFlags = ['h', 'help', 'V', 'version', 'sv', 'semver'];
+    const hasOtherFlags = Object.keys(argv).some(key => !helpOrVersionFlags.includes(key) && key !== '_' && key !== '$0');
+
+    if (process.argv.length <= 2 && !hasOtherFlags) {
       yargs.showHelp();
-      // Instead of exit, return false to indicate no further processing needed
       return false;
     }
     return true;
-  }).argv;
+  })
+  .strict() // Add strict mode to catch unknown options
+  .parse(); // Use parse() instead of accessing .argv directly
 
-if (argv.semver) {
-  const { getVersionDetails } = require('./version');
-  const details = getVersionDetails();
-  console.log('Semantic Version Details:');
-  console.log(`Version: ${details.version}`);
-  console.log(`Major: ${details.major}`);
-  console.log(`Minor: ${details.minor}`);
-  console.log(`Patch: ${details.patch}`);
-  if (details.prerelease.length > 0) console.log(`Prerelease: ${details.prerelease.join('.')}`);
-  if (details.build.length > 0) console.log(`Build Metadata: ${details.build.join('.')}`);
-  // Return instead of exit to allow proper cleanup
-  return true;
+// --- Main execution logic ---
+
+// Exit early if help or version was requested and handled by yargs
+if (argv.help || argv.version || argv.semver) {
+    // yargs handles showing help/version, semver is handled below
+    if (argv.semver) {
+      const { getVersionDetails } = require('./version');
+      const details = getVersionDetails();
+      console.log('Semantic Version Details:');
+      console.log(`Version: ${details.version}`);
+      console.log(`Major: ${details.major}`);
+      console.log(`Minor: ${details.minor}`);
+      console.log(`Patch: ${details.patch}`);
+      if (details.prerelease.length > 0) console.log(`Prerelease: ${details.prerelease.join('.')}`);
+      if (details.build.length > 0) console.log(`Build Metadata: ${details.build.join('.')}`);
+    }
+    return; // Exit cleanly
 }
 
-let configParams;
+
+let configParams = {}; // Initialize to empty object
 try {
-  configParams = readConfigFile(argv.config);
+  if (argv.config) { // Only read if config path is provided
+     configParams = readConfigFile(argv.config);
+  }
 } catch (error) {
   handleError(error);
+  return; // Stop execution if config reading fails
 }
+
+// Merge CLI args over config file args
 const mergedParams = mergeParams(configParams, argv);
 
 try {
   validateParams(mergedParams);
 } catch (error) {
   handleError(error);
+  return; // Stop execution if validation fails
 }
 
-if (mergedParams.debug) {
-  enableDebugging(mergedParams.debug, mergedParams.log_file);
+// Enable debugging *after* validation and merging
+if (mergedParams.debug > 0) { // Check if debug count is > 0
+  enableDebugging(mergedParams.debug, mergedParams.log_file); // Use mergedParams.log_file
 }
 
+// Set assembly and base URL
 mergedParams.assembly = mergedParams.assembly || 'hg38';
 if (!process.env.ENSEMBL_BASE_URL) {
   process.env.ENSEMBL_BASE_URL = getBaseUrl(mergedParams.assembly);
+  debug(`Set ENSEMBL_BASE_URL based on assembly '${mergedParams.assembly}': ${process.env.ENSEMBL_BASE_URL}`);
+} else {
+    debug(`Using existing ENSEMBL_BASE_URL from environment: ${process.env.ENSEMBL_BASE_URL}`);
 }
 
+
 /**
- * Main function that processes variant analysis based on merged parameters.
- * It handles the entire workflow from parsing options to returning results.
+ * Main async function for analysis.
  * @returns {Promise<void>} Resolves when processing is complete
  */
-async function main() {
+async function runAnalysis() { // Renamed to avoid conflict with module name
   try {
     debug('Starting variant analysis process');
 
+    // Parse optional parameters *after* merging CLI and config
+    const recoderOptions = parseOptionalParameters(mergedParams.recoder_params, {
+      vcf_string: '1',
+    });
+    const vepOptions = parseOptionalParameters(mergedParams.vep_params, {
+      CADD: '1',
+      hgvs: '1',
+      merged: '1',
+      mane: '1',
+    });
+    // Log detailed options for debugging *after* parsing
+    debugDetailed(
+        `Parsed options -> recoderOptions: ${JSON.stringify(recoderOptions)},` +
+        ` vepOptions: ${JSON.stringify(vepOptions)}`
+      );
+
     // Collect variants from all possible sources
     let variants = [];
-    const vcfRecordMap = new Map();
-    let vcfHeaderLines;
-
-    // Process VCF input if provided
-    let variantIds = [];
-    let vcfData = null;
+    let vcfRecordMap = new Map(); // Initialize here
+    let vcfHeaderLines = undefined; // Initialize here
+    let vcfData = null; // Initialize vcfData to null
 
     if (mergedParams.vcfInput) {
       debug(`Processing VCF file: ${mergedParams.vcfInput}`);
       try {
         vcfData = await readVariantsFromVcf(mergedParams.vcfInput);
-        variantIds = vcfData.variantsToProcess;
+        variants = vcfData.variantsToProcess; // Assign variants from VCF reader
         vcfHeaderLines = vcfData.headerLines;
-        debug(`Extracted ${variantIds.length} variant(s) from VCF file`);
-        debug(`Captured VCF header with ${vcfHeaderLines.length} lines`);
+        debug(`Extracted ${variants.length} variant(s) from VCF file`);
+        // debug(`Captured VCF header with ${vcfHeaderLines.length} lines`); // Already logged in reader
 
-        // Get the VCF record map with record data and genotypes
         if (vcfData.vcfRecordMap) {
-          for (const [key, record] of vcfData.vcfRecordMap) {
-            vcfRecordMap.set(key, record);
-          }
-          debug(`Created VCF record map with data for ${vcfRecordMap.size} variants`);
+          vcfRecordMap = vcfData.vcfRecordMap; // Assign the map directly
+          debug(`Using VCF record map with data for ${vcfRecordMap.size} variants`);
         }
 
-        // Extract sample IDs for inheritance pattern calculation
-        if (vcfData.samples && vcfData.samples.length > 0) {
-          debug(
-            `VCF file contains ${vcfData.samples.length} samples: ${vcfData.samples.join(', ')}`
-          );
-        }
+        // if (vcfData.samples && vcfData.samples.length > 0) { // Already logged in reader
+        //   debug(
+        //     `VCF file contains ${vcfData.samples.length} samples: ${vcfData.samples.join(', ')}`
+        //   );
+        // }
       } catch (error) {
         debug(`Error processing VCF file: ${error.message}`);
         console.error(`Error processing VCF file: ${error.message}`);
         throw new Error(`Failed to process VCF file: ${error.message}`);
       }
     } else {
-      // Add single variant if provided
+      // Handle non-VCF inputs
       if (mergedParams.variant) {
         variants.push(mergedParams.variant);
       }
-
-      // Add variants from comma-separated list if provided
       if (mergedParams.variants) {
         const variantsList = mergedParams.variants
           .split(',')
@@ -404,16 +452,14 @@ async function main() {
           .filter(Boolean);
         variants = [...variants, ...variantsList];
       }
-
-      // Add variants from file if provided
       if (mergedParams.variantsFile) {
         const fileVariants = readVariantsFromFile(mergedParams.variantsFile);
         variants = [...variants, ...fileVariants];
       }
     }
 
-    debug(`Processing ${variants.length} variants`);
-    debugDetailed(`Variants: ${JSON.stringify(variants)}`);
+    debug(`Final count of variants to process: ${variants.length}`);
+    debugDetailed(`Variants list: ${JSON.stringify(variants.slice(0, 10))}...`);
 
     // Read PED file if provided
     let pedigreeData = null;
@@ -425,7 +471,6 @@ async function main() {
       } catch (error) {
         debug(`Error reading PED file: ${error.message}`);
         console.error(`Warning: Could not read PED file: ${error.message}`);
-        // Continue without pedigree data
       }
     }
 
@@ -447,115 +492,93 @@ async function main() {
         } else {
           debug(
             `Warning: Invalid sample map format, expected 3 comma-separated IDs, ` +
-              `got ${sampleIds.length}`
+              `got ${sampleIds.length}. Ignoring --sample-map.`
           );
-          console.error('Warning: Invalid sample map format. Expected: Index,Mother,Father');
+          console.error('Warning: Invalid sample map format. Expected: Index,Mother,Father. Ignoring.');
+          sampleMap = null; // Reset to null if invalid
         }
       } catch (error) {
         debug(`Error parsing sample map: ${error.message}`);
         console.error(`Warning: Could not parse sample map: ${error.message}`);
+        sampleMap = null; // Reset on error
       }
     }
 
     // Determine if we should calculate inheritance patterns
     let calculateInheritance = Boolean(mergedParams.calculateInheritance);
-
-    // If --calculate-inheritance not explicitly set but we have PED or VCF with samples, enable it
     if (calculateInheritance === false && mergedParams.calculateInheritance === undefined) {
       if (pedigreeData || (vcfData && vcfData.samples && vcfData.samples.length > 1)) {
         calculateInheritance = true;
-        debug('Automatically enabling inheritance pattern calculation based on available data');
+        debug('Automatically enabling inheritance pattern calculation based on available data.');
       }
     }
-
     if (calculateInheritance) {
-      debug('Inheritance pattern calculation is enabled');
+      debug('Inheritance pattern calculation is enabled.');
     }
 
-    const recoderOptions = parseOptionalParameters(mergedParams.recoder_params, {
-      vcf_string: '1',
-    });
-    const vepOptions = parseOptionalParameters(mergedParams.vep_params, {
-      CADD: '1',
-      hgvs: '1',
-      merged: '1',
-      mane: '1',
-    });
-    // Log detailed options for debugging
-    debugDetailed(
-      `Parsed options: recoderOptions=${JSON.stringify(recoderOptions)},` +
-        ` vepOptions=${JSON.stringify(vepOptions)}`
-    );
 
-    // Prepare analysis parameters
+    // Prepare analysis parameters - *** THE FIX IS HERE ***
     const analysisParams = {
-      variants: mergedParams.vcfInput ? variantIds : variants,
+      // Source of variants determined above
+      variants: variants, // Use the final list of variants
+      // Input source flags for core logic
+      vcfInput: mergedParams.vcfInput, // Pass the path or flag
+      // Output and filter params
       output: mergedParams.output,
       filter: mergedParams.filter,
-      assembly: mergedParams.assembly,
+      // API options (use the parsed objects)
+      recoderOptions: recoderOptions, // <-- CORRECTED: Use the parsed object
+      vepOptions: vepOptions, // <-- CORRECTED: Use the parsed object
       cache: mergedParams.cache,
-      calculateInheritance: mergedParams.calculateInheritance,
-      pedigreeData,
-      sampleMap,
-      vcfRecordMap: vcfRecordMap,
-      vcfHeaderLines: vcfData ? vcfData.headerLines : undefined,
+      // Assembly
+      assembly: mergedParams.assembly,
+      // Inheritance params
+      calculateInheritance: calculateInheritance, // Use the calculated boolean
+      pedigreeData: pedigreeData, // Pass the parsed Map or null
+      sampleMap: sampleMap, // Pass the parsed map or null
+      // VCF context data (passed from vcfReader)
+      vcfRecordMap: vcfRecordMap, // Pass the Map or empty Map
+      vcfHeaderLines: vcfHeaderLines, // Pass the array or undefined
+      samples: vcfData ? vcfData.samples : undefined, // Pass sample list from VCF
+      // Scoring
       scoringConfigPath: mergedParams.scoringConfigPath,
-      vepParams: mergedParams.vepParams,
-      recoderParams: mergedParams.recoderParams,
-      skipRecoder: mergedParams.skipRecoder,
-      vcfHeaderLines,
+      // Note: Removed redundant vepParams/recoderParams and skipRecoder
     };
-
-    // Add pedigree data to analysis params if available
-    if (pedigreeData) {
-      analysisParams.pedigreeData = pedigreeData;
-    }
-
-    // Add inheritance pattern calculation parameters if enabled
-    if (calculateInheritance) {
-      analysisParams.calculateInheritance = true;
-
-      // Add VCF records with genotype data if available
-      if (vcfRecordMap && vcfRecordMap.size > 0) {
-        analysisParams.vcfRecordMap = vcfRecordMap;
-      }
-
-      // Add sample IDs if available
-      if (vcfData && vcfData.samples && vcfData.samples.length > 0) {
-        analysisParams.samples = vcfData.samples;
-      }
-
-      // Add sample mapping for trio analysis if available
-      if (sampleMap) {
-        analysisParams.sampleMap = sampleMap;
-      }
-
-      debug('Added inheritance pattern calculation parameters to analysis');
-    }
 
     // Add detailed debug logging before calling analyzeVariant
     debugDetailed(
-      `Variants to analyze: ${analysisParams.variants?.length || 0}. ` +
-        `Content: ${JSON.stringify(analysisParams.variants)}`
+      `Calling analyzeVariant with -> variants (${analysisParams.variants?.length || 0}): ${JSON.stringify(analysisParams.variants?.slice(0, 5))}...`
     );
-    debugDetailed(`VCF record map size: ${analysisParams.vcfRecordMap?.size || 'N/A'}`);
-    debugDetailed(`VCF header lines: ${analysisParams.vcfHeaderLines?.length || 'N/A'}`);
+    debugDetailed(` -> vcfInput: ${analysisParams.vcfInput}`);
+    debugDetailed(` -> vcfRecordMap size: ${analysisParams.vcfRecordMap?.size}`);
+    debugDetailed(` -> vcfHeaderLines count: ${analysisParams.vcfHeaderLines?.length}`);
     debugDetailed(
-      `Pedigree data keys: ${JSON.stringify(Array.from(analysisParams.pedigreeData?.keys() || []))}`
+      ` -> pedigreeData keys: ${JSON.stringify(Array.from(analysisParams.pedigreeData?.keys() || []))}`
     );
-    debugDetailed(`Calculate inheritance: ${analysisParams.calculateInheritance}`);
+    debugDetailed(` -> sampleMap: ${JSON.stringify(analysisParams.sampleMap)}`);
+    debugDetailed(` -> samples: ${JSON.stringify(analysisParams.samples)}`);
+    debugDetailed(` -> calculateInheritance: ${analysisParams.calculateInheritance}`);
+    debugDetailed(` -> vepOptions: ${JSON.stringify(analysisParams.vepOptions)}`); // Log the passed options
+    debugDetailed(` -> recoderOptions: ${JSON.stringify(analysisParams.recoderOptions)}`); // Log the passed options
 
     // Get the results by analyzing variants
     const result = await analyzeVariant(analysisParams);
 
     // Output the results
-    if (mergedParams.save) {
+    const savePath = mergedParams.save || mergedParams.outputFile; // Support both --save and --output-file
+    if (savePath) {
       // For CSV/TSV/VCF formats, result is already a formatted string
-      const output = ['CSV', 'TSV', 'VCF'].includes(mergedParams.output.toUpperCase())
+      const outputContent = ['CSV', 'TSV', 'VCF'].includes(mergedParams.output.toUpperCase())
         ? result
         : JSON.stringify(result, null, 2);
-      fs.writeFileSync(mergedParams.save, output);
-      console.log(`Results saved to ${mergedParams.save}`);
+      try {
+          fs.writeFileSync(savePath, outputContent);
+          console.log(`Results saved to ${savePath}`);
+      } catch (writeError) {
+          console.error(`Error saving results to ${savePath}: ${writeError.message}`);
+          // Optionally, print to console as fallback?
+          // console.log(outputContent);
+      }
     } else {
       // For CSV/TSV/VCF formats, result is already a formatted string
       if (['CSV', 'TSV', 'VCF'].includes(mergedParams.output.toUpperCase())) {
@@ -568,8 +591,14 @@ async function main() {
 
     debug('Variant analysis process completed successfully');
   } catch (error) {
+    // Use handleError which includes console.error and throws
     handleError(error);
   }
 }
 
-main();
+// Execute the main analysis function
+runAnalysis().catch(err => {
+    // handleError already prints details, just ensure process exits with error code
+    // if the enhanced error was thrown
+    process.exitCode = err.statusCode || 1;
+});

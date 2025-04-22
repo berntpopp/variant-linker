@@ -7,6 +7,7 @@
 'use strict';
 
 const debug = require('debug')('variant-linker:data-extractor');
+// Removed: const { formatAnnotationsToVcf } = require('./vcfFormatter'); // Breaks circular dependency
 
 /**
  * Default column configuration for CSV/TSV output.
@@ -30,7 +31,7 @@ function getDefaultColumnConfig(options = {}) {
   const defaultColumns = [
     {
       header: 'OriginalInput',
-      path: 'input',
+      path: 'originalInput', // <-- FIX: Use originalInput field added by processor
       isConsequenceLevel: false,
       defaultValue: '',
     },
@@ -65,7 +66,7 @@ function getDefaultColumnConfig(options = {}) {
   defaultColumns.push(
     {
       header: 'VEPInput',
-      path: 'id',
+      path: 'input', // <-- FIX: Use the 'input' field which holds the VEP-formatted input
       isConsequenceLevel: false,
       defaultValue: '',
     },
@@ -79,7 +80,7 @@ function getDefaultColumnConfig(options = {}) {
         const start = obj.start || '';
         const end = obj.end || '';
         const strand = obj.strand || '';
-        return `${value}:${start}-${end}(${strand})`;
+        return `${value}:${start}-${end}(${strand || '1'})`; // Ensure strand defaults to 1 if missing
       },
     },
     {
@@ -96,65 +97,80 @@ function getDefaultColumnConfig(options = {}) {
     },
     {
       header: 'Impact',
-      path: 'impact',
+      path: 'impact', // Correct path relative to consequence
       isConsequenceLevel: true,
       defaultValue: '',
     },
     {
       header: 'GeneSymbol',
-      path: 'gene_symbol',
+      path: 'gene_symbol', // Correct path relative to consequence
       isConsequenceLevel: true,
       defaultValue: '',
     },
     {
       header: 'GeneID',
-      path: 'gene_id',
+      path: 'gene_id', // Correct path relative to consequence
       isConsequenceLevel: true,
       defaultValue: '',
     },
     {
       header: 'FeatureType',
-      path: 'feature_type',
+      path: 'feature_type', // Correct path relative to consequence
       isConsequenceLevel: true,
       defaultValue: '',
     },
     {
       header: 'TranscriptID',
-      path: 'transcript_id',
+      path: 'transcript_id', // Correct path relative to consequence
       isConsequenceLevel: true,
       defaultValue: '',
     },
     {
       header: 'ConsequenceTerms',
-      path: 'consequence_terms',
+      path: 'consequence_terms', // Correct path relative to consequence
       isConsequenceLevel: true,
       defaultValue: '',
       formatter: (value) => (Array.isArray(value) ? value.join('&') : value),
     },
     {
       header: 'MANE',
-      path: 'mane',
+      path: 'mane', // Correct path relative to consequence
       isConsequenceLevel: true,
       defaultValue: '',
+      // Ensure MANE array values are handled correctly (e.g., join or take first)
+      formatter: (value) => {
+        if (!value) return '';
+        // VEP returns MANE values like ["MANE_Select"], ["MANE_Plus_Clinical"] or null
+        // We want to extract the string inside if present
+        if (Array.isArray(value) && value.length > 0) {
+          // Handle potential nested arrays or complex structures if needed
+          // Simple approach: join strings if multiple, otherwise take the first element
+          return value.map(String).join(',');
+        } else if (typeof value === 'string') {
+          return value;
+        }
+        return ''; // Default if not array or string
+      },
     },
     {
       header: 'HGVSc',
-      path: 'hgvsc',
+      path: 'hgvsc', // Correct path relative to consequence
       isConsequenceLevel: true,
       defaultValue: '',
     },
     {
       header: 'HGVSp',
-      path: 'hgvsp',
+      path: 'hgvsp', // Correct path relative to consequence
       isConsequenceLevel: true,
       defaultValue: '',
     },
     {
       header: 'ProteinPosition',
-      path: 'protein_start',
+      path: 'protein_start', // Base path relative to consequence
       isConsequenceLevel: true,
       defaultValue: '',
       formatter: (value, obj) => {
+        // obj here is the consequence object
         if (!value) return '';
         const end = obj.protein_end || value;
         return `${value}-${end}`;
@@ -162,41 +178,46 @@ function getDefaultColumnConfig(options = {}) {
     },
     {
       header: 'Amino_acids',
-      path: 'amino_acids',
+      path: 'amino_acids', // Correct path relative to consequence
       isConsequenceLevel: true,
       defaultValue: '',
     },
     {
       header: 'Codons',
-      path: 'codons',
+      path: 'codons', // Correct path relative to consequence
       isConsequenceLevel: true,
       defaultValue: '',
     },
     {
       header: 'ExistingVariation',
       path: 'existing_variation',
-      isConsequenceLevel: false,
+      isConsequenceLevel: false, // This IS annotation level
       defaultValue: '',
       formatter: (value) => (Array.isArray(value) ? value.join('&') : value),
     },
     {
       header: 'CADD',
+      // CADD scores are often top-level, but check VEP response structure.
+      // If cadd_phred exists within consequence, change isConsequenceLevel to true
+      // Assuming it's annotation level for now based on previous structure.
       path: 'cadd_phred',
-      isConsequenceLevel: false,
+      isConsequenceLevel: false, // This IS annotation level
       defaultValue: '',
     },
     {
       header: 'SIFT',
-      path: 'transcript_consequences.*.sift_prediction',
-      isConsequenceLevel: true,
+      path: 'sift_prediction', // <-- FIX: Path relative to consequence
+      isConsequenceLevel: true, // Should be true
       defaultValue: '',
     },
     {
       header: 'PolyPhen',
-      path: 'transcript_consequences.*.polyphen_prediction',
-      isConsequenceLevel: true,
+      path: 'polyphen_prediction', // <-- FIX: Path relative to consequence
+      isConsequenceLevel: true, // Should be true
       defaultValue: '',
     }
+    // Add any other custom score columns here if needed
+    // e.g., from the scoring module output, which might be top-level or consequence-level
   );
 
   return defaultColumns;
@@ -240,6 +261,7 @@ function extractField(dataObject, fieldConfig) {
     if (part === '*') {
       wildcardMode = true;
       if (!Array.isArray(current)) {
+        // If path expects an array but current is not, return default value
         return fieldConfig.defaultValue;
       }
 
@@ -255,17 +277,18 @@ function extractField(dataObject, fieldConfig) {
       for (const item of current) {
         const subConfig = {
           path: subpath,
-          defaultValue: fieldConfig.defaultValue,
+          defaultValue: fieldConfig.defaultValue, // Propagate defaultValue
         };
         const extracted = extractField(item, subConfig);
-        if (extracted !== fieldConfig.defaultValue) {
-          results.push(extracted);
-        }
+        // Only push non-default values? Or handle default at the end?
+        // Let's push all extracted values and handle defaults later if needed
+        results.push(extracted);
       }
-      break;
+      break; // Exit the loop after processing the wildcard level
     }
 
-    if (current === undefined || current === null) {
+    // Move to the next part of the path
+    if (current === undefined || current === null || typeof current !== 'object') {
       return fieldConfig.defaultValue;
     }
 
@@ -274,11 +297,13 @@ function extractField(dataObject, fieldConfig) {
 
   // Handle wildcard results
   if (wildcardMode) {
+    // Filter out default values IF the defaultValue itself isn't what we want
+    // This is complex; let's return the raw results for now.
+    // The formatter can handle filtering if needed.
     if (results.length === 0) {
       return fieldConfig.defaultValue;
     }
-    // Remove duplicates
-    results = [...new Set(results)];
+    // Apply formatter if present, otherwise return the array of results
     return fieldConfig.formatter ? fieldConfig.formatter(results, dataObject) : results;
   }
 
@@ -332,6 +357,7 @@ function flattenAnnotationData(annotationData, columnConfig = getDefaultColumnCo
         columnConfig
           .filter((config) => config.isConsequenceLevel)
           .forEach((config) => {
+            // Pass the consequence object to extractField
             rowData[config.header] = extractField(consequence, config);
           });
 
@@ -391,7 +417,12 @@ function formatToTabular(
       if (value === undefined || value === null) {
         value = '';
       } else if (typeof value === 'object') {
-        value = JSON.stringify(value);
+        // Handle arrays specifically if needed, otherwise stringify
+        if (Array.isArray(value)) {
+          value = value.join(';'); // Example: join arrays with semicolon
+        } else {
+          value = JSON.stringify(value);
+        }
       } else {
         value = String(value);
       }
@@ -431,11 +462,12 @@ const csqFieldMapping = {
     return ann?.most_severe_consequence || '';
   },
   IMPACT: (ann) => {
-    // Find impact from the most severe consequence within the transcript_consequences array
-    const cons = ann?.transcript_consequences?.find((c) =>
+    // Find impact from the first transcript consequence matching the most severe consequence
+    const matchingCons = ann?.transcript_consequences?.find((c) =>
       c.consequence_terms?.includes(ann.most_severe_consequence)
     );
-    return cons?.impact || '';
+    // Fallback to impact of the first consequence if no exact match
+    return matchingCons?.impact || ann?.transcript_consequences?.[0]?.impact || '';
   },
   SYMBOL: (ann) => {
     const cons = ann?.transcript_consequences?.find((c) => c.gene_symbol);
@@ -499,12 +531,14 @@ const csqFieldMapping = {
 
 /**
  * Formats a single annotation object into a VCF CSQ string field value.
+ * Generates a comma-separated list of CSQ strings, one for each transcript consequence.
  *
  * @param {Object} annotation - The annotation object (usually from VEP results).
  * @param {Array<string>} csqFormatFields - An array of CSQ field names in the desired order
  *   (e.g., from vlCsqFormat in processor).
  * @param {string} altAllele - The specific ALT allele this consequence pertains to.
- * @returns {string} The formatted CSQ string (pipe-separated values), or empty string if no data.
+ * @returns {string} The formatted CSQ string (pipe-separated values, comma-separated for multiple consequences),
+ *                   or empty string if no data.
  */
 function formatVcfCsqString(annotation, csqFormatFields, altAllele) {
   if (!annotation || !Array.isArray(csqFormatFields) || csqFormatFields.length === 0) {
@@ -522,31 +556,44 @@ function formatVcfCsqString(annotation, csqFormatFields, altAllele) {
       const handler = csqFieldMapping[fieldName];
       let value = '';
       if (typeof handler === 'function') {
-        // Create a modified annotation with just this consequence
-        const annotationWithSingleConsequence = {
-          ...annotation,
-          transcript_consequences: [consequence],
+        // Create a temporary annotation object representing just this consequence
+        // This ensures the handler functions correctly find the data within the current consequence context
+        const tempAnnotationContext = {
+          ...annotation, // Include top-level fields
+          transcript_consequences: [consequence], // Focus on the current consequence
+          // Specifically pass the consequence itself if needed, though handlers should use the array
+          current_consequence: consequence,
         };
-        value = handler(annotationWithSingleConsequence, altAllele);
+        // Call the handler with the modified context
+        value = handler(tempAnnotationContext, altAllele);
       } else {
-        // Basic fallback: Look for a direct property match (lowercase)
-        value = annotation[fieldName.toLowerCase()] || '';
-        debug(
-          `Warning: No specific CSQ handler for field '${fieldName}'. ` +
-            'Using direct property lookup.'
-        );
+        // Basic fallback: Look for a direct property match (lowercase) in the consequence itself first
+        value = consequence[fieldName.toLowerCase()] !== undefined
+            ? consequence[fieldName.toLowerCase()]
+            : annotation[fieldName.toLowerCase()] || ''; // Fallback to top-level annotation
+
+        // Only log warning if data is expected but not found
+        if (value === '') {
+            debug(
+              `Warning: No specific CSQ handler or direct property found for field '${fieldName}'. ` +
+              'Using empty string.'
+            );
+        }
       }
 
       // Ensure value is a string and handle null/undefined
       value = value === null || value === undefined ? '' : String(value);
 
-      // VEP standard: URL-encode
-      return encodeURIComponent(value);
+      // VEP standard: URL-encode potentially problematic characters like pipe (|), comma (,), semicolon (;)
+      // Use encodeURIComponent for broader safety, although VEP's exact encoding might differ slightly.
+      // Avoid encoding empty strings.
+      return value ? encodeURIComponent(value) : '';
     });
 
-    return values.join('|');
+    return values.join('|'); // Pipe-separate fields within a single CSQ string
   });
 
+  // Comma-separate the CSQ strings for different consequences
   return csqStrings.join(',');
 }
 
@@ -554,6 +601,6 @@ module.exports = {
   extractField,
   flattenAnnotationData,
   formatToTabular,
-  formatVcfCsqString, // Export the new function
-  getDefaultColumnConfig, // Export the function instead of the static array
+  formatVcfCsqString, // Export the function
+  getDefaultColumnConfig, // Export the function
 };
