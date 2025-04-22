@@ -10,7 +10,8 @@
 const axios = require('axios');
 const debugDetailed = require('debug')('variant-linker:detailed');
 const debugAll = require('debug')('variant-linker:all');
-const cache = require('./cache');
+// const cache = require('./cache'); // <-- Remove this line
+const { getCache, setCache } = require('./cache'); // <-- Import specific functions
 const apiConfig = require('../config/apiConfig.json');
 
 // Retry configuration from apiConfig.json
@@ -74,7 +75,8 @@ async function fetchApi(
     // Don't log the full URL here yet, log it inside the loop for retries
 
     if (cacheEnabled) {
-      const cached = cache.get(url);
+    //   const cached = cache.getCache(url); // <-- Change this call
+      const cached = getCache(url); // <-- Use imported function directly
       if (cached) {
         debugDetailed(`Returning cached result for: ${url}`);
         return cached;
@@ -121,7 +123,7 @@ async function fetchApi(
         await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
       }
 
-      // --- START: Enhanced Debug Logging for Request Details ---
+      // --- Enhanced Debug Logging for Request Details ---
       const requestHeaders = { 'Content-Type': 'application/json', 'Accept': 'application/json' }; // Added Accept header
       debugDetailed(
           `Attempt ${attempt + 1}/${MAX_RETRIES + 1}: Sending API Request...` +
@@ -130,7 +132,7 @@ async function fetchApi(
           `\n  Headers: ${JSON.stringify(requestHeaders)}` +
           (method.toUpperCase() === 'POST' ? `\n  Body: ${formatRequestBodyForLog(requestBody)}` : '')
       );
-      // --- END: Enhanced Debug Logging ---
+      // --- End Enhanced Debug Logging ---
 
       try {
         let response;
@@ -149,7 +151,8 @@ async function fetchApi(
         // debugDetailed(`Response Data (Truncated): ${formatRequestBodyForLog(response.data)}`);
 
         if (cacheEnabled) {
-          cache.setCache(url, response.data);
+        //   cache.setCache(url, response.data); // <-- Change this call
+          setCache(url, response.data); // <-- Use imported function directly
         }
 
         return response.data;
