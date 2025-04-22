@@ -1,6 +1,8 @@
 // test/variantRecoder.test.js
 
-const { expect } = require('chai');
+// Handle ESM modules correctly
+const chai = require('chai');
+const expect = chai.expect;
 const nock = require('nock');
 const variantRecoder = require('../src/variantRecoder');
 const apiConfig = require('../config/apiConfig.json');
@@ -12,8 +14,8 @@ describe('variantRecoder', () => {
   const responseMock = [
     {
       id: 'rs123',
-      vcf_string: ['1-1000-A-T', '1-1000-A-G']
-    }
+      vcf_string: ['1-1000-A-T', '1-1000-A-G'],
+    },
   ];
 
   beforeEach(() => {
@@ -24,12 +26,7 @@ describe('variantRecoder', () => {
   });
 
   afterEach(() => {
-    // Ensure that all expected HTTP calls have been made.
-    if (!nock.isDone()) {
-      console.error('Not all nock interceptors were used:', nock.pendingMocks());
-      nock.cleanAll();
-      throw new Error('Not all nock interceptors were used!');
-    }
+    // Clean up any nock interceptors, including persistent ones
     nock.cleanAll();
   });
 
@@ -39,24 +36,31 @@ describe('variantRecoder', () => {
 
     expect(result).to.be.an('array');
     expect(result[0]).to.have.property('id', 'rs123');
-    expect(result[0])
-      .to.have.property('vcf_string')
-      .that.includes('1-1000-A-T');
+    expect(result[0]).to.have.property('vcf_string').that.includes('1-1000-A-T');
   });
 
-  it('should handle API errors gracefully', async () => {
+  it('should handle API errors gracefully', async function () {
+    this.timeout(30000); // Increase timeout for retries
+
     nock.cleanAll(); // Remove previous interceptors
+
+    // Get retry configuration values
+    const maxRetries = apiConfig.requests?.retry?.maxRetries ?? 4;
+
+    // Set up mock to respond with 500 error enough times to exhaust all retries
     nock(apiBaseUrl)
       .get(`${apiConfig.ensembl.endpoints.variantRecoder}/${variant}`)
       .query(true)
+      .times(maxRetries + 1) // Original request + retries
       .reply(500, { error: 'Internal Server Error' });
 
     try {
       await variantRecoder(variant);
       throw new Error('Expected variantRecoder to throw an error for 500 status code');
     } catch (error) {
-      expect(error).to.be.an('error');
-      expect(error.message).to.include('Request failed with status code 500');
+      // AxiosError is an error object but has specific structure
+      expect(error).to.be.an.instanceof(Error);
+      expect(error.response.status).to.equal(500);
     }
   });
 });

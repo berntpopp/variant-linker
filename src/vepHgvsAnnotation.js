@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 'use strict';
 // src/vepHgvsAnnotation.js
 
@@ -9,7 +8,8 @@
  * @param {string} transcript - The transcript ID to be used in the annotation request.
  * @param {Object} [options={}] - Optional query parameters for the VEP API request.
  * @param {boolean} [cacheEnabled=false] - If true, cache the API response.
- * @returns {Promise<Object>} A promise that resolves to the annotation data retrieved from the VEP API.
+ * @returns {Promise<Object>} A promise that resolves to the annotation data
+ * retrieved from the VEP API.
  * @throws {Error} If the request to the VEP API fails.
  */
 const debug = require('debug')('variant-linker:main');
@@ -18,6 +18,16 @@ const debugAll = require('debug')('variant-linker:all');
 const { fetchApi } = require('./apiHelper');
 const apiConfig = require('../config/apiConfig.json');
 
+/**
+ * Retrieves VEP (Variant Effect Predictor) annotations for a given HGVS notation.
+ *
+ * @param {string} hgvs - The HGVS notation of the variant to be annotated.
+ * @param {string} transcript - The transcript ID to be used in the annotation request.
+ * @param {Object} [options={}] - Optional query parameters for the VEP API request.
+ * @param {boolean} [cacheEnabled=false] - If true, cache the API response.
+ * @returns {Promise<Object>} A promise that resolves to the annotation data from the VEP API.
+ * @throws {Error} If the request to the VEP API fails.
+ */
 async function vepHgvsAnnotation(hgvs, transcript, options = {}, cacheEnabled = false) {
   try {
     // Build the endpoint path using the external configuration.

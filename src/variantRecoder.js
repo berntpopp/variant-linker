@@ -1,9 +1,9 @@
-#!/usr/bin/env node
 'use strict';
 // src/variantRecoder.js
 
 /**
- * @fileoverview Provides functionality to fetch recoded information for a given genetic variant
+ * @fileoverview Provides functionality to fetch recoded information for a given genetic
+ * variant
  * using the Ensembl Variant Recoder API.
  * @module variantRecoder
  */
@@ -11,16 +11,15 @@
 const debug = require('debug')('variant-linker:main');
 const debugDetailed = require('debug')('variant-linker:detailed');
 const debugAll = require('debug')('variant-linker:all');
-const cache = require('./cache');
 const { fetchApi } = require('./apiHelper');
 const apiConfig = require('../config/apiConfig.json');
 
 /**
  * Fetches the recoded information of a given genetic variant using the Variant Recoder API.
  *
- * @param {string} variant - The genetic variant to be recoded. This may be provided in multiple formats.
+ * @param {string} variant - Genetic variant to be recoded (supports multiple formats).
  * @param {Object} [options={}] - Optional parameters for the Variant Recoder API request.
- *                                (Example: { vcf_string: '1' } )
+ *                               (Example: { vcf_string: '1' } )
  * @param {boolean} [cacheEnabled=false] - If true, cache the API response.
  * @returns {Promise<Object>} A promise that resolves to the recoded variant information,
  *                            including various IDs and HGVS notations.

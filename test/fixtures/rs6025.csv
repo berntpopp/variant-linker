@@ -1,0 +1,4 @@
+OriginalInput,VEPInput,Location,Allele,MostSevereConsequence,Impact,GeneSymbol,GeneID,FeatureType,TranscriptID,ConsequenceTerms,MANE,HGVSc,HGVSp,ProteinPosition,Amino_acids,Codons,ExistingVariation,CADD,SIFT,PolyPhen
+1 169549811 . C T . . .,.,1:169549811-169549811(1),C/T,missense_variant,MODERATE,F5,ENSG00000198734,,ENST00000367796,missense_variant,,ENST00000367796.3:c.1601G>A,ENSP00000356770.3:p.Arg534Gln,534-534,R/Q,cGa/cAa,,,,
+1 169549811 . C T . . .,.,1:169549811-169549811(1),C/T,missense_variant,MODERATE,F5,ENSG00000198734,,ENST00000367797,missense_variant,"[""MANE_Select""]",ENST00000367797.9:c.1601G>A,ENSP00000356771.3:p.Arg534Gln,534-534,R/Q,cGa/cAa,,,,
+1 169549811 . C T . . .,.,1:169549811-169549811(1),C/T,missense_variant,MODERATE,F5,2153,,NM_000130.5,missense_variant,"[""MANE_Select""]",NM_000130.5:c.1601G>A,NP_000121.2:p.Arg534Gln,534-534,R/Q,cGa/cAa,,,,

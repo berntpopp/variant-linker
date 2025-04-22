@@ -5,14 +5,20 @@
  * @fileoverview Processes variant linking by combining data from Variant Recoder
  * and VEP annotation calls, filters and formats the results, and outputs them.
  * Additionally, a JSON API–compatible filter function is provided for flexible filtering.
- * Filtering statistics (before and after) for both annotation objects and nested transcript_consequences
- * are added to meta.stepsPerformed.
+ * Filtering statistics (before/after) for annotations and transcript_consequences
+ * are tracked in meta.stepsPerformed.
  * @module variantLinkerProcessor
  */
 
 // Use fs only if in a Node environment.
-const fs = (typeof window === 'undefined') ? require('fs') : null;
+const fs = typeof window === 'undefined' ? require('fs') : null;
 const debug = require('debug')('variant-linker:processor');
+const {
+  flattenAnnotationData,
+  formatToTabular,
+  getDefaultColumnConfig,
+} = require('./dataExtractor');
+const { formatAnnotationsToVcf } = require('./vcfFormatter');
 
 /**
  * Helper: Resolves a dot‐notation path from an object.
@@ -123,20 +129,26 @@ function jsonApiFilter(data, criteria) {
     throw new Error('Data to be filtered must be an array.');
   }
 
+  /**
+   * Helper function to determine if an object matches all the specified filter criteria
+   * @param {Object} obj - The object to check against criteria
+   * @returns {boolean} True if the object matches all criteria, false otherwise
+   */
   function matchesCriteria(obj) {
     for (const field in criteria) {
       if (!criteria.hasOwnProperty(field)) continue;
       const conditions = criteria[field];
       // Use getValueByPath if the field contains a dot or wildcard.
-      let fieldValue = (field.includes('.') || field.includes('*'))
-        ? getValueByPath(obj, field)
-        : obj[field];
-      // If the resolved value is an array, require that at least one element satisfies each condition.
+      // Get field value with dot notation or wildcard support
+      const fieldValue =
+        field.includes('.') || field.includes('*') ? getValueByPath(obj, field) : obj[field];
+      // Check if one element in array satisfies conditions
+      // Check each operator in the conditions
       for (const operator in conditions) {
         if (!conditions.hasOwnProperty(operator)) continue;
         const target = conditions[operator];
         if (Array.isArray(fieldValue)) {
-          if (!fieldValue.some(val => applyOperator(val, operator, target))) {
+          if (!fieldValue.some((val) => applyOperator(val, operator, target))) {
             return false;
           }
         } else {
@@ -163,7 +175,8 @@ function jsonApiFilter(data, criteria) {
  * @param {function} vepHgvsAnnotation - A function that retrieves VEP annotations for a given HGVS.
  * @param {Object} recoderOptions - Optional parameters for the Variant Recoder API.
  * @param {Object} vepOptions - Optional parameters for the VEP API.
- * @returns {Promise<{variantData: Object, annotationData: Object}>} A promise that resolves with an object containing the variant recoder data and annotation data.
+ * @returns {Promise<{variantData: Object, annotationData: Object}>} A promise that resolves
+ * with an object containing variant recoder data and annotation data.
  * @throws {Error} If no data is returned from either API call.
  */
 async function processVariantLinking(
@@ -190,21 +203,13 @@ async function processVariantLinking(
         : undefined;
 
     if (!selectedHgvs) {
-      throw new Error(
-        'No valid HGVS notation found in Variant Recoder response'
-      );
+      throw new Error('No valid HGVS notation found in Variant Recoder response');
     }
 
     const selectedTranscript = selectedHgvs.split(':')[0];
-    debug(
-      `Selected HGVS: ${selectedHgvs}, Selected Transcript: ${selectedTranscript}`
-    );
+    debug(`Selected HGVS: ${selectedHgvs}, Selected Transcript: ${selectedTranscript}`);
 
-    const annotationData = await vepHgvsAnnotation(
-      selectedHgvs,
-      selectedTranscript,
-      vepOptions
-    );
+    const annotationData = await vepHgvsAnnotation(selectedHgvs, selectedTranscript, vepOptions);
     debug(`VEP annotation data received: ${JSON.stringify(annotationData)}`);
 
     if (!annotationData || annotationData.length === 0) {
@@ -226,10 +231,10 @@ async function processVariantLinking(
  * The filter parameter can be either a function or a JSON API–compatible filter criteria object.
  * When a criteria object is provided, filtering is applied to:
  *   1. The top-level annotationData array.
- *   2. And, if criteria keys start with "transcript_consequences", the nested transcript_consequences arrays
- *      are filtered accordingly.
- * Additionally, statistics on the number of annotations (and transcript consequences) before and after filtering
- * are added to meta.stepsPerformed.
+ *   2. And, if criteria keys start with "transcript_consequences", the nested
+ *      transcript_consequences arrays are filtered accordingly.
+ * Additionally, statistics on the number of annotations (and transcript consequences)
+ * before and after filtering are added to meta.stepsPerformed.
  *
  * @param {Object} results - The results object from variant processing.
  * @param {(function|Object)} [filterParam] - An optional filter function or filter criteria object.
@@ -251,7 +256,8 @@ function filterAndFormatResults(results, filterParam, format) {
           ? filteredResults.annotationData.length
           : 'N/A';
         filteredResults.meta.stepsPerformed.push(
-          `Top-level filter (function) applied: ${originalCount} annotations before, ${newCount} after filtering.`
+          `Top-level filter applied: ${originalCount} annotations before,` +
+            ` ${newCount} after filtering.`
         );
       }
     } else if (typeof filterParam === 'object') {
@@ -268,17 +274,18 @@ function filterAndFormatResults(results, filterParam, format) {
           }
         }
       }
-      let topLevelOriginalCount = results.annotationData.length;
+      const topLevelOriginalCount = results.annotationData.length;
       let topLevelFiltered = results.annotationData;
       if (Object.keys(topLevelCriteria).length > 0) {
         topLevelFiltered = jsonApiFilter(results.annotationData, topLevelCriteria);
         filteredResults.meta.stepsPerformed.push(
-          `Top-level filter applied: ${topLevelOriginalCount} annotations before, ${topLevelFiltered.length} after filtering.`
+          `Top-level filter applied: ${topLevelOriginalCount} before,` +
+            ` ${topLevelFiltered.length} after filtering.`
         );
       }
       let totalTCBefore = 0;
       let totalTCAfter = 0;
-      topLevelFiltered.forEach(annotation => {
+      topLevelFiltered.forEach((annotation) => {
         if (
           annotation.transcript_consequences &&
           Array.isArray(annotation.transcript_consequences) &&
@@ -294,15 +301,18 @@ function filterAndFormatResults(results, filterParam, format) {
           totalTCAfter += newTC;
         }
       });
+      // Only add transcript filtering statistics if we applied transcript criteria
       if (Object.keys(transcriptCriteria).length > 0) {
         filteredResults.meta.stepsPerformed.push(
-          `Transcript consequences filter applied: ${totalTCBefore} consequences before filtering, ${totalTCAfter} after filtering.`
+          `Transcript consequences filter applied: ${totalTCBefore} consequences` +
+            ` before filtering, ${totalTCAfter} after filtering.`
         );
       }
       filteredResults.annotationData = topLevelFiltered;
     } else {
       throw new Error('Filter parameter must be a function or a filter criteria object.');
     }
+    // Log filtered results with detailed information
     debug(`Filtered results: ${JSON.stringify(filteredResults)}`);
   }
 
@@ -311,8 +321,97 @@ function filterAndFormatResults(results, filterParam, format) {
     case 'JSON':
       formattedResults = JSON.stringify(filteredResults, null, 2);
       break;
+    case 'CSV':
+    case 'TSV':
+      const delimiter = format.toUpperCase() === 'CSV' ? ',' : '\t';
+
+      // Ensure we're working with clean filtered data before flattening
+      const annotationToUse = Array.isArray(filteredResults.annotationData)
+        ? filteredResults.annotationData
+        : [];
+
+      // *** FIX: Conditionally include inheritance columns ***
+      // Check the flag set in variantLinkerCore.js
+      const includeInheritanceCols = Boolean(filteredResults.meta?.inheritanceCalculated);
+      debug(`Include inheritance columns in ${format.toUpperCase()}: ${includeInheritanceCols}`);
+      const columnConfig = getDefaultColumnConfig({ includeInheritance: includeInheritanceCols });
+
+      const flatRows = flattenAnnotationData(annotationToUse, columnConfig);
+
+      // Format the flattened data as CSV/TSV
+      formattedResults = formatToTabular(flatRows, columnConfig, delimiter, true);
+
+      // Update meta message
+      const inheritanceMsg = includeInheritanceCols ? ' with inheritance columns' : '';
+      filteredResults.meta.stepsPerformed.push(
+        `Formatted output as ${format.toUpperCase()}${inheritanceMsg} using flatten-by-consequence strategy` +
+          ` with ${flatRows.length} rows`
+      );
+      break;
+    case 'VCF':
+      debug(
+        `Processing VCF output format. Has vcfRecordMap: ${Boolean(results.vcfRecordMap)},
+        Has vcfHeaderLines: ${Boolean(results.vcfHeaderLines)}`
+      );
+      debug(`Input variant type: ${results.meta?.variantType || 'unknown'}`);
+      debug(`Number of results to format as VCF: ${filteredResults.results?.length || 0}`);
+
+      // Dump first result structure for debugging
+      if (filteredResults.results && filteredResults.results.length > 0) {
+        const firstResult = filteredResults.results[0];
+        debug(`First result variantInfo: ${JSON.stringify(firstResult.variantInfo || {})}`);
+        if (firstResult.colocated_variants && firstResult.colocated_variants.length > 0) {
+          debug(`First result has ${firstResult.colocated_variants.length} colocated variants`);
+        }
+        if (firstResult.most_severe_consequence) {
+          debug(
+            `First result has most_severe_consequence:
+              ${JSON.stringify(firstResult.most_severe_consequence)}`
+          );
+        }
+      }
+
+      // Define VL_CSQ format following VEP's convention
+      const vlCsqFormat = [
+        'Allele', // Derived ALT
+        'Consequence', // Most severe consequence
+        'IMPACT', // Impact of most severe consequence
+        'SYMBOL', // Gene symbol
+        'Gene', // Ensembl Gene ID
+        'Feature_type', // Type of feature (e.g., Transcript)
+        'Feature', // Ensembl Feature ID (e.g., ENST...)
+        'BIOTYPE', // Biotype of the feature (e.g., protein_coding)
+        'HGVSc', // HGVS coding sequence notation
+        'HGVSp', // HGVS protein sequence notation
+        'Protein_position', // Position in protein
+        'Amino_acids', // Amino acid change
+        'Codons', // Codon change
+        'Existing_variation', // dbSNP IDs etc.
+        'SIFT', // SIFT prediction/score
+        'PolyPhen', // PolyPhen prediction/score
+      ];
+
+      // Format results as VCF using the dedicated formatter module
+      // Pass the annotation data, VCF record map, and header lines from filtered results
+      formattedResults = formatAnnotationsToVcf(
+        filteredResults.annotationData,
+        filteredResults.vcfRecordMap,
+        filteredResults.vcfHeaderLines,
+        vlCsqFormat
+      );
+
+      filteredResults.meta.stepsPerformed.push(
+        `Formatted output as VCF with annotations added as VL_CSQ INFO field`
+      );
+      break;
+    case 'SCHEMA':
+      // Existing SCHEMA support will be added later
+      formattedResults = JSON.stringify(filteredResults, null, 2);
+      break;
     default:
-      throw new Error('Unsupported format');
+      throw new Error(
+        `Unsupported format: ${format}. Valid formats are JSON, CSV, TSV, VCF, and SCHEMA`
+      );
   }
   return formattedResults;
 }
@@ -327,6 +426,10 @@ function filterAndFormatResults(results, filterParam, format) {
  */
 function outputResults(results, filename) {
   debug('Starting results output');
+  // Quick validation for VCF output
+  if (filename && filename.toLowerCase().endsWith('.vcf') && !results.includes('#CHROM')) {
+    console.warn('Warning: The generated VCF output appears to be invalid (missing #CHROM line)');
+  }
   if (filename) {
     if (!fs) {
       console.warn('File output is not supported in a browser environment.');
@@ -343,5 +446,6 @@ module.exports = {
   processVariantLinking,
   filterAndFormatResults,
   outputResults,
-  jsonApiFilter // Exported in case standalone use is desired.
+  jsonApiFilter, // Exported in case standalone use is desired.
+  // No more internal VCF formatting functions to export
 };

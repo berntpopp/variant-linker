@@ -1,10 +1,12 @@
 /**
  * @fileoverview Main export for Variant-Linker.
  * Exports the core functionality along with various helper modules.
- * 
+ *
  * The scoring module now exports:
- *   - readScoringConfigFromFiles(configPath): Reads and parses scoring configuration files from disk (Node only)
- *   - parseScoringConfig(variableAssignmentJson, formulaJson): Parses scoring configuration JSON objects
+ *   - readScoringConfigFromFiles(configPath): Reads and parses scoring configuration files
+ *     from disk (Node only)
+ *   - parseScoringConfig(variableAssignmentJson, formulaJson): Parses scoring
+ *     configuration JSON objects
  *   - applyScoring(annotationData, scoringConfig): Applies scoring formulas to annotation data
  */
 
@@ -15,7 +17,8 @@ const variantRecoder = require('./variantRecoder');
 const variantRecoderPost = require('./variantRecoderPost');
 const vepRegionsAnnotation = require('./vepRegionsAnnotation');
 const { convertVcfToEnsemblFormat } = require('./convertVcfToEnsemblFormat');
-const scoring = require('./scoring'); // scoring exports readScoringConfigFromFiles, parseScoringConfig, and applyScoring
+// Scoring exports readScoringConfigFromFiles, parseScoringConfig, and applyScoring
+const scoring = require('./scoring');
 const variantLinkerProcessor = require('./variantLinkerProcessor');
 const apiHelper = require('./apiHelper');
 const cache = require('./cache');

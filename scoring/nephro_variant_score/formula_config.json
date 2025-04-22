@@ -2,7 +2,7 @@
   "@context": "https://schema.org/",
   "@type": "Configuration",
   "formulas": {
-    "annotation_level": [
+    "annotationLevel": [
       {
         "nephro_variant_score": "1 / (1 + Math.exp(-((-36.30796) + ((gnomade_variant - 0.00658) / 0.05959) * (-309.33539) + ((gnomadg_variant - 0.02425) / 0.11003) * (-2.54581) + ((consequence_terms_variant.map(val => val === 'missense_variant' ? 1 : 0).includes(1) ? 1 : 0) - 0.24333) / 0.42909 * (-1.14313) + ((consequence_terms_variant.map(val => val === 'synonymous_variant' ? 1 : 0).includes(1) ? 1 : 0) - 0.22931) / 0.42039 * (-0.96418) + ((consequence_terms_variant.map(val => val === 'stop_gained' ? 1 : 0).includes(1) ? 1 : 0) - 0.06932) / 0.25400 * (-0.40553) + ((consequence_terms_variant.map(val => val === 'frameshift_variant' ? 1 : 0).includes(1) ? 1 : 0) - 0.13615) / 0.34295 * (0.90216) + ((cadd_phred_variant - 12.47608) / 11.78359) * 2.68520 + ((Math.max(...impact_variant.map(val => ({ 'HIGH': 4, 'MODERATE': 3, 'LOW': 2, 'MODIFIER': 1 }[val] || 0))) - 2.49999) / 1.11804) * 3.14822)))"
       },
