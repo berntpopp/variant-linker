@@ -109,28 +109,48 @@ function _groupAnnotationsByPosition(annotationData, vcfRecordMap) {
 
   // Determine if the input was likely a VCF file based on presence of vcfRecordMap
   const hasVcfInput = vcfRecordMap && vcfRecordMap.size > 0;
+  debugOutput(
+    `_groupAnnotationsByPosition: Input annotation count=${annotationData?.length}, hasVcfInput=${hasVcfInput}`
+  );
 
   // Logic depends on whether original input was VCF
   if (hasVcfInput) {
     debugOutput('Processing results using original VCF record map.');
     // Map results data to variant keys for faster lookup
+    // *** Annotation Lookup FIX: Use annotation.variantKey ***
     const annotationsByKey = {};
     for (const annotation of annotationData) {
-      // Use the input identifier that links back to the VCF record
-      // Prioritize originalInput if available
-      const key = annotation.originalInput || annotation.input;
-      if (key) {
-        // If multiple annotations map to the same key (e.g., split multi-allelic), store as array
-        if (!annotationsByKey[key]) {
-          annotationsByKey[key] = [];
+      if (annotation.variantKey) {
+        // Use the pre-assigned key
+        if (!annotationsByKey[annotation.variantKey]) {
+          annotationsByKey[annotation.variantKey] = [];
         }
-        annotationsByKey[key].push(annotation);
+        annotationsByKey[annotation.variantKey].push(annotation);
+      } else {
+        // Fallback using originalInput (less reliable now)
+        const lookupKey = annotation.originalInput || annotation.input;
+        if (lookupKey) {
+          if (!annotationsByKey[lookupKey]) {
+            annotationsByKey[lookupKey] = [];
+          }
+          annotationsByKey[lookupKey].push(annotation);
+          debugOutput(
+            `_groupAnnotationsByPosition: Warning - Used fallback key '${lookupKey}' for annotation lookup.`
+          );
+        } else {
+          debugOutput(
+            `_groupAnnotationsByPosition: Warning - Could not determine key for annotation: ${JSON.stringify(annotation)}`
+          );
+        }
       }
     }
-    debugOutput(`Mapped ${Object.keys(annotationsByKey).length} unique input keys to annotations.`);
+    debugOutput(
+      `_groupAnnotationsByPosition: Built annotationsByKey map with ${Object.keys(annotationsByKey).length} keys.`
+    );
 
     // Process based on the original VCF structure preserved in vcfRecordMap
     for (const [key, entry] of vcfRecordMap.entries()) {
+      // key is CHR-POS-REF-ALT
       const { originalRecord, alt } = entry; // the specific ALT allele from the original VCF line
       if (!originalRecord) {
         debugOutput(`Warning: No original record found for VCF entry key: ${key}`);
@@ -142,6 +162,11 @@ function _groupAnnotationsByPosition(annotationData, vcfRecordMap) {
       const ref = originalRecord.REF || '';
       const id = originalRecord.ID && originalRecord.ID !== '.' ? originalRecord.ID : '.'; // Prefer original ID
       const posKey = `${chrom}:${pos}:${ref}`;
+
+      // *** DEBUG POINT 15: Processing VCF Record Map Entry ***
+      debugOutput(
+        `_groupAnnotationsByPosition (VCF Path): Processing vcfRecordMap Key='${key}', PosKey='${posKey}', ALT='${alt}'`
+      );
 
       if (!positionGroups.has(posKey)) {
         positionGroups.set(posKey, {
@@ -155,55 +180,37 @@ function _groupAnnotationsByPosition(annotationData, vcfRecordMap) {
       }
 
       const group = positionGroups.get(posKey);
+      // *** Use the key directly from vcfRecordMap for lookup ***
       const matchingAnnotations = annotationsByKey[key] || [];
+      // *** DEBUG POINT 16: Annotations Found for VCF Key ***
+      debugOutput(` -> Found ${matchingAnnotations.length} annotation(s) for Key='${key}'`);
 
       // Find the specific annotation that corresponds to this ALT allele
-      // VEP results might be split, so we look for the one matching the VCF ALT
-      // Simple case: only one annotation for this input key
-      let annotationForAlt = null;
-      if (matchingAnnotations.length === 1) {
-        annotationForAlt = matchingAnnotations[0];
-      } else {
-        // More complex: find annotation matching the ALT (might need vcfString comparison)
-        annotationForAlt = matchingAnnotations.find((ann) => {
-          if (ann.vcfString) {
-            const [, , , annAlt] = ann.vcfString.split('-');
-            return annAlt === alt;
-          }
-          // Fallback if vcfString isn't available (less reliable)
-          return ann.input?.includes(alt); // Basic check
-        });
-      }
+      // If multiple annotations match the key (rare), we might just take the first
+      // (This assumes VEP results are appropriately associated upstream)
+      const annotationForAlt = matchingAnnotations.length > 0 ? matchingAnnotations[0] : null;
 
-      if (!annotationForAlt) {
-        debugOutput(
-          `Warning: Could not find matching annotation for VCF key ${key} and ALT ${alt}`
-        );
-        // Still add the ALT, but with empty annotation list
-        if (!group.alts.has(alt)) {
-          group.alts.set(alt, {
-            annotations: [],
-            originalInfo: originalRecord.INFO,
-            originalQual: originalRecord.QUAL,
-            originalFilter: originalRecord.FILTER,
-          });
-        } else {
-          // Merge if ALT already exists (should be rare for VCF input path)
-          group.alts.get(alt).annotations.push(...[]); // No annotation found
-        }
+      // *** DEBUG POINT 17: Annotation Matching ALT ***
+      debugOutput(
+        ` -> Annotation found for ALT='${alt}': ${!!annotationForAlt}. Content: ${JSON.stringify(annotationForAlt)}`
+      );
+
+      if (!group.alts.has(alt)) {
+        group.alts.set(alt, {
+          annotations: annotationForAlt ? [annotationForAlt] : [], // Start with the found annotation or empty
+          originalInfo: originalRecord.INFO,
+          originalQual: originalRecord.QUAL,
+          originalFilter: originalRecord.FILTER,
+        });
       } else {
-        if (!group.alts.has(alt)) {
-          group.alts.set(alt, {
-            annotations: [annotationForAlt],
-            originalInfo: originalRecord.INFO,
-            originalQual: originalRecord.QUAL,
-            originalFilter: originalRecord.FILTER,
-          });
-        } else {
-          // Add annotation if ALT allele exists (e.g. duplicate line in VCF)
+        // Add annotation if ALT allele exists and we found one
+        if (annotationForAlt) {
           group.alts.get(alt).annotations.push(annotationForAlt);
         }
       }
+      debugOutput(
+        ` -> Updated group for PosKey='${posKey}', ALT='${alt}'. Annotations count: ${group.alts.get(alt)?.annotations.length || 0}`
+      );
     }
   } else {
     // Handle non-VCF input: Construct VCF fields primarily from annotationData.vcfString
@@ -211,8 +218,7 @@ function _groupAnnotationsByPosition(annotationData, vcfRecordMap) {
     for (const annotation of annotationData) {
       if (!annotation || !annotation.vcfString) {
         debugOutput(
-          `Warning: Skipping annotation due to missing 'vcfString'.
-           Input: ${annotation?.originalInput || annotation?.input}`
+          `Warning: Skipping annotation due to missing 'vcfString'. Input: ${annotation?.originalInput || annotation?.input}`
         );
         continue;
       }
@@ -221,8 +227,7 @@ function _groupAnnotationsByPosition(annotationData, vcfRecordMap) {
       const parts = annotation.vcfString.split('-');
       if (parts.length !== 4) {
         debugOutput(
-          `Warning: Skipping due to unexpected vcfString format: '${annotation.vcfString}'.
-           Expected CHROM-POS-REF-ALT. Input: ${annotation?.originalInput}`
+          `Warning: Skipping due to unexpected vcfString format: '${annotation.vcfString}'. Expected CHROM-POS-REF-ALT. Input: ${annotation?.originalInput}`
         );
         continue;
       }
@@ -230,17 +235,13 @@ function _groupAnnotationsByPosition(annotationData, vcfRecordMap) {
       const pos = parseInt(posStr, 10);
 
       if (isNaN(pos)) {
-        debugOutput(
-          `Invalid POS in vcfString: '${posStr}'.
-           Input: ${annotation?.originalInput}`
-        );
+        debugOutput(`Invalid POS in vcfString: '${posStr}'. Input: ${annotation?.originalInput}`);
         continue;
       }
 
       if (!chrom || !ref || !alt) {
         debugOutput(
-          `Warning: Missing CHROM/REF/ALT in vcfString: '${annotation.vcfString}'.
-           Input: ${annotation?.originalInput}`
+          `Warning: Missing CHROM/REF/ALT in vcfString: '${annotation.vcfString}'. Input: ${annotation?.originalInput}`
         );
         continue;
       }
@@ -252,6 +253,12 @@ function _groupAnnotationsByPosition(annotationData, vcfRecordMap) {
           : '.';
 
       const posKey = `${chrom}:${pos}:${ref}`;
+      const key = annotation.variantKey || `${chrom}-${pos}-${ref}-${alt}`; // Use assigned key if available
+
+      // *** DEBUG POINT 18: Processing Non-VCF Annotation ***
+      debugOutput(
+        `_groupAnnotationsByPosition (Non-VCF Path): Processing annotation Key='${key}', PosKey='${posKey}', ALT='${alt}'`
+      );
 
       if (!positionGroups.has(posKey)) {
         positionGroups.set(posKey, {
@@ -276,9 +283,15 @@ function _groupAnnotationsByPosition(annotationData, vcfRecordMap) {
         // This could happen if the same variant was input multiple times (e.g., rsID and HGVS)
         group.alts.get(alt).annotations.push(annotation);
       }
+      debugOutput(
+        ` -> Updated group for PosKey='${posKey}', ALT='${alt}'. Annotations count: ${group.alts.get(alt)?.annotations.length || 0}`
+      );
     }
   }
-
+  // *** DEBUG POINT 19: Final Position Groups ***
+  debugOutput(
+    `_groupAnnotationsByPosition: Final positionGroups size=${positionGroups.size}. Keys: ${JSON.stringify(Array.from(positionGroups.keys()))}`
+  );
   return positionGroups;
 }
 
@@ -297,40 +310,67 @@ function _formatVcfInfoField(positionGroupData, vlCsqFormatFields) {
   let dedInhPattern = null;
   let compHetDetails = null;
 
-  // --- Collect CSQ strings for all ALTs/annotations ---
+  // *** DEBUG POINT 20: Formatting INFO for Position ***
+  debugOutput(
+    `_formatVcfInfoField: Formatting INFO for PosKey='${positionGroupData.chrom}:${positionGroupData.pos}:${positionGroupData.ref}'`
+  );
+
+  // --- Collect CSQ and Inheritance Info ---
   for (const [altAllele, altData] of positionGroupData.alts.entries()) {
-    // Capture firstAltData reliably
+    // *** DEBUG POINT 21: Processing ALT within INFO ***
+    debugOutput(
+      ` -> Processing ALT='${altAllele}'. Has ${altData.annotations?.length} annotation(s).`
+    );
+    // Capture firstAltData reliably if not already set
     if (!firstAltData) firstAltData = altData;
 
     if (altData.annotations && altData.annotations.length > 0) {
       for (const annotation of altData.annotations) {
-        // Generate CSQ for this annotation/ALT pair
+        // *** DEBUG POINT 22: Formatting CSQ String ***
         const csqString = formatVcfCsqString(annotation, vlCsqFormatFields, altAllele);
+        debugOutput(
+          `  -> CSQ for Annotation (Input='${annotation.originalInput || annotation.input}'): '${csqString}'`
+        );
         if (csqString) {
           allCsqStringsForLine.push(csqString);
         }
 
-        // --- Extract Inheritance Info ONCE per VCF line---
+        // *** DEBUG POINT 23: Extracting Inheritance Info ***
+        // Extract Inheritance Info ONCE per VCF line
         if (!inheritanceInfoFound && annotation.deducedInheritancePattern) {
+          debugOutput(
+            `  -> Found Inheritance data in annotation for Input='${annotation.originalInput || annotation.input}'`
+          );
           if (typeof annotation.deducedInheritancePattern === 'object') {
             dedInhPattern = annotation.deducedInheritancePattern.prioritizedPattern;
             if (annotation.deducedInheritancePattern.compHetDetails) {
               const details = annotation.deducedInheritancePattern.compHetDetails;
+              // Only add comphet tag if it's a confirmed or possible candidate with partners
               if (
                 (details.isCandidate || details.isPossible) &&
                 details.partnerVariantKeys?.length > 0
               ) {
                 compHetDetails = {
                   partners: details.partnerVariantKeys.join(','),
-                  gene: details.geneSymbol || '',
+                  gene: details.geneSymbol || '', // Ensure gene symbol exists
                 };
+                debugOutput(
+                  `   -> CompHet details found: Partners='${compHetDetails.partners}', Gene='${compHetDetails.gene}'`
+                );
+              } else {
+                debugOutput(
+                  `   -> CompHet details present but not a candidate/possible or no partners.`
+                );
               }
+            } else {
+              debugOutput(`   -> No CompHet details found in inheritance object.`);
             }
           } else {
-            // Backward compatibility
+            // Backward compatibility or simple string pattern
             dedInhPattern = annotation.deducedInheritancePattern;
+            debugOutput(`   -> Found simple inheritance pattern string: '${dedInhPattern}'`);
           }
-          inheritanceInfoFound = true; // Mark as found
+          inheritanceInfoFound = true; // Mark as found so we don't repeat for other ALTs/annotations on the same line
         }
         // --- End Inheritance Info Extraction ---
       }
@@ -341,10 +381,14 @@ function _formatVcfInfoField(positionGroupData, vlCsqFormatFields) {
   const infoParts = [];
 
   // Add original INFO fields first (excluding managed tags)
+  // *** DEBUG POINT 24: Original INFO Check ***
+  debugOutput(` -> Original INFO from first ALT: ${JSON.stringify(firstAltData?.originalInfo)}`);
   if (firstAltData?.originalInfo) {
     const originalInfoString = Object.entries(firstAltData.originalInfo)
       .filter(([key]) => !['VL_CSQ', 'VL_DED_INH', 'VL_COMPHET'].includes(key))
-      .map(([key, value]) => (value === true ? key : `${key}=${value}`))
+      .map(([key, value]) =>
+        value === true || value === 'true' || value === '' ? key : `${key}=${value}`
+      ) // Handle flags correctly
       .join(';');
     if (originalInfoString) {
       infoParts.push(originalInfoString);
@@ -352,26 +396,51 @@ function _formatVcfInfoField(positionGroupData, vlCsqFormatFields) {
   }
 
   // Add VL_CSQ tag if there were consequences
+  // *** DEBUG POINT 25: Adding CSQ and Inheritance Tags ***
+  debugOutput(
+    ` -> Adding VL_CSQ: ${allCsqStringsForLine.length > 0 ? 'Yes' : 'No'}. Count: ${allCsqStringsForLine.length}`
+  );
   if (allCsqStringsForLine.length > 0) {
     infoParts.push(`VL_CSQ=${allCsqStringsForLine.join(',')}`);
   }
   // *** NOTE: If no CSQ strings, the tag is omitted entirely ***
 
-  // Add inheritance pattern if available and not 'unknown'
-  if (dedInhPattern && dedInhPattern !== 'unknown') {
-    infoParts.push(`VL_DED_INH=${encodeURIComponent(dedInhPattern)}`);
+  // *** ADD INHERITANCE TAGS ***
+  // Add VL_DED_INH if available and meaningful
+  const ignorablePatterns = [
+    'unknown',
+    'reference',
+    'unknown_not_processed',
+    'error_analysis_failed',
+    // Add other patterns that shouldn't be outputted if necessary
+  ];
+  debugOutput(
+    ` -> Adding VL_DED_INH: ${dedInhPattern && !ignorablePatterns.includes(dedInhPattern) && !dedInhPattern?.startsWith('unknown_') && !dedInhPattern?.startsWith('error_') ? 'Yes (' + dedInhPattern + ')' : 'No'}`
+  );
+  if (
+    dedInhPattern &&
+    !ignorablePatterns.includes(dedInhPattern) &&
+    !dedInhPattern.startsWith('unknown_') &&
+    !dedInhPattern.startsWith('error_')
+  ) {
+    // Ensure pattern is safe for VCF INFO field (basic check)
+    const safePattern = String(dedInhPattern).replace(/[;=,\s|]/g, '_'); // Replace problematic characters more broadly
+    infoParts.push(`VL_DED_INH=${safePattern}`);
   }
 
-  // Add compound heterozygous details if available
+  // Add VL_COMPHET if details were extracted
+  debugOutput(` -> Adding VL_COMPHET: ${compHetDetails ? 'Yes' : 'No'}`);
   if (compHetDetails) {
-    infoParts.push(
-      `VL_COMPHET=${encodeURIComponent(compHetDetails.partners)}|\
-${encodeURIComponent(compHetDetails.gene)}`
-    );
+    const safePartners = String(compHetDetails.partners).replace(/[;=,\s|]/g, '_');
+    const safeGene = String(compHetDetails.gene).replace(/[;=,\s|]/g, '_');
+    infoParts.push(`VL_COMPHET=${safePartners}|${safeGene}`); // Use pipe separator as per description
   }
+  // *** END INHERITANCE TAGS ***
 
-  // --- Join and Return ---
-  return infoParts.length > 0 ? infoParts.join(';') : '.';
+  const finalInfoString = infoParts.length > 0 ? infoParts.join(';') : '.';
+  // *** DEBUG POINT 26: Final INFO String ***
+  debugOutput(` -> Final INFO string: '${finalInfoString}'`);
+  return finalInfoString;
 }
 
 /**
@@ -397,7 +466,9 @@ function _constructVcfLine(positionGroupData, infoString) {
 
   // Get QUAL and FILTER from the first ALT data, if available
   const qual =
-    firstAltData && firstAltData.originalQual !== undefined ? firstAltData.originalQual : '.';
+    firstAltData && firstAltData.originalQual !== undefined && firstAltData.originalQual !== null
+      ? firstAltData.originalQual
+      : '.';
 
   // Handle FILTER field according to VCF spec
   let filter = 'PASS'; // Default to PASS for non-VCF input or undefined filter
@@ -454,6 +525,10 @@ function _generateDefaultVcfHeader() {
  * @returns {string} The complete VCF formatted content.
  */
 function formatAnnotationsToVcf(annotationData, vcfRecordMap, vcfHeaderLines, vlCsqFormatFields) {
+  // *** DEBUG POINT 27: Starting VCF Formatting ***
+  debugOutput(
+    `formatAnnotationsToVcf: Starting formatting. Annotation count=${annotationData?.length}, vcfRecordMap size=${vcfRecordMap?.size}`
+  );
   const finalHeaderLines = _prepareVcfHeader(vcfHeaderLines, vlCsqFormatFields);
 
   if (!annotationData || !Array.isArray(annotationData) || annotationData.length === 0) {
@@ -472,6 +547,8 @@ function formatAnnotationsToVcf(annotationData, vcfRecordMap, vcfHeaderLines, vl
     outputDataLines.push(vcfLine);
   }
 
+  // *** DEBUG POINT 28: Final VCF Output Lines ***
+  debugOutput(`formatAnnotationsToVcf: Generated ${outputDataLines.length} data lines.`);
   const finalOutput = [...finalHeaderLines, ...outputDataLines];
 
   // Final check: if only header lines are present, maybe something went wrong

@@ -52,6 +52,7 @@ async function processSingleVariant(variant, params) {
   let variantData = null;
   let annotationData;
   let inputInfo = '';
+  let standardKey = variant; // Use original input as key initially
 
   if (inputFormat === 'VCF') {
     const parts = variant.trim().split('-');
@@ -63,6 +64,8 @@ async function processSingleVariant(variant, params) {
     const [chrom, pos, ref, alt] = parts;
     const formattedVariant = `${chrom} ${pos} . ${ref} ${alt} . . .`;
     inputInfo = formattedVariant;
+    // The variant itself is the standard key for VCF input
+    standardKey = variant;
     annotationData = await vepRegionsAnnotation(
       [formattedVariant],
       params.vepOptions,
@@ -92,6 +95,8 @@ async function processSingleVariant(variant, params) {
     const [chrom, pos, ref, alt] = parts;
     const formattedVariant = `${chrom} ${pos} . ${ref} ${alt} . . .`;
     inputInfo = formattedVariant;
+    // For HGVS, the recoded vcfString becomes the standard key
+    standardKey = vcfString;
     annotationData = await vepRegionsAnnotation(
       [formattedVariant],
       params.vepOptions,
@@ -99,23 +104,35 @@ async function processSingleVariant(variant, params) {
     );
   }
 
-  // Add input info to each annotation
+  // Add input info and standardized key to each annotation
   if (Array.isArray(annotationData)) {
-    annotationData = annotationData.map((ann) => ({
-      originalInput: variant,
-      inputFormat,
-      input: inputInfo,
-      ...ann,
-    }));
+    annotationData = annotationData.map((ann) => {
+      // *** DEBUG POINT 5: Single Variant Annotation Key Association ***
+      debugDetailed(
+        `processSingleVariant: Assigning variantKey='${standardKey}' to annotation for Input='${variant}'`
+      );
+      return {
+        originalInput: variant,
+        inputFormat,
+        input: inputInfo,
+        variantKey: standardKey, // Add the standardized key here
+        ...ann,
+      };
+    });
   } else {
+    // Handle case where annotationData is not an array (should not happen with VEP regions)
     annotationData = [
       {
         originalInput: variant,
         inputFormat,
         input: inputInfo,
+        variantKey: standardKey,
         ...annotationData,
       },
     ];
+    debugDetailed(
+      `processSingleVariant: Assigning variantKey='${standardKey}' to non-array annotation for Input='${variant}'`
+    );
   }
 
   return {
@@ -182,13 +199,18 @@ async function processBatchVariants(variants, params) {
     // Associate VEP results with original variants
     if (Array.isArray(vcfAnnotations)) {
       vcfAnnotations.forEach((annotation, index) => {
-        const originalVariant = vcfVariants[index];
+        const originalVariant = vcfVariants[index]; // This IS the CHR-POS-REF-ALT key
         const mappingInfo = variantMapping[originalVariant];
-
+        const key = originalVariant; // Use the consistent input key
+        // *** DEBUG POINT 6: VCF Batch Annotation Key Association ***
+        debugDetailed(
+          `processBatchVariants (VCF): Assigning variantKey='${key}' to annotation for OrigInput='${originalVariant}', VEPInput='${mappingInfo.formattedVariant}'`
+        );
         annotationData.push({
           originalInput: originalVariant,
           inputFormat: 'VCF',
-          input: mappingInfo.formattedVariant,
+          input: mappingInfo.formattedVariant, // VEP input format
+          variantKey: key, // Use the standardized key
           ...annotation,
         });
       });
@@ -231,7 +253,11 @@ async function processBatchVariants(variants, params) {
               if (parts.length === 4) {
                 const [chrom, pos, ref, alt] = parts;
                 const formattedVariant = `${chrom} ${pos} . ${ref} ${alt} . . .`;
+                const standardKey = `${chrom}-${pos}-${ref}-${alt}`; // Create the standard key
 
+                debugDetailed(
+                  `processBatchVariants (HGVS Recode): Mapping formatted VEP input '${formattedVariant}' (Key='${standardKey}') back to OrigInput='${originalVariant}'`
+                );
                 // Store mapping information
                 uniqueVcfStrings.push(formattedVariant);
                 if (!vcfToOriginalMapping[formattedVariant]) {
@@ -243,6 +269,7 @@ async function processBatchVariants(variants, params) {
                   recoderData: result,
                   alleleKey: alleleKey,
                   vcfString: vcfString,
+                  standardKey: standardKey, // Store the key derived from vcfString
                 });
 
                 foundValidVcf = true;
@@ -272,15 +299,22 @@ async function processBatchVariants(variants, params) {
     // Associate VEP results with original variants through the mapping
     if (Array.isArray(hgvsAnnotations)) {
       hgvsAnnotations.forEach((annotation, index) => {
-        const formattedVariant = uniqueVcfSet[index];
-        const mappings = vcfToOriginalMapping[formattedVariant];
+        const formattedVariant = uniqueVcfSet[index]; // The VEP input string
+        const mappings = vcfToOriginalMapping[formattedVariant]; // Get original variant(s) info
 
         // For each original variant mapped to this VCF string
         for (const mapping of mappings) {
+          // *** DEBUG POINT 7: HGVS Batch Annotation Key Association ***
+          // The key should be the one derived from the vcfString
+          const key = mapping.standardKey;
+          debugDetailed(
+            `processBatchVariants (HGVS Annotate): Assigning variantKey='${key}' to annotation for OrigInput='${mapping.originalInput}', VEPInput='${formattedVariant}'`
+          );
           annotationData.push({
             originalInput: mapping.originalInput,
             inputFormat: mapping.inputFormat,
-            input: formattedVariant,
+            input: formattedVariant, // VEP input format
+            variantKey: key, // Use the standardized key from vcfString
             recoderData: mapping.recoderData,
             allele: mapping.alleleKey,
             vcfString: mapping.vcfString,
@@ -290,6 +324,10 @@ async function processBatchVariants(variants, params) {
       });
     }
   }
+  // *** DEBUG POINT 8: Final Combined Annotation Data (Before Inheritance) ***
+  debugDetailed(
+    `processBatchVariants: Final combined annotationData before inheritance (count=${annotationData.length}): ${JSON.stringify(annotationData.slice(0, 2))}...`
+  );
 
   return { annotationData };
 }
@@ -314,6 +352,8 @@ async function processBatchVariants(variants, params) {
  * containing family relationships and affected status.
  * @param {boolean} [params.calculateInheritance] - Whether to calculate inheritance patterns.
  * @param {Object} [params.sampleMap] - Manual mapping of sample roles if PED not available.
+ * @param {Map<string, Object>} [params.vcfRecordMap] - Map from vcfReader containing VCF record data.
+ * @param {Array<string>} [params.vcfHeaderLines] - Array of header lines from VCF file.
  * @param {Array<string>} [params.samples] - List of sample IDs from VCF file.
  * @return {Promise<Object>} Result object with meta, variantData, and
  * annotationData properties.
@@ -338,16 +378,56 @@ async function analyzeVariant(params) {
   const stepsPerformed = [];
 
   // Handle both single variant and batch variants for backwards compatibility
-  const variants = params.variants || (params.variant ? [params.variant] : []);
+  // Use variants from VCF input if available, otherwise use other inputs
+  const variants = params.vcfInput ? params.variants : params.variants || [];
+
+  if (!params.vcfInput && variants.length === 0 && params.variant) {
+    variants.push(params.variant); // Handle single variant input
+  }
 
   if (variants.length === 0) {
-    throw new Error('No variants provided. Use either params.variant or params.variants.');
+    throw new Error(
+      'No variants provided. Use --variant, --variants, --variants-file, or --vcf-input.'
+    );
   }
 
   let result;
-  const batchProcessing = variants.length > 1;
+  const batchProcessing = variants.length > 1 || params.vcfInput; // vcfInput is always batch
 
-  if (batchProcessing) {
+  // If input is VCF, VEP is called directly, no need for separate recoding step
+  if (params.vcfInput) {
+    stepsPerformed.push(`Processing ${variants.length} variants from VCF file`);
+    // VEP is called directly using the pre-formatted variants
+    const formattedVepInput = variants.map((vcfStr) => {
+      const [chrom, pos, ref, alt] = vcfStr.split('-');
+      return `${chrom} ${pos} . ${ref} ${alt} . . .`;
+    });
+    const vepAnnotations = await vepRegionsAnnotation(
+      formattedVepInput,
+      params.vepOptions,
+      params.cache
+    );
+    // Need to associate annotations back to the original CHR-POS-REF-ALT key
+    result = { annotationData: [] };
+    if (Array.isArray(vepAnnotations)) {
+      vepAnnotations.forEach((annotation, index) => {
+        const originalKey = variants[index]; // variants contains the CHR-POS-REF-ALT keys
+        // *** Explicitly assign variantKey for VCF input path ***
+        debugDetailed(
+          `analyzeVariant (VCF Input Path): Assigning variantKey='${originalKey}' to annotation.`
+        );
+        result.annotationData.push({
+          originalInput: originalKey,
+          inputFormat: 'VCF',
+          input: formattedVepInput[index], // VEP input format
+          variantKey: originalKey, // Use the standardized key
+          ...annotation,
+        });
+      });
+    } else {
+      debug('VEP did not return an array for VCF input.');
+    }
+  } else if (batchProcessing) {
     stepsPerformed.push(`Processing ${variants.length} variants in batch mode`);
     result = await processBatchVariants(variants, params);
   } else {
@@ -355,6 +435,11 @@ async function analyzeVariant(params) {
     stepsPerformed.push('Processing single variant');
     result = await processSingleVariant(variants[0], params);
   }
+
+  // *** DEBUG POINT 9: Annotation Data Before Scoring/Inheritance ***
+  debugDetailed(
+    `analyzeVariant: Annotation data BEFORE scoring/inheritance (count=${result.annotationData?.length}): ${JSON.stringify(result.annotationData?.slice(0, 2))}...`
+  );
 
   // Optionally apply scoring to annotation data.
   if (params.scoringConfig) {
@@ -381,7 +466,7 @@ async function analyzeVariant(params) {
 
   let finalOutput = {
     meta: metaInfo,
-    variantData: result.variantData,
+    variantData: result.variantData, // Will be null for VCF input
     annotationData: result.annotationData,
   };
 
@@ -409,70 +494,39 @@ async function analyzeVariant(params) {
     // Create a map of variant keys to genotype data
     const genotypesMap = new Map();
 
-    // Ensure finalOutput.annotationData is populated before this loop
-    if (!finalOutput || !Array.isArray(finalOutput.annotationData)) {
-      debugDetailed(
-        'Error: finalOutput.annotationData is not available or not an array before building genotypesMap.'
-      );
-    } else {
-      debugDetailed(`Starting to build genotypesMap for inheritance...`);
-      debugDetailed(
-        `Iterating through ${finalOutput.annotationData.length} annotations to build genotypesMap.`
-      );
-      for (const annotation of finalOutput.annotationData) {
-        try {
-          // Regenerate key based on annotation details from VEP response
-          const chrom = annotation.seq_region_name || annotation.chr || '';
-          const pos = annotation.start || '';
-          // REF/ALT from allele_string might be more reliable post-VEP
-          const alleleParts = annotation.allele_string ? annotation.allele_string.split('/') : [];
-          const ref = alleleParts[0] || '';
-          const alt = alleleParts[1] || '';
-
-          if (!chrom || !pos || !ref || !alt) {
-            debugDetailed(
-              `Missing components: chr=${chrom}, pos=${pos}, ref=${ref}, alt=${alt}. ` +
-                `Input: ${annotation?.input}`
-            );
-            continue;
-          }
-
-          const key = `${chrom}:${pos}:${ref}:${alt}`;
-          // Make sure variantKey is consistently set
-          annotation.variantKey = key;
-          debugDetailed(
-            `Key: ${key}. Input: ${annotation?.input}. ` + `Original: ${annotation?.originalInput}`
-          );
-
-          if (params.vcfRecordMap && params.vcfRecordMap.has(key)) {
-            const vcfRecord = params.vcfRecordMap.get(key);
-            debugDetailed(
-              `VCF record ${key}: Has genotypes = ${Boolean(vcfRecord.genotypes?.size)}`
-            );
-
-            if (vcfRecord.genotypes && vcfRecord.genotypes.size > 0) {
-              genotypesMap.set(key, vcfRecord.genotypes);
-              debugDetailed(
-                `-> Genotypes ${key}: ${JSON.stringify(Array.from(vcfRecord.genotypes.entries()))}`
-              );
-            } else {
-              debugDetailed(`-> No genotype data found in VCF record map entry for variant ${key}`);
-            }
-          } else {
-            // Log details about why the key might be missing
-            const mapKeys = params.vcfRecordMap ? Array.from(params.vcfRecordMap.keys()) : [];
-            debugDetailed(
-              `-> VCF record NOT found for key ${key}. vcfRecordMap size: ${params.vcfRecordMap ? params.vcfRecordMap.size : 'N/A'}. Map keys sample: ${mapKeys.slice(0, 5).join(', ')}...`
-            );
-          }
-        } catch (error) {
-          debugDetailed(
-            `Error preparing variant key or getting genotypes for an annotation: ${error.message}`
-          );
+    // Build genotypesMap from vcfRecordMap (passed in params for VCF input)
+    if (params.vcfRecordMap && params.vcfRecordMap.size > 0) {
+      debugDetailed(`Building genotypesMap from provided vcfRecordMap...`);
+      for (const [key, recordData] of params.vcfRecordMap.entries()) {
+        if (recordData.genotypes && recordData.genotypes.size > 0) {
+          genotypesMap.set(key, recordData.genotypes);
+          // Debug log added inside loop below for clarity
+        } else {
+          debugDetailed(` -> No genotype data found in VCF record map entry for variant ${key}`);
         }
       }
-      debugDetailed(`Finished building genotypesMap. Final Size: ${genotypesMap.size}`);
+    } else {
+      // Fallback attempt (might be less reliable if keys aren't standardized yet)
+      debugDetailed(`Attempting to build genotypesMap from annotationData (fallback)...`);
+      if (!finalOutput || !Array.isArray(finalOutput.annotationData)) {
+        debugDetailed(
+          'Error: finalOutput.annotationData is not available or not an array before building genotypesMap (fallback).'
+        );
+      } else {
+        for (const annotation of finalOutput.annotationData) {
+          const key = annotation.variantKey; // Use the key assigned earlier
+          if (key && annotation.genotypes && annotation.genotypes.size > 0) {
+            // Assuming genotypes might be attached directly (less likely now)
+            genotypesMap.set(key, annotation.genotypes);
+          }
+        }
+      }
     }
+
+    // *** DEBUG POINT 10: Genotypes Map for Inheritance ***
+    debugDetailed(
+      `analyzeVariant: Built genotypesMap for inheritance (size=${genotypesMap.size}). Keys: ${JSON.stringify(Array.from(genotypesMap.keys()).slice(0, 5))}...`
+    );
 
     // Only proceed if we have genotype data for at least one variant
     if (genotypesMap.size > 0) {
@@ -502,23 +556,36 @@ async function analyzeVariant(params) {
         debugDetailed('Inheritance Core: Preparing to call analyzeInheritanceForSample...');
         try {
           const inheritanceResults = inheritance.analyzeInheritanceForSample(
-            finalOutput.annotationData,
-            genotypesMap,
+            finalOutput.annotationData, // Pass annotations which now should have variantKey
+            genotypesMap, // Pass the map built from vcfRecordMap
             params.pedigreeData,
             params.sampleMap
           );
-          debugDetailed(`Inheritance analysis complete. Results: ${inheritanceResults?.size}`);
+          // *** DEBUG POINT 11: Inheritance Results ***
+          debugDetailed(
+            `analyzeVariant: Received inheritanceResults (size=${inheritanceResults?.size}). Keys: ${JSON.stringify(Array.from(inheritanceResults?.keys() || []).slice(0, 5))}...`
+          );
 
           // Update annotations with inheritance results
           let calculatedPatternsCount = 0;
           if (inheritanceResults instanceof Map) {
+            // *** DEBUG POINT 12: Merging Inheritance Results ***
+            debugDetailed(
+              `analyzeVariant: Merging inheritance results into ${finalOutput.annotationData?.length} annotations...`
+            );
             for (const annotation of finalOutput.annotationData) {
-              if (annotation.variantKey && inheritanceResults.has(annotation.variantKey)) {
-                annotation.deducedInheritancePattern = inheritanceResults.get(
-                  annotation.variantKey
+              const keyToLookup = annotation.variantKey; // Use the key assigned earlier
+              if (keyToLookup && inheritanceResults.has(keyToLookup)) {
+                const inheritanceData = inheritanceResults.get(keyToLookup);
+                annotation.deducedInheritancePattern = inheritanceData;
+                debugDetailed(
+                  ` -> Merged inheritance for Key='${keyToLookup}': ${JSON.stringify(inheritanceData)}`
                 );
                 calculatedPatternsCount++;
               } else {
+                debugDetailed(
+                  ` -> No inheritance result found for Key='${keyToLookup}' (Annotation Input: ${annotation.originalInput || annotation.input})`
+                );
                 annotation.deducedInheritancePattern = {
                   prioritizedPattern: 'unknown_not_processed',
                   possiblePatterns: [],
@@ -572,6 +639,11 @@ async function analyzeVariant(params) {
     }
   }
 
+  // *** DEBUG POINT 13: Final Annotation Data Before Formatting ***
+  debugDetailed(
+    `analyzeVariant: Final annotationData BEFORE formatting (count=${finalOutput.annotationData?.length}). Check for deducedInheritancePattern: ${JSON.stringify(finalOutput.annotationData?.slice(0, 2))}...`
+  );
+
   if (params.output && params.output.toUpperCase() === 'SCHEMA') {
     finalOutput = mapOutputToSchemaOrg(finalOutput);
     addCustomFormats();
@@ -592,6 +664,13 @@ async function analyzeVariant(params) {
   // Apply formatting based on output format
   const outputFormat = params.output ? params.output.toUpperCase() : 'JSON';
   if (['CSV', 'TSV', 'VCF'].includes(outputFormat)) {
+    // *** DEBUG POINT 14: Data Passed to VCF Formatter ***
+    if (outputFormat === 'VCF') {
+      debugDetailed(`analyzeVariant: Passing data to filterAndFormatResults for VCF output.`);
+      debugDetailed(` -> annotationData count: ${finalOutput.annotationData?.length}`);
+      debugDetailed(` -> vcfRecordMap size: ${finalOutput.vcfRecordMap?.size}`);
+      debugDetailed(` -> vcfHeaderLines count: ${finalOutput.vcfHeaderLines?.length}`);
+    }
     // For CSV/TSV/VCF, return the formatted string directly
     return filterAndFormatResults(finalOutput, filterParam, outputFormat);
   } else if (outputFormat === 'JSON' && filterParam) {

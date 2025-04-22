@@ -31,6 +31,8 @@ benchmark_*.log*
 *results.json
 # Exclude specific .txt files that we want to allow
 *.txt
+# log files in the root directory
+
 !examples/*.txt
 !examples/benchmark_data/*.txt
 !sample_variants.txt

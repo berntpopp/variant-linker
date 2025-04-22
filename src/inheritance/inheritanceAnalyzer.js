@@ -287,10 +287,11 @@ function _mergeCompHetResults(inheritanceResults, geneSymbol, compHetResult) {
  * This is the main entry point for the inheritance analysis workflow.
  *
  * @param {Array<Object>} annotations - Variant objects with required properties.
- * @param {Map<string, Map<string, string>>} genotypesMap - Variant genotype maps.
+ *                                      Each must have a 'variantKey' property in CHR-POS-REF-ALT format.
+ * @param {Map<string, Map<string, string>>} genotypesMap - Variant genotype maps, keyed by CHR-POS-REF-ALT.
  * @param {Map<string, Object>|null} pedigreeData - Optional parsed pedigree data.
  * @param {Object|null} sampleMap - Optional role to sample ID mapping.
- * @returns {Map<string, Object>} Map of variantKeys to inheritance results.
+ * @returns {Map<string, Object>} Map of variantKeys (CHR-POS-REF-ALT) to inheritance results.
  */
 function analyzeInheritanceForSample(annotations, genotypesMap, pedigreeData, sampleMap) {
   debugDetailed(`--- Entering analyzeInheritanceForSample ---`);
@@ -310,16 +311,21 @@ function analyzeInheritanceForSample(annotations, genotypesMap, pedigreeData, sa
     debug('No genotype data provided for inheritance analysis.');
     // Populate results with error state for each annotation key if possible
     for (const ann of annotations) {
-      // Generate key if possible, otherwise log warning
-      const chrom = ann.seq_region_name || ann.chr || '';
-      const pos = ann.start || '';
-      const alleleParts = ann.allele_string ? ann.allele_string.split('/') : [];
-      const ref = alleleParts[0] || '';
-      const alt = alleleParts[1] || '';
-      const key = chrom && pos && ref && alt ? `${chrom}:${pos}:${ref}:${alt}` : null;
+      // Use the variantKey if already present, otherwise try to generate it
+      const key =
+        ann.variantKey ||
+        (() => {
+          const chrom = ann.seq_region_name || ann.chr || '';
+          const pos = ann.start || '';
+          const alleleParts = ann.allele_string ? ann.allele_string.split('/') : [];
+          const ref = alleleParts[0] || '';
+          const alt = alleleParts[1] || '';
+          // Use standardized hyphenated key format here as well
+          return chrom && pos && ref && alt ? `${chrom}-${pos}-${ref}-${alt}` : null;
+        })();
 
       if (key) {
-        ann.variantKey = key; // Assign key
+        ann.variantKey = key; // Ensure variantKey is set
         results.set(key, {
           prioritizedPattern: 'unknown_missing_genotypes',
           possiblePatterns: ['unknown_missing_genotypes'],
@@ -345,24 +351,14 @@ function analyzeInheritanceForSample(annotations, genotypesMap, pedigreeData, sa
   // --- Pass 1: Initial Pattern Deduction, Segregation, and Prioritization per Variant ---
   debugDetailed(`--- Pass 1: Initial Analysis (${annotations.length} variants) ---`);
   for (const annotation of annotations) {
-    // Regenerate key based on annotation details - ENSURE CONSISTENCY
-    const chrom = annotation.seq_region_name || annotation.chr || '';
-    const pos = annotation.start || '';
-    const alleleParts = annotation.allele_string ? annotation.allele_string.split('/') : [];
-    const ref = alleleParts[0] || '';
-    const alt = alleleParts.length > 1 ? alleleParts[1] : ''; // Handle cases like 'A/'
+    // Use the variantKey already assigned in variantLinkerCore
+    const variantKey = annotation.variantKey;
 
-    let variantKey = null;
-    if (chrom && pos && ref && alt) {
-      variantKey = `${chrom}:${pos}:${ref}:${alt}`;
-      annotation.variantKey = variantKey; // Ensure variantKey is set on the annotation object
-    } else {
+    if (!variantKey) {
       debugDetailed(
-        `  SKIPPING - Cannot generate valid variantKey.
-         Chrom: ${chrom}, Pos: ${pos}, Ref: ${ref}, Alt: ${alt}.
-         OriginalInput: ${annotation.originalInput}`
+        `  SKIPPING - Annotation is missing variantKey. OriginalInput: ${annotation.originalInput || annotation.input}`
       );
-      continue; // Skip processing this annotation if key cannot be formed
+      continue; // Skip processing this annotation if key is missing
     }
 
     debugDetailed(
@@ -371,20 +367,26 @@ function analyzeInheritanceForSample(annotations, genotypesMap, pedigreeData, sa
        Input=${annotation.originalInput || annotation.input}`
     );
 
+    // *** FIX: Use the correct variantKey (CHR-POS-REF-ALT) for genotype lookup ***
     const genotypes = genotypesMap.get(variantKey);
+
     if (!genotypes) {
+      // This log message is now more accurate if genotypesMap is correct but key is wrong
       debugDetailed(`  SKIPPING - No genotypes found for key ${variantKey} in genotypesMap.`);
       results.set(variantKey, {
         prioritizedPattern: 'unknown_missing_genotypes',
         possiblePatterns: ['unknown_missing_genotypes'],
         segregationStatus: {},
-        error: 'Genotype data not found in map for this variant key.',
+        error: `Genotype data not found in map for this variant key ('${variantKey}')`,
       });
       continue;
     }
 
     try {
       // 1. Deduce Patterns
+      // We need chrom info. Extract from key or annotation if possible.
+      const keyParts = variantKey.split('-'); // Use hyphen now
+      const chrom = keyParts[0] || annotation.seq_region_name || annotation.chr || 'unknown';
       const variantInfo = { chrom: chrom }; // Use consistent chrom value
       debugDetailed(`  --> Calling patternDeducer.deduceInheritancePatterns for ${variantKey}...`);
       const possiblePatterns = patternDeducer.deduceInheritancePatterns(
@@ -456,7 +458,7 @@ function analyzeInheritanceForSample(annotations, genotypesMap, pedigreeData, sa
       );
       debugDetailed(`  <-- prioritizePattern result: ${prioritizedPattern}`);
 
-      // Store initial result
+      // Store initial result using the correct variantKey
       results.set(variantKey, {
         prioritizedPattern,
         possiblePatterns,
@@ -467,6 +469,7 @@ function analyzeInheritanceForSample(annotations, genotypesMap, pedigreeData, sa
     } catch (error) {
       debug(`!!! ERROR analyzing inheritance for variant ${variantKey}: ${error.message} !!!`);
       debugDetailed(`Stack trace: ${error.stack}`);
+      // Store error using the correct variantKey
       results.set(variantKey, {
         prioritizedPattern: 'error_analysis_failed',
         possiblePatterns: ['error_analysis_failed'],
@@ -515,15 +518,17 @@ function analyzeInheritanceForSample(annotations, genotypesMap, pedigreeData, sa
 
       debugDetailed(`  Analyzing gene ${geneSymbol} (${geneVariants.length} variants)...`);
       try {
+        // Ensure compoundHetAnalyzer also receives the correct genotypesMap keyed by CHR-POS-REF-ALT
         const compHetResult = compoundHetAnalyzer.analyzeCompoundHeterozygous(
           geneVariants,
-          genotypesMap,
+          genotypesMap, // Pass the map keyed by CHR-POS-REF-ALT
           pedigreeData, // Pass PED data, analyzer handles null/missing case
           indexSampleId // Crucial parameter
         );
 
         if (compHetResult) {
           debugDetailed(`  --> Merging CompHet results for ${geneSymbol}...`);
+          // Ensure _mergeCompHetResults uses the correct hyphenated keys
           _mergeCompHetResults(results, geneSymbol, compHetResult);
           debugDetailed(`  <-- Finished merging CompHet results for ${geneSymbol}.`);
         } else {
@@ -534,6 +539,7 @@ function analyzeInheritanceForSample(annotations, genotypesMap, pedigreeData, sa
         debugDetailed(`Stack trace: ${compHetError.stack}`);
         // Optionally mark involved variants with an error status
         for (const variant of geneVariants) {
+          // Use the correct key to update the results map
           if (results.has(variant.variantKey)) {
             const currentResult = results.get(variant.variantKey);
             results.set(variant.variantKey, {

@@ -28,7 +28,7 @@ const VCF = require('@gmod/vcf').default;
  * @param {string} filePath - Path to the VCF file to read
  * @returns {Promise<Object>} Object containing:
  *   - variantsToProcess {Array<string>}: Array of variant strings in the format "CHROM-POS-REF-ALT"
- *   - vcfRecordMap {Map}: Map of variant keys to original VCF record data with genotypes
+ *   - vcfRecordMap {Map}: Map of variant keys ("CHROM-POS-REF-ALT") to original VCF record data with genotypes
  *   - headerText {string}: The complete original VCF header text
  *   - headerLines {Array<string>}: Array of header lines
  *   - samples {Array<string>}: Array of sample IDs found in the VCF
@@ -94,11 +94,11 @@ async function readVariantsFromVcf(filePath) {
       let record;
       try {
         record = parser.parseLine(line);
+        // *** DEBUG POINT: Log the raw parsed record ***
+        debugDetailed(`VCF Record Parsed: ${JSON.stringify(record)}`);
         debugDetailed(
           `VCF Record (${record?.CHROM}:${record?.POS}): Has samples = ${Boolean(record?.SAMPLES)}`
         );
-        // Note: record.SAMPLES is a function, record.SAMPLES() returns the data
-        // Logging record.SAMPLES directly might not show the genotypes
       } catch (parseError) {
         debug(
           `Warning: Failed to parse VCF line: ${line.substring(0, 100)}... ` +
@@ -156,14 +156,16 @@ async function readVariantsFromVcf(filePath) {
           continue;
         }
 
-        // Create a unique key for the variant
-        const key = `${chrom}:${pos}:${ref}:${alt}`;
+        // *** Key Generation FIX ***
+        // Use the CHR-POS-REF-ALT format consistently
+        const key = `${chrom}-${pos}-${ref}-${alt}`; // Use hyphenated key
+        const formattedVariant = key; // variantsToProcess uses this format
 
-        // Format variant for internal processing
-        const formattedVariant = `${chrom}-${pos}-${ref}-${alt}`;
-
-        // Add to variants to process
-        variantsToProcess.push(formattedVariant);
+        // *** DEBUG POINT 1: Key Generation ***
+        debugDetailed(
+          `vcfReader: Generated Key='${key}' (hyphenated) and FormattedVariant='${formattedVariant}' for ALT='${alt}'`
+        );
+        variantsToProcess.push(formattedVariant); // Add to variants to process
 
         // Store genotypes for this variant (CHROM/POS/REF/ALT)
         const genotypes = new Map();
@@ -241,7 +243,6 @@ async function readVariantsFromVcf(filePath) {
           }
         } else {
           // If no GENOTYPES function or no samples defined in header, store missing
-          // ** FIX: Corrected line break for length **
           debugDetailed(
             `No GENOTYPES function or no samples found for ${key}. ` +
               `Using './.' for all samples.`
@@ -251,24 +252,30 @@ async function readVariantsFromVcf(filePath) {
           }
         }
 
-        // Log the final genotypes Map before storing
+        // *** DEBUG POINT 2: Genotype Map Content ***
         debugDetailed(
-          `Final genotypes for ${key}: ${JSON.stringify(Array.from(genotypes.entries()))}`
+          `vcfReader: Final genotypes Map for Key='${key}': ${JSON.stringify(Array.from(genotypes.entries()))}`
         );
 
-        // Store original record info with genotypes
+        // *** Storing in vcfRecordMap FIX ***
+        // Store original record info with genotypes using the NEW key
         vcfRecordMap.set(key, {
+          // Use the new hyphenated key format
           chrom,
           pos,
           ref,
-          alt,
+          alt, // Store the specific ALT allele this entry corresponds to
           genotypes, // Store the populated or default genotypes map
           originalRecord: record, // Keep original record if needed elsewhere
         });
+        // *** DEBUG POINT 3: Storing in vcfRecordMap ***
+        debugDetailed(`vcfReader: Stored record in vcfRecordMap for Key='${key}'`);
       }
     }
 
     debug(`Processed ${variantsToProcess.length} variants from VCF file`);
+    // *** DEBUG POINT 4: Final Map Size ***
+    debugDetailed(`vcfReader: Final vcfRecordMap size: ${vcfRecordMap.size}`);
 
     return {
       variantsToProcess,
