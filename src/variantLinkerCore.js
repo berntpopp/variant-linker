@@ -73,6 +73,10 @@ async function processSingleVariant(variant, params) {
     );
   } else {
     variantData = await variantRecoder(variant, params.recoderOptions, params.cache);
+    // Ensure variantData is an array and has elements
+    if (!Array.isArray(variantData) || variantData.length === 0) {
+      throw new Error(`Variant Recoder did not return valid data for variant "${variant}"`);
+    }
     const firstKey = Object.keys(variantData[0])[0];
     const recoderEntry = variantData[0][firstKey];
     if (!recoderEntry || !recoderEntry.vcf_string || !Array.isArray(recoderEntry.vcf_string)) {
@@ -279,49 +283,71 @@ async function processBatchVariants(variants, params) {
         }
       }
 
+      // ** FIX: Handle variants where recoder doesn't return a VCF string **
       if (!foundValidVcf) {
-        throw new Error(
-          `No valid VCF string found in Variant Recoder response for variant "${originalVariant}"`
+        // Log warning instead of throwing error to allow processing other variants
+        console.warn(
+          `Warning: No valid VCF string found in Variant Recoder response for variant "${originalVariant}". Skipping.`
         );
+        debug(
+          `Warning: No valid VCF string found in Variant Recoder response for variant "${originalVariant}". Skipping.`
+        );
+        // Add a placeholder to annotationData
+        annotationData.push({
+          originalInput: originalVariant,
+          inputFormat: 'HGVS',
+          error: 'No valid VCF string from recoder',
+          annotationData: [], // Or null/undefined
+        });
       }
     }
 
     // Remove duplicates from uniqueVcfStrings while preserving order
     const uniqueVcfSet = [...new Set(uniqueVcfStrings)];
 
-    // Call VEP with unique formatted VCF strings
-    const hgvsAnnotations = await vepRegionsAnnotation(
-      uniqueVcfSet,
-      params.vepOptions,
-      params.cache
-    );
+    // Check if there are any VCF strings left to annotate
+    if (uniqueVcfSet.length > 0) {
+      // Call VEP with unique formatted VCF strings
+      const hgvsAnnotations = await vepRegionsAnnotation(
+        uniqueVcfSet,
+        params.vepOptions,
+        params.cache
+      );
 
-    // Associate VEP results with original variants through the mapping
-    if (Array.isArray(hgvsAnnotations)) {
-      hgvsAnnotations.forEach((annotation, index) => {
-        const formattedVariant = uniqueVcfSet[index]; // The VEP input string
-        const mappings = vcfToOriginalMapping[formattedVariant]; // Get original variant(s) info
+      // Associate VEP results with original variants through the mapping
+      if (Array.isArray(hgvsAnnotations)) {
+        hgvsAnnotations.forEach((annotation, index) => {
+          const formattedVariant = uniqueVcfSet[index]; // The VEP input string
+          const mappings = vcfToOriginalMapping[formattedVariant]; // Get original variant(s) info
 
-        // For each original variant mapped to this VCF string
-        for (const mapping of mappings) {
-          // *** DEBUG POINT 7: HGVS Batch Annotation Key Association ***
-          // The key should be the one derived from the vcfString
-          const key = mapping.standardKey;
-          debugDetailed(
-            `processBatchVariants (HGVS Annotate): Assigning variantKey='${key}' to annotation for OrigInput='${mapping.originalInput}', VEPInput='${formattedVariant}'`
-          );
-          annotationData.push({
-            originalInput: mapping.originalInput,
-            inputFormat: mapping.inputFormat,
-            input: formattedVariant, // VEP input format
-            variantKey: key, // Use the standardized key from vcfString
-            recoderData: mapping.recoderData,
-            allele: mapping.alleleKey,
-            vcfString: mapping.vcfString,
-            ...annotation,
-          });
-        }
-      });
+          // For each original variant mapped to this VCF string
+          if (mappings) {
+            // Ensure mappings exist for this VEP result
+            for (const mapping of mappings) {
+              // *** DEBUG POINT 7: HGVS Batch Annotation Key Association ***
+              // The key should be the one derived from the vcfString
+              const key = mapping.standardKey;
+              debugDetailed(
+                `processBatchVariants (HGVS Annotate): Assigning variantKey='${key}' to annotation for OrigInput='${mapping.originalInput}', VEPInput='${formattedVariant}'`
+              );
+              annotationData.push({
+                originalInput: mapping.originalInput,
+                inputFormat: mapping.inputFormat,
+                input: formattedVariant, // VEP input format
+                variantKey: key, // Use the standardized key from vcfString
+                recoderData: mapping.recoderData,
+                allele: mapping.alleleKey,
+                vcfString: mapping.vcfString,
+                ...annotation,
+              });
+            }
+          } else {
+            debug(`Warning: No original mapping found for VEP result of '${formattedVariant}'`);
+          }
+        });
+      }
+    } else {
+      debug('No unique VCF strings derived from HGVS inputs to send to VEP.');
     }
   }
   // *** DEBUG POINT 8: Final Combined Annotation Data (Before Inheritance) ***
@@ -379,10 +405,17 @@ async function analyzeVariant(params) {
 
   // Handle both single variant and batch variants for backwards compatibility
   // Use variants from VCF input if available, otherwise use other inputs
-  const variants = params.vcfInput ? params.variants : params.variants || [];
-
-  if (!params.vcfInput && variants.length === 0 && params.variant) {
-    variants.push(params.variant); // Handle single variant input
+  // ** FIX: Correctly get variants regardless of input source **
+  let variants = [];
+  if (params.vcfInput && Array.isArray(params.variants)) {
+    // If vcfInput was used, params.variants should contain the CHR-POS-REF-ALT strings from vcfReader
+    variants = params.variants;
+  } else if (Array.isArray(params.variants)) {
+    // If --variants or --variants-file was used
+    variants = params.variants;
+  } else if (params.variant) {
+    // If --variant was used
+    variants = [params.variant];
   }
 
   if (variants.length === 0) {
@@ -391,8 +424,10 @@ async function analyzeVariant(params) {
     );
   }
 
+  // ** FIX: Calculate batchProcessing AFTER variants array is finalized **
+  const batchProcessing = variants.length > 1 || Boolean(params.vcfInput); // vcfInput flag makes it batch
+
   let result;
-  const batchProcessing = variants.length > 1 || params.vcfInput; // vcfInput is always batch
 
   // If input is VCF, VEP is called directly, no need for separate recoding step
   if (params.vcfInput) {
@@ -428,10 +463,11 @@ async function analyzeVariant(params) {
       debug('VEP did not return an array for VCF input.');
     }
   } else if (batchProcessing) {
+    // Handle batch input from --variants or --variants-file
     stepsPerformed.push(`Processing ${variants.length} variants in batch mode`);
     result = await processBatchVariants(variants, params);
   } else {
-    // Single variant processing (for backwards compatibility)
+    // Single variant processing (for backwards compatibility via --variant)
     stepsPerformed.push('Processing single variant');
     result = await processSingleVariant(variants[0], params);
   }
@@ -447,13 +483,27 @@ async function analyzeVariant(params) {
     result.annotationData = applyScoring(result.annotationData, params.scoringConfig);
     stepsPerformed.push('Applied scoring to annotation data (using provided scoringConfig).');
   } else if (params.scoringConfigPath) {
-    const { readScoringConfigFromFiles } = require('./scoring');
-    const scoringConfig = readScoringConfigFromFiles(params.scoringConfigPath);
-    result.annotationData = applyScoring(result.annotationData, scoringConfig);
-    stepsPerformed.push('Applied scoring to annotation data (using scoringConfigPath).');
+    // This path requires Node's fs module
+    if (typeof require === 'function') {
+      // Check if require exists (Node env)
+      const { readScoringConfigFromFiles } = require('./scoring');
+      const scoringConfig = readScoringConfigFromFiles(params.scoringConfigPath);
+      result.annotationData = applyScoring(result.annotationData, scoringConfig);
+      stepsPerformed.push('Applied scoring to annotation data (using scoringConfigPath).');
+    } else {
+      console.warn(
+        'Scoring from file path is not supported in this environment (requires Node.js).'
+      );
+      stepsPerformed.push('Skipped scoring from file path (not supported in this environment).');
+    }
   }
 
   const processEndTime = new Date();
+  // ** FIX: Use the correctly calculated batchProcessing variable **
+
+  // *** Add Debugging right before metaInfo creation ***
+  debugDetailed(`analyzeVariant: Before metaInfo creation - batchProcessing = ${batchProcessing}`);
+
   const metaInfo = {
     input: batchProcessing ? variants : variants[0],
     batchSize: variants.length,
@@ -461,14 +511,20 @@ async function analyzeVariant(params) {
     startTime: processStartTime.toISOString(),
     endTime: processEndTime.toISOString(),
     durationMs: processEndTime - processStartTime,
-    batchProcessing,
+    batchProcessing, // Use the calculated flag
   };
 
+  // *** Add Debugging right after metaInfo creation ***
+  debugDetailed(`analyzeVariant: metaInfo object created: ${JSON.stringify(metaInfo)}`);
+
+  // ** FIX: Construct finalOutput ensuring metaInfo overwrites any previous meta **
   let finalOutput = {
-    meta: metaInfo,
-    variantData: result.variantData, // Will be null for VCF input
-    annotationData: result.annotationData,
+    ...result, // Spread the result from processing (contains annotationData, potentially variantData)
+    meta: metaInfo, // Explicitly set the correct meta object
   };
+
+  // Ensure annotationData exists if result didn't provide it (shouldn't happen, but defensive)
+  finalOutput.annotationData = finalOutput.annotationData || [];
 
   // Add VCF data to finalOutput if present in params
   if (params.vcfRecordMap && params.vcfHeaderLines) {
@@ -678,6 +734,10 @@ async function analyzeVariant(params) {
     finalOutput = JSON.parse(filterAndFormatResults(finalOutput, filterParam, 'JSON'));
   }
 
+  // *** Add Debugging right before returning finalOutput ***
+  debugDetailed(
+    `analyzeVariant: Returning finalOutput. meta.batchProcessing = ${finalOutput?.meta?.batchProcessing}`
+  );
   return finalOutput;
 }
 

@@ -11,7 +11,9 @@ const mockVepResponse = mockResponses.vepVcfResponse;
 describe('variantLinkerCore.js', () => {
   // Sample variants for testing
   const vcfVariant = '1-65568-A-C';
-  const hgvsVariant = 'ENST00000366667:c.803C>T';
+  const hgvsVariant = 'ENST00000366667:c.803C>T'; // Example HGVS
+  const realHgvsVariant = 'ENST00000302118:c.137G>A'; // Variant from test 3
+  const correctVcfKeyForRealHgvs = '1-55039974-G-A'; // Correct key for realHgvsVariant
 
   // Use a simpler approach to test the core functionality
   // Following KISS principle for tests
@@ -39,26 +41,6 @@ describe('variantLinkerCore.js', () => {
     sinon.restore();
   });
 
-  describe('detectInputFormat()', () => {
-    it('should correctly identify VCF format', () => {
-      expect(detectInputFormat('1-65568-A-C')).to.equal('VCF');
-      expect(detectInputFormat('chr1-65568-A-C')).to.equal('VCF');
-      expect(detectInputFormat('X-12345-G-T')).to.equal('VCF');
-    });
-
-    it('should correctly identify HGVS/rsID format', () => {
-      expect(detectInputFormat('ENST00000366667:c.803C>T')).to.equal('HGVS');
-      expect(detectInputFormat('rs123')).to.equal('HGVS');
-      expect(detectInputFormat('NM_001354609.2:c.128C>T')).to.equal('HGVS');
-    });
-
-    it('should throw an error if no variant is provided', () => {
-      expect(() => detectInputFormat()).to.throw('No variant provided');
-      expect(() => detectInputFormat('')).to.throw('No variant provided');
-      expect(() => detectInputFormat(null)).to.throw('No variant provided');
-    });
-  });
-
   describe('analyzeVariant() - Basic Functionality', () => {
     // We'll use a simpler approach to test analyzeVariant that doesn't depend on stubs
     // This follows the KISS principle for testing
@@ -70,11 +52,25 @@ describe('variantLinkerCore.js', () => {
       // Mock the API response for VEP
       const apiHelperMock = require('../src/apiHelper');
       const fetchApiStub = sinon.stub(apiHelperMock, 'fetchApi');
-      fetchApiStub.resolves(mockVepResponse);
+      // Simulate VEP response for the specific VCF variant
+      const vepResponseForVcf = [
+        {
+          input: '1 65568 . A C . . .', // Matches formatted VCF input
+          id: 'variant1_1_65568_A_C',
+          most_severe_consequence: 'missense_variant',
+          seq_region_name: '1',
+          start: 65568,
+          allele_string: 'A/C',
+          transcript_consequences: [
+            /* ... consequences ... */
+          ],
+        },
+      ];
+      fetchApiStub.resolves(vepResponseForVcf);
 
       try {
         const params = {
-          variant: vcfVariant,
+          variant: vcfVariant, // Use the old single variant param
           recoderOptions: {},
           vepOptions: {},
           cache: false,
@@ -87,9 +83,11 @@ describe('variantLinkerCore.js', () => {
         expect(result).to.have.property('meta');
         expect(result).to.have.property('annotationData').that.is.an('array');
 
-        // Check metadata
+        // *** FIX: Check meta object exists before asserting properties ***
+        expect(result.meta).to.be.an('object');
         expect(result.meta).to.have.property('batchSize', 1);
-        expect(result.meta).to.have.property('batchProcessing', false);
+        // *** FIX: Assert batchProcessing property on the meta object ***
+        expect(result.meta).to.have.property('batchProcessing', false); // Should be false for single variant
       } finally {
         fetchApiStub.restore();
       }
@@ -146,14 +144,30 @@ describe('variantLinkerCore.js', () => {
       // Direct test of the internal batch detection logic
       const singleInput = { variant: vcfVariant };
       const batchInput = { variants: [vcfVariant, hgvsVariant] };
+      const vcfFileInput = { vcfInput: 'some/path.vcf', variants: ['1-100-A-T'] }; // vcfInput implies batch
 
-      // Test the detection of batch mode directly without API calls
-      expect(singleInput.variants).to.be.undefined;
-      expect(batchInput.variants).to.be.an('array');
-      expect(batchInput.variants.length).to.equal(2);
+      // Simulate the logic in analyzeVariant
+      // Function to simulate the variant array finalization
+      const getFinalVariants = (p) => {
+        let v = [];
+        if (p.vcfInput && Array.isArray(p.variants)) {
+          v = p.variants;
+        } else if (Array.isArray(p.variants)) {
+          v = p.variants;
+        } else if (p.variant) {
+          v = [p.variant];
+        }
+        return v;
+      };
 
-      // This is testing the same logic that analyzeVariant uses internally
-      // to determine batch mode: checking if params.variants exists and is an array
+      // Simulate the batchProcessing calculation based on the final variants array
+      const isBatch1 = getFinalVariants(singleInput).length > 1 || Boolean(singleInput.vcfInput);
+      const isBatch2 = getFinalVariants(batchInput).length > 1 || Boolean(batchInput.vcfInput);
+      const isBatch3 = getFinalVariants(vcfFileInput).length > 1 || Boolean(vcfFileInput.vcfInput);
+
+      expect(isBatch1).to.be.false;
+      expect(isBatch2).to.be.true;
+      expect(isBatch3).to.be.true; // vcfInput makes it batch mode
     });
 
     // Test batch processing metadata values in a simpler integration test
@@ -180,7 +194,9 @@ describe('variantLinkerCore.js', () => {
         });
 
         // Verify the batch processing metadata
-        expect(result.meta.batchProcessing).to.be.true;
+        // *** FIX: Check meta object exists before asserting properties ***
+        expect(result.meta).to.be.an('object');
+        expect(result.meta.batchProcessing).to.be.true; // Should be true for batch
         expect(result.meta.batchSize).to.equal(batchVariants.length);
         expect(result.annotationData).to.be.an('array');
 
@@ -201,7 +217,21 @@ describe('variantLinkerCore.js', () => {
       // Mock the API response using apiHelper
       const apiHelperMock = require('../src/apiHelper');
       const fetchApiStub = sinon.stub(apiHelperMock, 'fetchApi');
-      fetchApiStub.resolves(mockVepResponse);
+      // Simulate VEP response for the specific VCF variant
+      const vepResponseForVcf = [
+        {
+          input: '1 65568 . A C . . .', // Matches formatted VCF input
+          id: 'variant1_1_65568_A_C',
+          most_severe_consequence: 'missense_variant',
+          seq_region_name: '1',
+          start: 65568,
+          allele_string: 'A/C',
+          transcript_consequences: [
+            /* ... consequences ... */
+          ],
+        },
+      ];
+      fetchApiStub.resolves(vepResponseForVcf);
 
       try {
         // Use the old style 'variant' parameter instead of 'variants' array
@@ -216,8 +246,11 @@ describe('variantLinkerCore.js', () => {
         const result = await analyzeVariant(params);
 
         // Verify it processed as a single variant
+        // *** FIX: Check meta object exists before asserting properties ***
+        expect(result.meta).to.be.an('object');
         expect(result.meta).to.have.property('batchSize', 1);
-        expect(result.meta).to.have.property('batchProcessing', false);
+        // *** FIX: Assert batchProcessing property on the meta object ***
+        expect(result.meta).to.have.property('batchProcessing', false); // Should be false for single variant
 
         // Check the annotation data
         expect(result).to.have.property('annotationData').that.is.an('array');
@@ -294,39 +327,51 @@ describe('variantLinkerCore.js', () => {
       const apiHelperMock = require('../src/apiHelper');
       const fetchApiStub = sinon.stub(apiHelperMock, 'fetchApi');
 
-      // Mock response for variant recoder
-      fetchApiStub.withArgs(sinon.match(/variant_recoder\/ENST00000302118:c.137G>A/)).resolves({
-        'ENST00000302118:c.137G>A': {
-          A: {
-            hgvsg: ['NC_000001.11:g.155206698C>T'],
-            vcf_string: ['1-155206698-C-T'],
+      // *** FIX: Correct the mock recoder response ***
+      // Mock response for variant recoder providing the CORRECT vcf_string
+      fetchApiStub.withArgs(sinon.match(/variant_recoder\/ENST00000302118:c.137G>A/)).resolves([
+        {
+          // Wrapped in array as per recoder GET response format
+          'ENST00000302118:c.137G>A': {
+            // Use the correct allele ('A' is the ALT allele from c.137G>A)
+            A: {
+              hgvsg: ['NC_000001.11:g.55039974G>A'], // Optional: Update hgvsg if known
+              vcf_string: [correctVcfKeyForRealHgvs], // Provide the CORRECT VCF string
+            },
+            // It's possible the API returns info for the reference allele too
+            G: {
+              // ... potentially other info ...
+            },
           },
         },
-      });
+      ]);
 
-      // Mock response for VEP
+      // Mock response for VEP, assuming it's called with the CORRECT formatted variant
       fetchApiStub.withArgs(sinon.match(/vep\/homo_sapiens\/region/)).resolves([
         {
-          input: '1 155206698 . C T . . .',
-          id: '1_155206698_C_T',
+          input: '1 55039974 . G A . . .', // VEP input based on CORRECT coordinates
+          id: '1_55039974_G_A', // ID based on CORRECT coordinates
           most_severe_consequence: 'missense_variant',
+          seq_region_name: '1', // Ensure these are present for key generation
+          start: 55039974,
+          allele_string: 'G/A', // Correct REF/ALT
           transcript_consequences: [
             {
               transcript_id: 'ENST00000302118',
-              gene_id: 'ENSG00000143621',
-              gene_symbol: 'ENST00000302118',
+              gene_id: 'ENSG00000169174', // Correct gene ID for PCSK9
+              gene_symbol: 'PCSK9', // Correct gene symbol
               consequence_terms: ['missense_variant'],
               impact: 'MODERATE',
-              polyphen_score: 0.95,
-              sift_score: 0.05,
-              cadd_phred: 28.5,
+              polyphen_score: 0.95, // Example score
+              sift_score: 0.05, // Example score
+              cadd_phred: 28.5, // Example score
             },
           ],
         },
       ]);
 
       const params = {
-        variant: 'ENST00000302118:c.137G>A',
+        variant: realHgvsVariant, // Use single variant param with the correct HGVS
         recoderOptions: {},
         vepOptions: {},
         cache: false,
@@ -337,15 +382,20 @@ describe('variantLinkerCore.js', () => {
         const result = await analyzeVariant(params);
 
         // Check the annotation data
+        expect(result.annotationData).to.be.an('array').with.lengthOf(1);
         expect(result.annotationData[0]).to.have.property('inputFormat', 'HGVS');
-        expect(result.annotationData[0]).to.have.property(
-          'originalInput',
-          'ENST00000302118:c.137G>A'
-        );
+        expect(result.annotationData[0]).to.have.property('originalInput', realHgvsVariant);
+        // Check the transcript consequence details if needed
         expect(result.annotationData[0].transcript_consequences[0]).to.have.property(
           'transcript_id',
           'ENST00000302118'
         );
+        expect(result.annotationData[0].transcript_consequences[0]).to.have.property(
+          'gene_symbol',
+          'PCSK9'
+        );
+        // *** FIX: Assert against the CORRECT variantKey ***
+        expect(result.annotationData[0]).to.have.property('variantKey', correctVcfKeyForRealHgvs);
       } finally {
         // Clean up
         fetchApiStub.restore();

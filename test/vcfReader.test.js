@@ -53,11 +53,11 @@ describe('VCF Reader', () => {
     expect(result.variantsToProcess).to.include('2-23456-T-C'); // Second variant, first alt
     expect(result.variantsToProcess).to.include('2-23456-T-G'); // Second variant, second alt
 
-    // Check the VCF record map
+    // *** FIX: Check the VCF record map keys using hyphenated format ***
     expect(result.vcfRecordMap.size).to.equal(3);
-    expect(result.vcfRecordMap.has('1:12345:A:G')).to.be.true;
-    expect(result.vcfRecordMap.has('2:23456:T:C')).to.be.true;
-    expect(result.vcfRecordMap.has('2:23456:T:G')).to.be.true;
+    expect(result.vcfRecordMap.has('1-12345-A-G')).to.be.true; // Use hyphen
+    expect(result.vcfRecordMap.has('2-23456-T-C')).to.be.true; // Use hyphen
+    expect(result.vcfRecordMap.has('2-23456-T-G')).to.be.true; // Use hyphen
 
     // Check the header was properly preserved
     expect(result.headerLines).to.have.lengthOf(8); // 7 metadata lines + 1 CHROM line
@@ -69,7 +69,9 @@ describe('VCF Reader', () => {
     expect(result.samples[0]).to.equal('SAMPLE1');
 
     // Check that genotype information was extracted correctly
-    const variant1Record = result.vcfRecordMap.get('1:12345:A:G');
+    // *** FIX: Use hyphenated key to retrieve record ***
+    const variant1Record = result.vcfRecordMap.get('1-12345-A-G');
+    expect(variant1Record).to.be.an('object'); // Add basic check that record exists
     expect(variant1Record).to.have.property('genotypes');
     expect(variant1Record.genotypes).to.be.instanceOf(Map);
     // We'll check for the presence of a genotype, but not its exact value
