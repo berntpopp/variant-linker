@@ -39,6 +39,8 @@ describe('Inheritance Analysis Integration Tests', function () {
             const pos = parseInt(parts[1], 10);
             const ref = parts[3];
             const alt = parts[4];
+            // ** FIX: Ensure variantKey generated here matches the hyphenated format if used **
+            // Although analyzeVariant should handle key assignment primarily.
             return {
               input: variantInput,
               id: `${chrom}_${pos}_${ref}_${alt}` || 'variant_id', // Generate a mock ID
@@ -87,10 +89,12 @@ describe('Inheritance Analysis Integration Tests', function () {
     const pedigreeData = await readPedigree(pedPath);
 
     // 3. Construct params for analyzeVariant, passing extracted data
+    // *** FIX: Pass vcfInput flag and use variantsToProcess ***
     const params = {
-      variants: vcfData.variantsToProcess, // <-- Pass the extracted variants
-      vcfRecordMap: vcfData.vcfRecordMap, // <-- Pass the record map
-      vcfHeaderLines: vcfData.headerLines, // <-- Pass header lines
+      vcfInput: vcfPath, // Indicate VCF file input
+      variants: vcfData.variantsToProcess, // Pass the extracted variants (CHR-POS-REF-ALT format)
+      vcfRecordMap: vcfData.vcfRecordMap, // Pass the record map (keyed by CHR-POS-REF-ALT)
+      vcfHeaderLines: vcfData.headerLines, // Pass header lines
       pedigreeData: pedigreeData, // Pass the loaded Map
       calculateInheritance: true,
       output: 'JSON',
@@ -118,13 +122,14 @@ describe('Inheritance Analysis Integration Tests', function () {
 
       // Ensure variantKey exists (it should be added during analysis)
       expect(annotation).to.have.property('variantKey').that.is.a('string');
-      const variantKey = annotation.variantKey;
+      // ** FIX: The key assigned by analyzeVariant for VCF input IS CHR-POS-REF-ALT **
+      const variantKey = annotation.variantKey; // This should be CHR-POS-REF-ALT
 
       expect(patternResult).to.be.an('object');
       expect(patternResult).to.have.property('prioritizedPattern');
 
       // Find the expected pattern for this specific variant key
-      const expected = expectedPatterns[variantKey];
+      const expected = expectedPatterns[variantKey]; // Lookup using the correct hyphenated key
 
       // Check if we have an expectation for this key
       if (expected === undefined) {
@@ -160,30 +165,33 @@ describe('Inheritance Analysis Integration Tests', function () {
   // --- Test Cases ---
 
   it('should correctly identify de novo variants', async () => {
+    // *** FIX: Use hyphenated keys ***
     const expected = {
-      '1:1000000:A:G': 'de_novo',
-      '2:2000000:C:T': 'de_novo',
-      '3:3000000:G:A': 'de_novo',
+      '1-1000000-A-G': 'de_novo',
+      '2-2000000-C-T': 'de_novo',
+      '3-3000000-G-A': 'de_novo',
     };
     await runInheritanceTest('trio_denovo.vcf', 'trio_denovo.ped', expected);
   });
 
   it('should correctly identify autosomal recessive homozygous variants', async () => {
+    // *** FIX: Use hyphenated keys ***
     const expected = {
-      '1:1000000:A:G': 'autosomal_recessive',
-      '2:2000000:C:T': 'autosomal_recessive',
-      '3:3000000:G:A': 'autosomal_recessive',
+      '1-1000000-A-G': 'autosomal_recessive',
+      '2-2000000-C-T': 'autosomal_recessive',
+      '3-3000000-G-A': 'autosomal_recessive',
     };
     await runInheritanceTest('trio_ar_homozygous.vcf', 'trio_ar_homozygous.ped', expected);
   });
 
   it('should correctly identify compound heterozygous variants', async () => {
+    // *** FIX: Use hyphenated keys ***
     const expected = {
-      '1:1000000:A:G': 'compound_heterozygous', // Part of CompHet pair in ABCA4
-      '1:1002000:C:T': 'compound_heterozygous', // Part of CompHet pair in ABCA4
-      '1:1003000:G:A': 'compound_heterozygous', // Part of CompHet pair in ABCA4
-      '2:2000000:T:C': 'de_novo', // Not CompHet (BRCA1), correctly identified as de_novo
-      '3:3000000:G:A': 'autosomal_recessive', // Not CompHet (TP53), appears AR
+      '1-1000000-A-G': 'compound_heterozygous', // Part of CompHet pair in ABCA4
+      '1-1002000-C-T': 'compound_heterozygous', // Part of CompHet pair in ABCA4
+      '1-1003000-G-A': 'compound_heterozygous', // Part of CompHet pair in ABCA4
+      '2-2000000-T-C': 'de_novo', // Not CompHet (BRCA1), correctly identified as de_novo
+      '3-3000000-G-A': 'autosomal_recessive', // Not CompHet (TP53), appears AR
     };
     // Add a MOCK gene symbol to the VEP response for this test
     nock.cleanAll(); // Clear previous mock
@@ -225,6 +233,7 @@ describe('Inheritance Analysis Integration Tests', function () {
     const vcfDataCompHet = await readVariantsFromVcf(vcfPath);
     const pedigreeDataCompHet = await readPedigree(pedPath);
     const paramsCompHet = {
+      vcfInput: vcfPath, // Indicate VCF file input
       variants: vcfDataCompHet.variantsToProcess,
       vcfRecordMap: vcfDataCompHet.vcfRecordMap,
       vcfHeaderLines: vcfDataCompHet.headerLines,
@@ -235,42 +244,46 @@ describe('Inheritance Analysis Integration Tests', function () {
     };
     const resultCompHet = await analyzeVariant(paramsCompHet);
 
+    // *** FIX: Use hyphenated keys for lookup ***
     const abca4Variant1 = resultCompHet.annotationData.find(
-      (a) => a.variantKey === '1:1000000:A:G'
+      (a) => a.variantKey === '1-1000000-A-G'
     );
     const abca4Variant2 = resultCompHet.annotationData.find(
-      (a) => a.variantKey === '1:1002000:C:T'
+      (a) => a.variantKey === '1-1002000-C-T'
     );
     const abca4Variant3 = resultCompHet.annotationData.find(
-      (a) => a.variantKey === '1:1003000:G:A'
+      (a) => a.variantKey === '1-1003000-G-A'
     ); // Check this one too
 
     expect(abca4Variant1?.deducedInheritancePattern?.compHetDetails?.isCandidate).to.be.true;
     expect(
       abca4Variant1?.deducedInheritancePattern?.compHetDetails?.partnerVariantKeys
-    ).to.include.members(['1:1002000:C:T', '1:1003000:G:A']);
+      // *** FIX: Use hyphenated keys in assertion ***
+    ).to.include.members(['1-1002000-C-T', '1-1003000-G-A']);
     expect(abca4Variant1?.deducedInheritancePattern?.compHetDetails?.geneSymbol).to.equal('ABCA4');
 
     expect(abca4Variant2?.deducedInheritancePattern?.compHetDetails?.isCandidate).to.be.true;
     expect(
       abca4Variant2?.deducedInheritancePattern?.compHetDetails?.partnerVariantKeys
-    ).to.include.members(['1:1000000:A:G', '1:1003000:G:A']);
+      // *** FIX: Use hyphenated keys in assertion ***
+    ).to.include.members(['1-1000000-A-G', '1-1003000-G-A']);
     expect(abca4Variant2?.deducedInheritancePattern?.compHetDetails?.geneSymbol).to.equal('ABCA4');
 
     expect(abca4Variant3?.deducedInheritancePattern?.compHetDetails?.isCandidate).to.be.true;
     expect(
       abca4Variant3?.deducedInheritancePattern?.compHetDetails?.partnerVariantKeys
-    ).to.include.members(['1:1000000:A:G', '1:1002000:C:T']);
+      // *** FIX: Use hyphenated keys in assertion ***
+    ).to.include.members(['1-1000000-A-G', '1-1002000-C-T']);
     expect(abca4Variant3?.deducedInheritancePattern?.compHetDetails?.geneSymbol).to.equal('ABCA4');
   });
 
   it('should identify possible compound heterozygous if parents are missing', async () => {
-    // ** FIX: Updated expectation **
+    // *** FIX: Use hyphenated keys ***
     const expected = {
-      '1:1000000:A:G': 'compound_heterozygous_possible_missing_parents',
-      '1:1002000:C:T': 'compound_heterozygous_possible_missing_parents',
-      '1:1003000:G:A': 'autosomal_dominant', // Changed from 'dominant'
-      '2:2000000:T:C': 'autosomal_dominant', // Changed from 'dominant'
+      '1-1000000-A-G': 'compound_heterozygous_possible_missing_parents',
+      '1-1002000-C-T': 'compound_heterozygous_possible_missing_parents',
+      '1-1003000-G-A': 'autosomal_dominant', // Changed from 'dominant'
+      '2-2000000-T-C': 'autosomal_dominant', // Changed from 'dominant'
     };
     // Mock VEP response with gene symbols
     nock.cleanAll();
@@ -315,37 +328,41 @@ describe('Inheritance Analysis Integration Tests', function () {
   // --- X-Linked Tests ---
 
   it('should correctly identify X-Linked Recessive (Male Proband)', async () => {
+    // *** FIX: Use hyphenated keys ***
     const expected = {
-      'X:100000:A:G': 'x_linked_recessive',
-      'X:200000:C:T': 'x_linked_recessive',
-      'X:300000:G:A': 'reference',
+      'X-100000-A-G': 'x_linked_recessive',
+      'X-200000-C-T': 'x_linked_recessive',
+      'X-300000-G-A': 'reference',
     };
     await runInheritanceTest('pedigree_xlr_male.vcf', 'pedigree_xlr_male.ped', expected);
   });
 
   it('should correctly identify X-Linked Recessive (Female Proband)', async () => {
+    // *** FIX: Use hyphenated keys ***
     const expected = {
-      'X:100000:A:G': 'x_linked_recessive',
-      'X:200000:C:T': 'reference',
-      'X:300000:G:A': 'x_linked_recessive',
+      'X-100000-A-G': 'x_linked_recessive',
+      'X-200000-C-T': 'reference',
+      'X-300000-G-A': 'x_linked_recessive',
     };
     await runInheritanceTest('pedigree_xlr_female.vcf', 'pedigree_xlr_female.ped', expected);
   });
 
   it('should correctly identify X-Linked Dominant (Male Proband)', async () => {
+    // *** FIX: Use hyphenated keys ***
     const expected = {
-      'X:100000:A:G': 'x_linked_recessive', // Changed from x_linked_dominant based on priority
-      'X:200000:C:T': 'x_linked_recessive', // Changed from x_linked_dominant based on priority
-      'X:300000:G:A': 'reference',
+      'X-100000-A-G': 'x_linked_recessive', // Changed from x_linked_dominant based on priority
+      'X-200000-C-T': 'x_linked_recessive', // Changed from x_linked_dominant based on priority
+      'X-300000-G-A': 'reference',
     };
     await runInheritanceTest('pedigree_xld_male.vcf', 'pedigree_xld_male.ped', expected);
   });
 
   it('should correctly identify X-Linked Dominant (Female Proband)', async () => {
+    // *** FIX: Use hyphenated keys ***
     const expected = {
-      'X:100000:A:G': 'x_linked_dominant',
-      'X:200000:C:T': 'x_linked_dominant',
-      'X:300000:G:A': 'reference',
+      'X-100000-A-G': 'x_linked_dominant',
+      'X-200000-C-T': 'x_linked_dominant',
+      'X-300000-G-A': 'reference',
     };
     await runInheritanceTest('pedigree_xld_female.vcf', 'pedigree_xld_female.ped', expected);
   });
