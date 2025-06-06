@@ -5,7 +5,7 @@
     "transcript_consequences.*.consequence_terms": "unique:consequence_terms_variant",
     "transcript_consequences.*.cadd_phred": "max:cadd_phred_variant|default:25",
     "transcript_consequences.*.impact": "unique:impact_variant",
-    "colocated_variants.*.frequencies.*.gnomade": "max:gnomade_variant|default:0",
-    "colocated_variants.*.frequencies.*.gnomadg": "max:gnomadg_variant|default:0"
+    "colocated_variants.0.frequencies.*.gnomade": "max:gnomade_variant|default:0",
+    "colocated_variants.0.frequencies.*.gnomadg": "max:gnomadg_variant|default:0"
   }
 }
