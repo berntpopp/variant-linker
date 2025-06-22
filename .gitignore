@@ -57,3 +57,7 @@ clinvar_*.txt
 # Allow PED files in test fixtures for inheritance testing
 *.ped
 !test/fixtures/inheritance/*.ped
+
+# claude files and folders
+.claude/
+CLAUDE.md
