@@ -60,3 +60,4 @@ clinvar_*.txt
 
 # claude files and folders
 .claude/
+CLAUDE.md
