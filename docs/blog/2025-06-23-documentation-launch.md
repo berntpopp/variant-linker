@@ -7,6 +7,8 @@ tags: [documentation, launch, docusaurus]
 
 We're excited to announce the launch of the new Variant-Linker documentation website! Built with Docusaurus, our new docs provide comprehensive guides, API references, and examples to help you get the most out of Variant-Linker.
 
+<!-- truncate -->
+
 ## What's New
 
 ### 🎯 Organized Structure

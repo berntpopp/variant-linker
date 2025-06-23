@@ -1,1 +1,6 @@
-404: Not Found
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <rect width="200" height="200" fill="#f8f9fa"/>
+  <circle cx="100" cy="70" r="30" fill="#007acc"/>
+  <polygon points="70,130 100,90 130,130" fill="#28a745"/>
+  <text x="100" y="160" text-anchor="middle" font-family="Arial" font-size="14" fill="#333">Easy to Use</text>
+</svg>
