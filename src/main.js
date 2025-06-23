@@ -110,8 +110,7 @@ function validateParams(params) {
     throw new Error('Missing required parameter: output');
   }
 
-  if (!validOutputs.includes(params.output.toUpperCase())) {
-    // Convert to uppercase for comparison
+  if (!validOutputs.includes(params.output.toUpperCase())) { // Convert to uppercase for comparison
     throw new Error(
       `Invalid output format: ${params.output}. Valid formats are ${validOutputs.join(', ')}`
     );
@@ -135,29 +134,7 @@ function validateParams(params) {
 function mergeParams(configParams, cliParams) {
   const merged = { ...configParams, ...cliParams };
   // Ensure all short options used in yargs are removed
-  const shortOptions = [
-    'c',
-    'v',
-    'vf',
-    'vs',
-    'o',
-    's',
-    'd',
-    'vp',
-    'rp',
-    'scp',
-    'lf',
-    'sv',
-    'f',
-    'p',
-    'ci',
-    'sm',
-    'vi',
-    'C',
-    'of',
-    'h',
-    'V',
-  ];
+  const shortOptions = ['c', 'v', 'vf', 'vs', 'o', 's', 'd', 'vp', 'rp', 'scp', 'lf', 'sv', 'f', 'p', 'ci', 'sm', 'vi', 'C', 'of', 'h', 'V'];
   shortOptions.forEach((option) => {
     delete merged[option];
   });
@@ -166,6 +143,7 @@ function mergeParams(configParams, cliParams) {
   delete merged['$0'];
   return merged;
 }
+
 
 /**
  * Enables debug logging according to the specified debug level.
@@ -188,8 +166,8 @@ function enableDebugging(debugLevel, logFilePath) {
       debugDetailed.log = overrideLog;
       debugAll.log = overrideLog;
     } catch (err) {
-      console.error(`Error creating log file '${logFilePath}': ${err.message}`);
-      // Continue without file logging if stream creation fails
+        console.error(`Error creating log file '${logFilePath}': ${err.message}`);
+        // Continue without file logging if stream creation fails
     }
   }
   debug('Debug mode enabled');
@@ -208,12 +186,11 @@ function parseOptionalParameters(paramString, defaultParams) {
     paramsArray.forEach((param) => {
       const [key, value] = param.split('=');
       const trimmedKey = key.trim();
-      if (trimmedKey && value !== undefined) {
-        // Check value is not undefined
-        options[trimmedKey] = value.trim(); // Trim key/value
+      if (trimmedKey && value !== undefined) { // Check value is not undefined
+         options[trimmedKey] = value.trim(); // Trim key/value
       } else if (trimmedKey) {
-        // Handle flags (parameters without '=value') - Set to '1' as per VEP convention
-        options[trimmedKey] = '1';
+         // Handle flags (parameters without '=value') - Set to '1' as per VEP convention
+         options[trimmedKey] = '1';
       }
     });
   }
@@ -270,8 +247,7 @@ const argv = yargs(process.argv.slice(2)) // Use process.argv.slice(2) for bette
     description: 'Path to scoring configuration directory',
     type: 'string',
   })
-  .option('log_file', {
-    // Keep snake_case for consistency with README example
+  .option('log_file', { // Keep snake_case for consistency with README example
     alias: 'lf',
     description: 'Path to log file for debug info',
     type: 'string',
@@ -332,9 +308,9 @@ const argv = yargs(process.argv.slice(2)) // Use process.argv.slice(2) for bette
     'Process multiple variants from a comma-separated list'
   )
   .example(
-    'variant-linker --vcf-input input.vcf --output VCF --save output.vcf',
-    'Annotate a VCF file and save the output'
-  )
+      'variant-linker --vcf-input input.vcf --output VCF --save output.vcf',
+      'Annotate a VCF file and save the output'
+   )
   .epilogue('For more information, see https://github.com/berntpopp/variant-linker')
   .help()
   .alias('help', 'h')
@@ -344,9 +320,7 @@ const argv = yargs(process.argv.slice(2)) // Use process.argv.slice(2) for bette
   .check((argv) => {
     // Show help if no parameters provided and not called with specific flags like --version or --help
     const helpOrVersionFlags = ['h', 'help', 'V', 'version', 'sv', 'semver'];
-    const hasOtherFlags = Object.keys(argv).some(
-      (key) => !helpOrVersionFlags.includes(key) && key !== '_' && key !== '$0'
-    );
+    const hasOtherFlags = Object.keys(argv).some(key => !helpOrVersionFlags.includes(key) && key !== '_' && key !== '$0');
 
     if (process.argv.length <= 2 && !hasOtherFlags) {
       yargs.showHelp();
@@ -361,26 +335,26 @@ const argv = yargs(process.argv.slice(2)) // Use process.argv.slice(2) for bette
 
 // Exit early if help or version was requested and handled by yargs
 if (argv.help || argv.version || argv.semver) {
-  // yargs handles showing help/version, semver is handled below
-  if (argv.semver) {
-    const { getVersionDetails } = require('./version');
-    const details = getVersionDetails();
-    console.log('Semantic Version Details:');
-    console.log(`Version: ${details.version}`);
-    console.log(`Major: ${details.major}`);
-    console.log(`Minor: ${details.minor}`);
-    console.log(`Patch: ${details.patch}`);
-    if (details.prerelease.length > 0) console.log(`Prerelease: ${details.prerelease.join('.')}`);
-    if (details.build.length > 0) console.log(`Build Metadata: ${details.build.join('.')}`);
-  }
-  return; // Exit cleanly
+    // yargs handles showing help/version, semver is handled below
+    if (argv.semver) {
+      const { getVersionDetails } = require('./version');
+      const details = getVersionDetails();
+      console.log('Semantic Version Details:');
+      console.log(`Version: ${details.version}`);
+      console.log(`Major: ${details.major}`);
+      console.log(`Minor: ${details.minor}`);
+      console.log(`Patch: ${details.patch}`);
+      if (details.prerelease.length > 0) console.log(`Prerelease: ${details.prerelease.join('.')}`);
+      if (details.build.length > 0) console.log(`Build Metadata: ${details.build.join('.')}`);
+    }
+    return; // Exit cleanly
 }
+
 
 let configParams = {}; // Initialize to empty object
 try {
-  if (argv.config) {
-    // Only read if config path is provided
-    configParams = readConfigFile(argv.config);
+  if (argv.config) { // Only read if config path is provided
+     configParams = readConfigFile(argv.config);
   }
 } catch (error) {
   handleError(error);
@@ -398,8 +372,7 @@ try {
 }
 
 // Enable debugging *after* validation and merging
-if (mergedParams.debug > 0) {
-  // Check if debug count is > 0
+if (mergedParams.debug > 0) { // Check if debug count is > 0
   enableDebugging(mergedParams.debug, mergedParams.log_file); // Use mergedParams.log_file
 }
 
@@ -407,19 +380,17 @@ if (mergedParams.debug > 0) {
 mergedParams.assembly = mergedParams.assembly || 'hg38';
 if (!process.env.ENSEMBL_BASE_URL) {
   process.env.ENSEMBL_BASE_URL = getBaseUrl(mergedParams.assembly);
-  debug(
-    `Set ENSEMBL_BASE_URL based on assembly '${mergedParams.assembly}': ${process.env.ENSEMBL_BASE_URL}`
-  );
+  debug(`Set ENSEMBL_BASE_URL based on assembly '${mergedParams.assembly}': ${process.env.ENSEMBL_BASE_URL}`);
 } else {
-  debug(`Using existing ENSEMBL_BASE_URL from environment: ${process.env.ENSEMBL_BASE_URL}`);
+    debug(`Using existing ENSEMBL_BASE_URL from environment: ${process.env.ENSEMBL_BASE_URL}`);
 }
+
 
 /**
  * Main async function for analysis.
  * @returns {Promise<void>} Resolves when processing is complete
  */
-async function runAnalysis() {
-  // Renamed to avoid conflict with module name
+async function runAnalysis() { // Renamed to avoid conflict with module name
   try {
     debug('Starting variant analysis process');
 
@@ -435,9 +406,9 @@ async function runAnalysis() {
     });
     // Log detailed options for debugging *after* parsing
     debugDetailed(
-      `Parsed options -> recoderOptions: ${JSON.stringify(recoderOptions)},` +
+        `Parsed options -> recoderOptions: ${JSON.stringify(recoderOptions)},` +
         ` vepOptions: ${JSON.stringify(vepOptions)}`
-    );
+      );
 
     // Collect variants from all possible sources
     let variants = [];
@@ -523,9 +494,7 @@ async function runAnalysis() {
             `Warning: Invalid sample map format, expected 3 comma-separated IDs, ` +
               `got ${sampleIds.length}. Ignoring --sample-map.`
           );
-          console.error(
-            'Warning: Invalid sample map format. Expected: Index,Mother,Father. Ignoring.'
-          );
+          console.error('Warning: Invalid sample map format. Expected: Index,Mother,Father. Ignoring.');
           sampleMap = null; // Reset to null if invalid
         }
       } catch (error) {
@@ -546,6 +515,7 @@ async function runAnalysis() {
     if (calculateInheritance) {
       debug('Inheritance pattern calculation is enabled.');
     }
+
 
     // Prepare analysis parameters - *** THE FIX IS HERE ***
     const analysisParams = {
@@ -602,12 +572,12 @@ async function runAnalysis() {
         ? result
         : JSON.stringify(result, null, 2);
       try {
-        fs.writeFileSync(savePath, outputContent);
-        console.log(`Results saved to ${savePath}`);
+          fs.writeFileSync(savePath, outputContent);
+          console.log(`Results saved to ${savePath}`);
       } catch (writeError) {
-        console.error(`Error saving results to ${savePath}: ${writeError.message}`);
-        // Optionally, print to console as fallback?
-        // console.log(outputContent);
+          console.error(`Error saving results to ${savePath}: ${writeError.message}`);
+          // Optionally, print to console as fallback?
+          // console.log(outputContent);
       }
     } else {
       // For CSV/TSV/VCF formats, result is already a formatted string
@@ -627,8 +597,8 @@ async function runAnalysis() {
 }
 
 // Execute the main analysis function
-runAnalysis().catch((err) => {
-  // handleError already prints details, just ensure process exits with error code
-  // if the enhanced error was thrown
-  process.exitCode = err.statusCode || 1;
+runAnalysis().catch(err => {
+    // handleError already prints details, just ensure process exits with error code
+    // if the enhanced error was thrown
+    process.exitCode = err.statusCode || 1;
 });

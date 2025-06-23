@@ -29,19 +29,20 @@ const MAX_BODY_LOG_LENGTH = 500;
  * @returns {string} - A string representation, possibly truncated.
  */
 function formatRequestBodyForLog(body) {
-  if (!body) {
-    return 'None';
-  }
-  try {
-    const bodyString = JSON.stringify(body);
-    if (bodyString.length > MAX_BODY_LOG_LENGTH) {
-      return `${bodyString.substring(0, MAX_BODY_LOG_LENGTH)}... (truncated)`;
+    if (!body) {
+        return 'None';
     }
-    return bodyString;
-  } catch (e) {
-    return '[Error formatting request body for log]';
-  }
+    try {
+        const bodyString = JSON.stringify(body);
+        if (bodyString.length > MAX_BODY_LOG_LENGTH) {
+            return `${bodyString.substring(0, MAX_BODY_LOG_LENGTH)}... (truncated)`;
+        }
+        return bodyString;
+    } catch (e) {
+        return '[Error formatting request body for log]';
+    }
 }
+
 
 /**
  * Fetch data from an API endpoint using axios with optional caching.
@@ -74,7 +75,7 @@ async function fetchApi(
     // Don't log the full URL here yet, log it inside the loop for retries
 
     if (cacheEnabled) {
-      //   const cached = cache.getCache(url); // <-- Change this call
+    //   const cached = cache.getCache(url); // <-- Change this call
       const cached = getCache(url); // <-- Use imported function directly
       if (cached) {
         debugDetailed(`Returning cached result for: ${url}`);
@@ -94,52 +95,42 @@ async function fetchApi(
         const retryAfterHeader = lastError?.response?.headers?.['retry-after'];
 
         if (lastError?.response?.status === 429 && retryAfterHeader) {
-          const retryAfterSeconds = parseInt(retryAfterHeader, 10);
-          if (!isNaN(retryAfterSeconds)) {
-            const retryAfterMs = retryAfterSeconds * 1000;
-            // Use the larger of the calculated delay or the header value, add jitter
-            retryDelayMs = Math.max(retryDelayMs, retryAfterMs) + Math.random() * 100;
-            debugDetailed(
-              `Rate limited (429). Using Retry-After header: ${retryAfterSeconds}s. ` +
-                `Effective delay: ${retryDelayMs.toFixed(0)}ms`
-            );
-          } else {
-            // Handle date format for Retry-After (less common)
-            try {
-              const retryDate = new Date(retryAfterHeader).getTime();
-              const now = Date.now();
-              if (retryDate > now) {
-                const retryAfterMs = retryDate - now;
-                retryDelayMs = Math.max(retryDelayMs, retryAfterMs) + Math.random() * 100;
-                debugDetailed(
-                  `Rate limited (429). Using Retry-After header (date). ` +
-                    `Effective delay: ${retryDelayMs.toFixed(0)}ms`
-                );
-              }
-            } catch (dateParseError) {
-              debugDetailed(
-                `Could not parse Retry-After date: ${retryAfterHeader}. Using standard backoff.`
-              );
+            const retryAfterSeconds = parseInt(retryAfterHeader, 10);
+            if (!isNaN(retryAfterSeconds)) {
+                const retryAfterMs = retryAfterSeconds * 1000;
+                // Use the larger of the calculated delay or the header value, add jitter
+                retryDelayMs = Math.max(retryDelayMs, retryAfterMs) + (Math.random() * 100);
+                debugDetailed(`Rate limited (429). Using Retry-After header: ${retryAfterSeconds}s. ` +
+                              `Effective delay: ${retryDelayMs.toFixed(0)}ms`);
+            } else {
+                // Handle date format for Retry-After (less common)
+                try {
+                    const retryDate = new Date(retryAfterHeader).getTime();
+                    const now = Date.now();
+                    if (retryDate > now) {
+                         const retryAfterMs = retryDate - now;
+                         retryDelayMs = Math.max(retryDelayMs, retryAfterMs) + (Math.random() * 100);
+                         debugDetailed(`Rate limited (429). Using Retry-After header (date). ` +
+                                       `Effective delay: ${retryDelayMs.toFixed(0)}ms`);
+                    }
+                } catch (dateParseError) {
+                    debugDetailed(`Could not parse Retry-After date: ${retryAfterHeader}. Using standard backoff.`);
+                }
             }
-          }
         }
 
-        debugDetailed(
-          `Retry attempt ${attempt}/${MAX_RETRIES} after ${retryDelayMs.toFixed(0)}ms delay`
-        );
+        debugDetailed(`Retry attempt ${attempt}/${MAX_RETRIES} after ${retryDelayMs.toFixed(0)}ms delay`);
         await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
       }
 
       // --- Enhanced Debug Logging for Request Details ---
-      const requestHeaders = { 'Content-Type': 'application/json', Accept: 'application/json' }; // Added Accept header
+      const requestHeaders = { 'Content-Type': 'application/json', 'Accept': 'application/json' }; // Added Accept header
       debugDetailed(
-        `Attempt ${attempt + 1}/${MAX_RETRIES + 1}: Sending API Request...` +
+          `Attempt ${attempt + 1}/${MAX_RETRIES + 1}: Sending API Request...` +
           `\n  Method: ${method.toUpperCase()}` +
           `\n  URL: ${url}` +
           `\n  Headers: ${JSON.stringify(requestHeaders)}` +
-          (method.toUpperCase() === 'POST'
-            ? `\n  Body: ${formatRequestBodyForLog(requestBody)}`
-            : '')
+          (method.toUpperCase() === 'POST' ? `\n  Body: ${formatRequestBodyForLog(requestBody)}` : '')
       );
       // --- End Enhanced Debug Logging ---
 
@@ -154,17 +145,18 @@ async function fetchApi(
         // If we get here, the request succeeded
         debugDetailed(
           `Attempt ${attempt + 1} Succeeded (Status: ${response.status}). ` +
-            `Response data length: ${JSON.stringify(response.data)?.length || 0}`
+          `Response data length: ${JSON.stringify(response.data)?.length || 0}`
         );
         // Optionally log truncated response data for detailed debugging:
         // debugDetailed(`Response Data (Truncated): ${formatRequestBodyForLog(response.data)}`);
 
         if (cacheEnabled) {
-          //   cache.setCache(url, response.data); // <-- Change this call
+        //   cache.setCache(url, response.data); // <-- Change this call
           setCache(url, response.data); // <-- Use imported function directly
         }
 
         return response.data;
+
       } catch (error) {
         lastError = error; // Store the error for potential Retry-After parsing
         const statusCode = error.response?.status;
@@ -186,27 +178,23 @@ async function fetchApi(
         // Non-retryable error or max retries reached
         // Log more context about the failed request
         debugAll(
-          `Failed request details:` +
-            `\n  Method: ${method.toUpperCase()}` +
-            `\n  URL: ${url}` +
-            (method.toUpperCase() === 'POST'
-              ? `\n  Body (Truncated): ${formatRequestBodyForLog(requestBody)}`
-              : '')
+          `Failed request details:`+
+          `\n  Method: ${method.toUpperCase()}` +
+          `\n  URL: ${url}` +
+          (method.toUpperCase() === 'POST' ? `\n  Body (Truncated): ${formatRequestBodyForLog(requestBody)}` : '')
         );
         debugAll(
           `Exhausted all ${attempt + 1} attempts or non-retryable error for URL: ${url}. ` +
             `Last error (${statusCode || error.code}): ${error.message}`
         );
         if (error.response) {
-          // Log truncated response data on error
-          debugAll(
-            `Error Response Data (Truncated): ${formatRequestBodyForLog(error.response.data)}`
-          );
-          debugAll(`Error Response Headers: ${JSON.stringify(error.response.headers)}`);
+             // Log truncated response data on error
+             debugAll(`Error Response Data (Truncated): ${formatRequestBodyForLog(error.response.data)}`);
+             debugAll(`Error Response Headers: ${JSON.stringify(error.response.headers)}`);
         } else if (error.request) {
-          debugAll('Error: No response received from server.');
+             debugAll('Error: No response received from server.');
         } else {
-          debugAll(`Error Details: ${error.message}`);
+             debugAll(`Error Details: ${error.message}`);
         }
         throw error; // Throw the last encountered error
       }
@@ -216,6 +204,7 @@ async function fetchApi(
     // Throw the last error if the loop finishes unexpectedly (e.g., MAX_RETRIES is -1)
     debugAll(`Exiting fetchApi loop unexpectedly for ${url}. Throwing last error.`);
     throw lastError;
+
   } catch (error) {
     // Catch any synchronous errors from initial setup (URL building, etc.)
     debugAll(`Error in fetchApi setup or final throw: ${error.message}`);

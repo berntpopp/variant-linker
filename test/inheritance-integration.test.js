@@ -52,7 +52,6 @@ describe('Inheritance Analysis Integration Tests', function () {
             else if (chrom === '1' && pos === 1002000) geneSymbol = 'ABCA4';
             else if (chrom === '1' && pos === 1003000) geneSymbol = 'BRCA1';
             else if (chrom === '2' && pos === 2000000) geneSymbol = 'BRCA2';
-
             // ** FIX: Ensure variantKey generated here matches the hyphenated format if used **
             // Although analyzeVariant should handle key assignment primarily.
             return {
