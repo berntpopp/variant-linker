@@ -2,3 +2,7 @@ node_modules/
 dist/
 coverage/
 webpack.config.js
+docs/src/
+docs/build/
+docs/node_modules/
+docs/static/

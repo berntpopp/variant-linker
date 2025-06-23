@@ -1,7 +1,7 @@
 // @ts-check
 // Note: type annotations allow type checking and IDEs autocompletion
 
-const {themes} = require('prism-react-renderer');
+const { themes } = require('prism-react-renderer');
 const lightCodeTheme = themes.github;
 const darkCodeTheme = themes.dracula;
 
@@ -40,14 +40,12 @@ const config = {
         docs: {
           sidebarPath: require.resolve('./sidebars.js'),
           // Please change this to your repo.
-          editUrl:
-            'https://github.com/berntpopp/variant-linker/tree/main/docs/',
+          editUrl: 'https://github.com/berntpopp/variant-linker/tree/main/docs/',
         },
         blog: {
           showReadingTime: true,
           // Please change this to your repo.
-          editUrl:
-            'https://github.com/berntpopp/variant-linker/tree/main/docs/',
+          editUrl: 'https://github.com/berntpopp/variant-linker/tree/main/docs/',
         },
         theme: {
           customCss: require.resolve('./src/css/custom.css'),
@@ -56,27 +54,28 @@ const config = {
     ],
   ],
 
+  // Note: TypeDoc plugin temporarily disabled for initial setup
+  // Will be re-enabled once dependencies are stable
   plugins: [
-    [
-      'docusaurus-plugin-typedoc',
-      {
-        // TypeDoc options
-        entryPoints: ['../src/index.js'],
-        tsconfig: '../tsconfig.json',
-        out: 'api',
-        sidebar: {
-          categoryLabel: 'API Reference',
-          position: 1,
-          fullNames: true,
-        },
-        readme: 'none',
-        excludePrivate: true,
-        excludeProtected: true,
-        excludeExternals: true,
-        hideGenerator: true,
-        sort: ['source-order'],
-      },
-    ],
+    // [
+    //   'docusaurus-plugin-typedoc',
+    //   {
+    //     entryPoints: ['../src/index.js'],
+    //     tsconfig: '../tsconfig.json',
+    //     out: 'api',
+    //     sidebar: {
+    //       categoryLabel: 'API Reference',
+    //       position: 1,
+    //       fullNames: true,
+    //     },
+    //     readme: 'none',
+    //     excludePrivate: true,
+    //     excludeProtected: true,
+    //     excludeExternals: true,
+    //     hideGenerator: true,
+    //     sort: ['source-order'],
+    //   },
+    // ],
   ],
 
   themeConfig:
@@ -97,7 +96,7 @@ const config = {
             position: 'left',
             label: 'Documentation',
           },
-          {to: '/blog', label: 'Blog', position: 'left'},
+          { to: '/blog', label: 'Blog', position: 'left' },
           {
             href: 'https://github.com/berntpopp/variant-linker',
             label: 'GitHub',

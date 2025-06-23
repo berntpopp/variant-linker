@@ -19,19 +19,12 @@ const sidebars = {
     {
       type: 'category',
       label: 'Getting Started',
-      items: [
-        'getting-started/installation',
-        'getting-started/cli-usage',
-      ],
+      items: ['getting-started/installation', 'getting-started/cli-usage'],
     },
     {
       type: 'category',
       label: 'Guides',
-      items: [
-        'guides/vcf-and-ped-files',
-        'guides/inheritance-analysis',
-        'guides/scoring-engine',
-      ],
+      items: ['guides/vcf-and-ped-files', 'guides/inheritance-analysis', 'guides/scoring-engine'],
     },
     'benchmarking',
     'contributing',
