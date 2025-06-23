@@ -1,6 +1,6 @@
 # Variant-Linker
 
-[![Build Status](https://github.com/berntpopp/variant-linker/workflows/CI/badge.svg)](https://github.com/berntpopp/variant-linker/actions)
+[![CI](https://github.com/berntpopp/variant-linker/workflows/CI/badge.svg)](https://github.com/berntpopp/variant-linker/actions)
 [![npm version](https://badge.fury.io/js/variant-linker.svg)](https://badge.fury.io/js/variant-linker)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
