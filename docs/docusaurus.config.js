@@ -115,8 +115,8 @@ const config = {
                 to: '/docs/getting-started/installation',
               },
               {
-                label: 'API Reference',
-                to: '/docs/api',
+                label: 'Guides',
+                to: '/docs/guides/vcf-and-ped-files',
               },
             ],
           },
