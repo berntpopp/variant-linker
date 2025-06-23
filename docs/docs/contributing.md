@@ -268,14 +268,17 @@ This project uses [Conventional Commits](https://www.conventionalcommits.org/) w
 |------|-------------|----------------|
 | `feat` | New feature | Minor version bump |
 | `fix` | Bug fix | Patch version bump |
-| `docs` | Documentation changes | No release |
-| `style` | Code style changes | No release |
-| `refactor` | Code refactoring | No release |
 | `perf` | Performance improvements | Patch version bump |
-| `test` | Test additions/changes | No release |
-| `build` | Build system changes | No release |
-| `ci` | CI configuration changes | No release |
-| `chore` | Other maintenance | No release |
+| `revert` | Revert previous commit | Patch version bump |
+| `docs` | Documentation changes | **No release** |
+| `style` | Code style changes | **No release** |
+| `refactor` | Code refactoring | **No release** |
+| `test` | Test additions/changes | **No release** |
+| `build` | Build system changes | **No release** |
+| `ci` | CI configuration changes | **No release** |
+| `chore` | Other maintenance | **No release** |
+
+**📝 Documentation-Only Changes**: Commits with types `docs`, `style`, `chore`, `refactor`, `test`, `build`, or `ci` will NOT trigger a new release. This is perfect for documentation updates, code formatting, and development workflow improvements.
 
 ### Breaking Changes
 

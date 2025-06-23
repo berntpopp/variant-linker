@@ -1,8 +1,41 @@
 {
   "branches": ["main"],
   "plugins": [
-    "@semantic-release/commit-analyzer",
-    "@semantic-release/release-notes-generator",
+    ["@semantic-release/commit-analyzer", {
+      "preset": "conventionalcommits",
+      "releaseRules": [
+        {"type": "docs", "scope": "*", "release": false},
+        {"type": "style", "scope": "*", "release": false},
+        {"type": "chore", "scope": "*", "release": false},
+        {"type": "refactor", "scope": "*", "release": false},
+        {"type": "test", "scope": "*", "release": false},
+        {"type": "build", "scope": "*", "release": false},
+        {"type": "ci", "scope": "*", "release": false},
+        {"type": "perf", "release": "patch"},
+        {"type": "revert", "release": "patch"},
+        {"type": "fix", "release": "patch"},
+        {"type": "feat", "release": "minor"},
+        {"breaking": true, "release": "major"}
+      ]
+    }],
+    ["@semantic-release/release-notes-generator", {
+      "preset": "conventionalcommits",
+      "presetConfig": {
+        "types": [
+          {"type": "feat", "section": "Features"},
+          {"type": "fix", "section": "Bug Fixes"},
+          {"type": "perf", "section": "Performance Improvements"},
+          {"type": "revert", "section": "Reverts"},
+          {"type": "docs", "hidden": true},
+          {"type": "style", "hidden": true},
+          {"type": "chore", "hidden": true},
+          {"type": "refactor", "hidden": true},
+          {"type": "test", "hidden": true},
+          {"type": "build", "hidden": true},
+          {"type": "ci", "hidden": true}
+        ]
+      }
+    }],
     ["@semantic-release/npm", {
       "npmPublish": true,
       "tarballDir": "dist"
