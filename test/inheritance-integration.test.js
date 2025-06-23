@@ -166,7 +166,7 @@ describe('Inheritance Analysis Integration Tests', function () {
       expect(patternResult.prioritizedPattern).to.equal(
         expected,
         `Mismatch for variant ${variantKey} in ${vcfFileName}. ` +
-        `Expected '${expected}', got '${patternResult.prioritizedPattern}'`
+          `Expected '${expected}', got '${patternResult.prioritizedPattern}'`
       );
       foundMatches++;
     }

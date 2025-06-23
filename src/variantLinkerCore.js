@@ -697,7 +697,9 @@ async function analyzeVariant(params) {
 
   // *** DEBUG POINT 13: Final Annotation Data Before Formatting ***
   debugDetailed(
-    `analyzeVariant: Final annotationData BEFORE formatting (count=${finalOutput.annotationData?.length}). Check for deducedInheritancePattern: ${JSON.stringify(finalOutput.annotationData?.slice(0, 2))}...`
+    `analyzeVariant: Final annotationData BEFORE formatting ` +
+    `(count=${finalOutput.annotationData?.length}). ` +
+    `Check for deducedInheritancePattern: ${JSON.stringify(finalOutput.annotationData?.slice(0, 2))}...`
   );
 
   if (params.output && params.output.toUpperCase() === 'SCHEMA') {

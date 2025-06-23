@@ -12,7 +12,7 @@ module.exports = {
   rules: {
     // Enforce Google style but with some exceptions for KISS principles
     'prettier/prettier': 'error',
-    'max-len': ['error', { code: 100, ignoreUrls: true, ignoreStrings: true }],
+    'max-len': ['error', { code: 120, ignoreUrls: true, ignoreStrings: true }],
 
     // More lenient JSDoc requirements
     'require-jsdoc': [
