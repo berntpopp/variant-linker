@@ -50,3 +50,7 @@ Variant-Linker is perfect for:
 - **Variant Prioritization**: Scoring and ranking variants based on custom criteria
 
 Ready to get started? Check out our [Installation Guide](./getting-started/installation.md) to begin using Variant-Linker in your projects.
+
+## 🎯 **Perfect for Research & Clinical Use**
+
+Variant-Linker bridges the gap between research and clinical genetics by providing enterprise-grade annotation capabilities in an easy-to-use package.
