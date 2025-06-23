@@ -1,7 +1,7 @@
 # Variant-Linker
 
 [![CI](https://github.com/berntpopp/variant-linker/workflows/CI/badge.svg)](https://github.com/berntpopp/variant-linker/actions)
-[![npm version](https://badge.fury.io/js/variant-linker.svg)](https://badge.fury.io/js/variant-linker)
+[![npm version](https://img.shields.io/npm/v/variant-linker.svg)](https://www.npmjs.com/package/variant-linker)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 A powerful CLI tool and JavaScript library for genetic variant annotation using Ensembl APIs.
