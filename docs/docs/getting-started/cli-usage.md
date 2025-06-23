@@ -2,6 +2,8 @@
 
 Variant-Linker provides a comprehensive command-line interface for genetic variant annotation. This guide covers all the available options and usage patterns.
 
+> **Note**: If you're interested in using Variant-Linker as a JavaScript library in your Node.js applications, see the [API Usage Guide](api-usage.md) for programmatic integration options.
+
 ## Basic Usage
 
 ### Single Variant Analysis

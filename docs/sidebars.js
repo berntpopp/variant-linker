@@ -19,7 +19,11 @@ const sidebars = {
     {
       type: 'category',
       label: 'Getting Started',
-      items: ['getting-started/installation', 'getting-started/cli-usage'],
+      items: [
+        'getting-started/installation',
+        'getting-started/cli-usage',
+        'getting-started/api-usage',
+      ],
     },
     {
       type: 'category',

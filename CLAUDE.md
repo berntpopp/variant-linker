@@ -5,12 +5,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Development Commands
 
 ### Essential Commands
-- **Build**: `npm run build` - Creates production webpack bundle in `dist/`
+- **Build**: `npm run build` - Creates production webpack bundle in `dist/` (UMD library format)
 - **Test**: `npm test` - Runs Mocha test suite with recursive discovery
 - **Lint**: `npm run lint` - ESLint check with Google style guide
 - **Lint Fix**: `npm run lint:fix` - Auto-fix linting issues where possible
 - **Start**: `npm start` - Runs the CLI tool directly
 - **Benchmark**: `npm run benchmark` - Performance testing with various batch sizes
+
+### Documentation Commands
+- **Docs Dev**: `npm run docs:dev` - Start development server for documentation
+- **Docs Build**: `npm run docs:build` - Build documentation site
+- **Docs Serve**: `npm run docs:serve` - Serve built documentation locally
 
 ### CLI Usage Examples
 ```bash
@@ -256,9 +261,11 @@ function createVepAnnotation({ input, consequence, impact, polyphen });
 #### Test Execution and Coverage
 
 ##### Execution Commands
-- **`npm test`** - Full test suite with recursive discovery
+- **`npm test`** - Full test suite with recursive discovery (30-second timeout)
 - **`npm run benchmark`** - Performance testing across scenarios
 - **`npm run lint`** - Code quality including test file validation
+- **Running specific tests**: `npx mocha test/specific-test.js` - Run individual test files
+- **Debug mode**: `DEBUG=variant-linker:* npm test` - Run tests with debug output
 
 ##### Coverage Areas
 - **Unit test coverage** - Individual function and module testing
@@ -291,6 +298,7 @@ function createVepAnnotation({ input, consequence, impact, polyphen });
 
 The tool is designed for dual use as CLI and library:
 
+#### Node.js Library Usage
 ```javascript
 const { analyzeVariant, variantRecoderPost, vepRegionsAnnotation } = require('variant-linker');
 
@@ -303,6 +311,13 @@ const result = await analyzeVariant({
 });
 ```
 
+#### Browser Bundle Usage
+The webpack build creates a UMD library (`dist/variant-linker.bundle.js`):
+- **Entry point**: `src/index.js`
+- **Global object**: `VariantLinker` when loaded via script tag
+- **Browser compatibility**: Node.js modules (fs, path) replaced with browser-compatible alternatives
+- **Module formats**: Supports CommonJS, AMD, and global usage
+
 ### Code Style and Linting
 
 #### ESLint Configuration
@@ -312,10 +327,11 @@ const result = await analyzeVariant({
 - Custom rules for test files (Mocha/Chai support)
 
 #### Key Style Points
-- 100 character line limit
+- 120 character line limit (configured in .eslintrc.js)
 - camelCase for variables/functions
-- JSDoc comments required for functions
-- No console.log in production code (use debug module)
+- JSDoc comments required for functions (FunctionDeclarations and ClassDeclarations)
+- Console.log allowed (rule disabled in this project)
+- Prettier integration for consistent formatting
 
 ### Development Workflow
 
@@ -323,6 +339,15 @@ const result = await analyzeVariant({
 1. Run `npm run lint` to check code style
 2. Run `npm test` to ensure all tests pass
 3. Use conventional commit messages for semantic-release
+
+#### Release Process
+- **Semantic Release**: Automated versioning based on conventional commits
+- **Commit format**: `feat:`, `fix:`, `docs:`, `style:`, `refactor:`, `test:`, `chore:`
+- **Version bumps**: 
+  - `feat:` → minor version increase
+  - `fix:` → patch version increase
+  - `BREAKING CHANGE:` → major version increase
+- **CI/CD**: GitHub Actions handles automated releases to npm
 
 #### Performance Considerations
 - Use batch APIs for multiple variants
