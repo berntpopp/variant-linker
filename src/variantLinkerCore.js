@@ -521,7 +521,8 @@ async function analyzeVariant(params) {
     } else {
       // Fallback attempt (might be less reliable if keys aren't standardized yet)
       debugDetailed(`Attempting to build genotypesMap from annotationData (fallback)...`);
-      if (!result || !Array.isArray(result.annotationData)) { // Use result here
+      if (!result || !Array.isArray(result.annotationData)) {
+        // Use result here
         debugDetailed(
           'Error: result.annotationData is not available or not an array before building genotypesMap (fallback).'
         );
@@ -693,7 +694,6 @@ async function analyzeVariant(params) {
     finalOutput.pedigreeData = pedigreeObject;
     // stepsPerformed already includes PED message from main.js
   }
-
 
   // *** DEBUG POINT 13: Final Annotation Data Before Formatting ***
   debugDetailed(

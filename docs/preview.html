@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Variant-Linker Documentation Preview</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+            color: #333;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px 20px;
+            text-align: center;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+        .nav {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+        .nav ul {
+            list-style: none;
+            padding: 0;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+        }
+        .nav li {
+            background: white;
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .nav a {
+            text-decoration: none;
+            color: #333;
+            font-weight: 500;
+        }
+        .nav a:hover {
+            color: #667eea;
+        }
+        .feature {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        .code {
+            background: #f1f3f4;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Monaco', 'Courier New', monospace;
+            overflow-x: auto;
+        }
+        .badge {
+            display: inline-block;
+            background: #28a745;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            margin: 2px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🧬 Variant-Linker Documentation</h1>
+        <p>A powerful CLI tool and JavaScript library for genetic variant annotation using Ensembl APIs</p>
+        <div>
+            <span class="badge">TypeScript Support</span>
+            <span class="badge">VCF Processing</span>
+            <span class="badge">Family Analysis</span>
+            <span class="badge">Custom Scoring</span>
+        </div>
+    </div>
+
+    <div class="nav">
+        <h2>📖 Documentation Sections</h2>
+        <ul>
+            <li><a href="#introduction">🏠 Introduction</a></li>
+            <li><a href="#installation">⚙️ Installation</a></li>
+            <li><a href="#cli-usage">💻 CLI Usage</a></li>
+            <li><a href="#vcf-ped">📄 VCF & PED Files</a></li>
+            <li><a href="#inheritance">👨‍👩‍👧‍👦 Inheritance Analysis</a></li>
+            <li><a href="#scoring">🎯 Scoring Engine</a></li>
+            <li><a href="#benchmarking">📊 Benchmarking</a></li>
+            <li><a href="#contributing">🤝 Contributing</a></li>
+        </ul>
+    </div>
+
+    <div class="feature">
+        <h2 id="introduction">🏠 Introduction</h2>
+        <p>Variant-Linker facilitates genetic variant annotation by integrating with Ensembl's APIs. It supports both CLI and library usage with comprehensive features for variant analysis.</p>
+        
+        <h3>Key Features:</h3>
+        <ul>
+            <li><strong>🔄 Variant Translation</strong> - Convert between rsID, HGVS, and VCF formats</li>
+            <li><strong>📊 VEP Annotations</strong> - Comprehensive variant effect predictions</li>
+            <li><strong>👨‍👩‍👧‍👦 Family Analysis</strong> - Inheritance pattern detection from PED files</li>
+            <li><strong>🗂️ VCF Support</strong> - Full VCF input/output with header preservation</li>
+            <li><strong>⚡ Batch Processing</strong> - Efficient handling of large variant datasets</li>
+            <li><strong>🎯 Custom Scoring</strong> - Configurable variant prioritization models</li>
+        </ul>
+    </div>
+
+    <div class="feature">
+        <h2 id="installation">⚙️ Installation</h2>
+        <div class="code">
+git clone https://github.com/berntpopp/variant-linker.git
+cd variant-linker
+npm install
+npm link  # Optional: for global CLI access
+        </div>
+    </div>
+
+    <div class="feature">
+        <h2 id="cli-usage">💻 CLI Usage Examples</h2>
+        <div class="code">
+# Analyze a single variant
+variant-linker --variant "rs6025" --output JSON
+
+# Process VCF file with inheritance analysis
+variant-linker --vcf-input sample.vcf --ped family.ped --calculate-inheritance --output VCF
+
+# Batch processing with custom scoring
+variant-linker --variants-file variants.txt --scoring_config_path scoring/nephro_variant_score/ --output CSV
+        </div>
+    </div>
+
+    <div class="feature">
+        <h2>🚀 Full Documentation Site</h2>
+        <p>This is a preview of the documentation structure. The complete interactive documentation site will be available at:</p>
+        <div class="code">
+https://berntpopp.github.io/variant-linker/
+        </div>
+        <p>The full site includes:</p>
+        <ul>
+            <li>🔍 <strong>Search functionality</strong> - Find information quickly</li>
+            <li>🌙 <strong>Dark/Light mode</strong> - Comfortable reading in any lighting</li>
+            <li>📱 <strong>Mobile responsive</strong> - Works perfectly on all devices</li>
+            <li>🔗 <strong>API Reference</strong> - Auto-generated from code comments</li>
+            <li>📝 <strong>Comprehensive guides</strong> - Step-by-step tutorials</li>
+            <li>🔄 <strong>Auto-updates</strong> - Always current with latest code</li>
+        </ul>
+    </div>
+
+    <div class="feature">
+        <h2>🛠️ Development Commands</h2>
+        <p>Once the dependencies are installed, you can use these commands:</p>
+        <div class="code">
+# Start development server (with hot reload)
+npm run docs:dev
+
+# Build for production
+npm run docs:build
+
+# Serve built site locally
+npm run docs:serve
+        </div>
+    </div>
+
+    <div class="feature">
+        <h2>📋 Next Steps</h2>
+        <ol>
+            <li><strong>Merge the branch</strong> to main to trigger automatic deployment</li>
+            <li><strong>Enable GitHub Pages</strong> in repository settings</li>
+            <li><strong>Visit the live site</strong> at the GitHub Pages URL</li>
+            <li><strong>Customize</strong> the content and styling as needed</li>
+        </ol>
+    </div>
+
+    <footer style="text-align: center; margin-top: 50px; padding: 20px; color: #666;">
+        <p>📚 This preview shows the documentation structure implemented with Docusaurus</p>
+        <p>🔧 Generated with Claude Code</p>
+    </footer>
+</body>
+</html>
