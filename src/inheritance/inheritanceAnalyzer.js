@@ -198,10 +198,7 @@ function _mergeCompHetResults(inheritanceResults, geneSymbol, compHetResult) {
         'compound_heterozygous_possible',
         'compound_heterozygous_possible_missing_parents',
         'compound_heterozygous_possible_no_pedigree',
-<<<<<<< HEAD
         'compound_heterozygous_possible_missing_parent_genotypes',
-=======
->>>>>>> origin/main
       ];
 
       const isCurrentWeak =
