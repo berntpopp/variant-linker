@@ -13,7 +13,10 @@
     "serve": "webpack serve --mode development --open",
     "lint": "eslint . --ext .js",
     "lint:fix": "eslint . --ext .js --fix",
-    "benchmark": "node scripts/benchmark.js"
+    "benchmark": "node scripts/benchmark.js",
+    "docs:dev": "cd docs && npm start",
+    "docs:build": "cd docs && npm run build",
+    "docs:serve": "cd docs && npm run serve"
   },
   "keywords": [
     "variant",
@@ -32,7 +35,7 @@
   "bugs": {
     "url": "https://github.com/berntpopp/variant-linker/issues"
   },
-  "homepage": "https://github.com/berntpopp/variant-linker#readme",
+  "homepage": "https://berntpopp.github.io/variant-linker/",
   "files": [
     "src",
     "config",
