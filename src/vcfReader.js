@@ -77,7 +77,9 @@ async function readVariantsFromVcf(filePath) {
       const headerFields = headerFieldLine.split('\t');
       // VCF format: The first 9 columns are fixed, samples start at index 9
       if (headerFields.length > 9) {
-        samples.push(...headerFields.slice(9));
+        // Trim sample IDs to remove any carriage return or other whitespace characters
+        const trimmedSamples = headerFields.slice(9).map((id) => id.trim());
+        samples.push(...trimmedSamples);
         debug(`Found ${samples.length} samples in VCF file: ${samples.join(', ')}`);
       } else {
         debug('No samples found in VCF file (single-sample or no genotypes)');
@@ -220,9 +222,10 @@ async function readVariantsFromVcf(filePath) {
                 gtString !== '.'
               ) {
                 // Store the extracted genotype string (e.g., "0/1", "0|0")
-                // Ensure it's stored as a string
-                genotypes.set(sampleId, gtString);
-                debugDetailed(` -> Storing GT '${gtString}' for sample ${sampleId}`);
+                // Ensure it's stored as a string and trim any whitespace/carriage returns
+                const trimmedGT = gtString.trim();
+                genotypes.set(sampleId, trimmedGT);
+                debugDetailed(` -> Storing GT '${trimmedGT}' for sample ${sampleId}`);
               } else {
                 // Use './.' if GT is missing, null, empty, or explicitly '.'
                 genotypes.set(sampleId, './.');

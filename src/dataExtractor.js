@@ -568,16 +568,17 @@ function formatVcfCsqString(annotation, csqFormatFields, altAllele) {
         value = handler(tempAnnotationContext, altAllele);
       } else {
         // Basic fallback: Look for a direct property match (lowercase) in the consequence itself first
-        value = consequence[fieldName.toLowerCase()] !== undefined
+        value =
+          consequence[fieldName.toLowerCase()] !== undefined
             ? consequence[fieldName.toLowerCase()]
             : annotation[fieldName.toLowerCase()] || ''; // Fallback to top-level annotation
 
         // Only log warning if data is expected but not found
         if (value === '') {
-            debug(
-              `Warning: No specific CSQ handler or direct property found for field '${fieldName}'. ` +
+          debug(
+            `Warning: No specific CSQ handler or direct property found for field '${fieldName}'. ` +
               'Using empty string.'
-            );
+          );
         }
       }
 

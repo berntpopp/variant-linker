@@ -177,6 +177,7 @@ function _mergeCompHetResults(inheritanceResults, geneSymbol, compHetResult) {
         'de_novo',
         'autosomal_recessive',
         'x_linked_recessive',
+        'x_linked_dominant',
         'compound_heterozygous', // Confirmed CompHet itself is strong
       ];
       const weakPatterns = [
@@ -186,7 +187,7 @@ function _mergeCompHetResults(inheritanceResults, geneSymbol, compHetResult) {
         'homozygous',
         'potential_x_linked',
         'non_mendelian',
-        'autosomal_dominant', // Explicitly add autosomal_dominant if it wasn't covered by 'dominant'
+        'autosomal_dominant', // Can be overridden by confirmed CompHet
         // Add other potential initial patterns if needed
         'autosomal_dominant_possible',
         'autosomal_recessive_possible',
@@ -197,6 +198,7 @@ function _mergeCompHetResults(inheritanceResults, geneSymbol, compHetResult) {
         'compound_heterozygous_possible',
         'compound_heterozygous_possible_missing_parents',
         'compound_heterozygous_possible_no_pedigree',
+        'compound_heterozygous_possible_missing_parent_genotypes',
       ];
 
       const isCurrentWeak =
@@ -210,9 +212,8 @@ function _mergeCompHetResults(inheritanceResults, geneSymbol, compHetResult) {
       );
 
       if (compHetResult.isCompHet) {
-        // Confirmed CompHet overrides everything except other strong patterns
-        // Allow overriding AD even if considered strong by some metrics
-        if (!isCurrentStrong || currentResult.prioritizedPattern === 'autosomal_dominant') {
+        // Confirmed CompHet overrides weak patterns and autosomal_dominant, but not other strong patterns
+        if (isCurrentWeak || currentResult.prioritizedPattern === 'autosomal_dominant') {
           debugDetailed(
             `    -> Overriding '${newPrioritizedPattern}' with confirmed 'compound_heterozygous'`
           );

@@ -20,6 +20,9 @@ const DEFAULT_PRIORITY_ORDER = [
   // Medium Confidence / Likely / Possible based on data
   'de_novo_candidate', // (Trio missing parent)
   'compound_heterozygous_possible',
+  'compound_heterozygous_possible_missing_parents',
+  'compound_heterozygous_possible_missing_parent_genotypes',
+  'compound_heterozygous_possible_no_pedigree',
   'autosomal_dominant', // AD often less stringent than recessive
   'x_linked_dominant',
   'autosomal_recessive_possible', // (Trio missing parent)

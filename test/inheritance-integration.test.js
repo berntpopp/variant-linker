@@ -39,6 +39,20 @@ describe('Inheritance Analysis Integration Tests', function () {
             const pos = parseInt(parts[1], 10);
             const ref = parts[3];
             const alt = parts[4];
+
+            // Extract gene symbol from the variant input if available (from INFO field)
+            // The VCF input should have gene info, but fallback to chromosome-based mock genes
+            let geneSymbol = 'MOCK_GENE';
+            if (chrom === '1' && pos === 1000000) geneSymbol = 'SCN1A';
+            else if (chrom === '2' && pos === 2000000) geneSymbol = 'SCN2A';
+            else if (chrom === '3' && pos === 3000000) geneSymbol = 'KMT2A';
+            else if (chrom === 'X' && pos === 100000) geneSymbol = 'MECP2';
+            else if (chrom === 'X' && pos === 200000) geneSymbol = 'PCDH19';
+            else if (chrom === 'X' && pos === 300000) geneSymbol = 'COL4A5';
+            else if (chrom === '1' && pos === 1002000) geneSymbol = 'ABCA4';
+            else if (chrom === '1' && pos === 1003000) geneSymbol = 'BRCA1';
+            else if (chrom === '2' && pos === 2000000) geneSymbol = 'BRCA2';
+
             // ** FIX: Ensure variantKey generated here matches the hyphenated format if used **
             // Although analyzeVariant should handle key assignment primarily.
             return {
@@ -53,7 +67,7 @@ describe('Inheritance Analysis Integration Tests', function () {
               transcript_consequences: [
                 {
                   // Minimal consequence needed
-                  gene_symbol: 'MOCK_GENE', // Needed for gene grouping in inheritance
+                  gene_symbol: geneSymbol, // Use specific gene symbols for inheritance testing
                   consequence_terms: ['mock_consequence'],
                   impact: 'MODIFIER',
                 },
