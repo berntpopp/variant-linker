@@ -6,3 +6,4 @@ docs/src/
 docs/build/
 docs/node_modules/
 docs/static/
+docs/docusaurus.config.js

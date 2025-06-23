@@ -20,6 +20,7 @@ const vepEndpoint = apiConfig.ensembl.endpoints.vepRegions;
 // --- Test Suite ---
 describe('Inheritance Analysis Integration Tests', function () {
   // Increase timeout for tests involving multiple steps + potential API mocks
+  // eslint-disable-next-line no-invalid-this
   this.timeout(15000); // 15 seconds timeout per test
 
   let sandbox;
@@ -164,7 +165,8 @@ describe('Inheritance Analysis Integration Tests', function () {
       // Assert the prioritized pattern matches the expectation for this variant
       expect(patternResult.prioritizedPattern).to.equal(
         expected,
-        `Mismatch for variant ${variantKey} in ${vcfFileName}. Expected '${expected}', got '${patternResult.prioritizedPattern}'`
+        `Mismatch for variant ${variantKey} in ${vcfFileName}. ` +
+        `Expected '${expected}', got '${patternResult.prioritizedPattern}'`
       );
       foundMatches++;
     }
