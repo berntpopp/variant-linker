@@ -208,7 +208,8 @@ async function processBatchVariants(variants, params) {
         const key = originalVariant; // Use the consistent input key
         // *** DEBUG POINT 6: VCF Batch Annotation Key Association ***
         debugDetailed(
-          `processBatchVariants (VCF): Assigning variantKey='${key}' to annotation for OrigInput='${originalVariant}', VEPInput='${mappingInfo.formattedVariant}'`
+          `processBatchVariants (VCF): Assigning variantKey='${key}' to annotation for ` +
+            `OrigInput='${originalVariant}', VEPInput='${mappingInfo.formattedVariant}'`
         );
         annotationData.push({
           originalInput: originalVariant,
@@ -260,7 +261,8 @@ async function processBatchVariants(variants, params) {
                 const standardKey = `${chrom}-${pos}-${ref}-${alt}`; // Create the standard key
 
                 debugDetailed(
-                  `processBatchVariants (HGVS Recode): Mapping formatted VEP input '${formattedVariant}' (Key='${standardKey}') back to OrigInput='${originalVariant}'`
+                  `processBatchVariants (HGVS Recode): Mapping formatted VEP input '${formattedVariant}' ` +
+                    `(Key='${standardKey}') back to OrigInput='${originalVariant}'`
                 );
                 // Store mapping information
                 uniqueVcfStrings.push(formattedVariant);
@@ -328,7 +330,8 @@ async function processBatchVariants(variants, params) {
               // The key should be the one derived from the vcfString
               const key = mapping.standardKey;
               debugDetailed(
-                `processBatchVariants (HGVS Annotate): Assigning variantKey='${key}' to annotation for OrigInput='${mapping.originalInput}', VEPInput='${formattedVariant}'`
+                `processBatchVariants (HGVS Annotate): Assigning variantKey='${key}' to annotation for ` +
+                  `OrigInput='${mapping.originalInput}', VEPInput='${formattedVariant}'`
               );
               annotationData.push({
                 originalInput: mapping.originalInput,
@@ -352,7 +355,8 @@ async function processBatchVariants(variants, params) {
   }
   // *** DEBUG POINT 8: Final Combined Annotation Data (Before Inheritance) ***
   debugDetailed(
-    `processBatchVariants: Final combined annotationData before inheritance (count=${annotationData.length}): ${JSON.stringify(annotationData.slice(0, 2))}...`
+    `processBatchVariants: Final combined annotationData before inheritance ` +
+      `(count=${annotationData.length}): ${JSON.stringify(annotationData.slice(0, 2))}...`
   );
 
   return { annotationData };
@@ -475,7 +479,8 @@ async function analyzeVariant(params) {
 
   // *** DEBUG POINT 9: Annotation Data Before Scoring/Inheritance ***
   debugDetailed(
-    `analyzeVariant: Annotation data BEFORE scoring/inheritance (count=${result.annotationData?.length}): ${JSON.stringify(result.annotationData?.slice(0, 2))}...`
+    `analyzeVariant: Annotation data BEFORE scoring/inheritance ` +
+      `(count=${result.annotationData?.length}): ${JSON.stringify(result.annotationData?.slice(0, 2))}...`
   );
 
   // Optionally apply scoring to annotation data.
@@ -539,7 +544,8 @@ async function analyzeVariant(params) {
 
     // *** DEBUG POINT 10: Genotypes Map for Inheritance ***
     debugDetailed(
-      `analyzeVariant: Built genotypesMap for inheritance (size=${genotypesMap.size}). Keys: ${JSON.stringify(Array.from(genotypesMap.keys()).slice(0, 5))}...`
+      `analyzeVariant: Built genotypesMap for inheritance (size=${genotypesMap.size}). ` +
+        `Keys: ${JSON.stringify(Array.from(genotypesMap.keys()).slice(0, 5))}...`
     );
 
     // Only proceed if we have genotype data for at least one variant
@@ -578,7 +584,8 @@ async function analyzeVariant(params) {
           );
           // *** DEBUG POINT 11: Inheritance Results ***
           debugDetailed(
-            `analyzeVariant: Received inheritanceResults (size=${inheritanceResults?.size}). Keys: ${JSON.stringify(Array.from(inheritanceResults?.keys() || []).slice(0, 5))}...`
+            `analyzeVariant: Received inheritanceResults (size=${inheritanceResults?.size}). ` +
+              `Keys: ${JSON.stringify(Array.from(inheritanceResults?.keys() || []).slice(0, 5))}...`
           );
 
           // Update annotations with inheritance results
@@ -599,7 +606,8 @@ async function analyzeVariant(params) {
                 calculatedPatternsCount++;
               } else {
                 debugDetailed(
-                  ` -> No inheritance result found for Key='${keyToLookup}' (Annotation Input: ${annotation.originalInput || annotation.input})`
+                  ` -> No inheritance result found for Key='${keyToLookup}' ` +
+                    `(Annotation Input: ${annotation.originalInput || annotation.input})`
                 );
                 annotation.deducedInheritancePattern = {
                   prioritizedPattern: 'unknown_not_processed',
@@ -698,8 +706,8 @@ async function analyzeVariant(params) {
   // *** DEBUG POINT 13: Final Annotation Data Before Formatting ***
   debugDetailed(
     `analyzeVariant: Final annotationData BEFORE formatting ` +
-    `(count=${finalOutput.annotationData?.length}). ` +
-    `Check for deducedInheritancePattern: ${JSON.stringify(finalOutput.annotationData?.slice(0, 2))}...`
+      `(count=${finalOutput.annotationData?.length}). ` +
+      `Check for deducedInheritancePattern: ${JSON.stringify(finalOutput.annotationData?.slice(0, 2))}...`
   );
 
   if (params.output && params.output.toUpperCase() === 'SCHEMA') {
@@ -738,7 +746,9 @@ async function analyzeVariant(params) {
 
   // *** Add Debugging right before returning finalOutput ***
   debugDetailed(
-    `analyzeVariant: Returning finalOutput. meta.inheritanceCalculated = ${finalOutput?.meta?.inheritanceCalculated}, meta.batchProcessing = ${finalOutput?.meta?.batchProcessing}`
+    `analyzeVariant: Returning finalOutput. ` +
+      `meta.inheritanceCalculated = ${finalOutput?.meta?.inheritanceCalculated}, ` +
+      `meta.batchProcessing = ${finalOutput?.meta?.batchProcessing}`
   );
   return finalOutput;
 }

@@ -577,13 +577,15 @@ async function runAnalysis() {
 
     // Add detailed debug logging before calling analyzeVariant
     debugDetailed(
-      `Calling analyzeVariant with -> variants (${analysisParams.variants?.length || 0}): ${JSON.stringify(analysisParams.variants?.slice(0, 5))}...`
+      `Calling analyzeVariant with -> variants (${analysisParams.variants?.length || 0}): ` +
+        `${JSON.stringify(analysisParams.variants?.slice(0, 5))}...`
     );
     debugDetailed(` -> vcfInput: ${analysisParams.vcfInput}`);
     debugDetailed(` -> vcfRecordMap size: ${analysisParams.vcfRecordMap?.size}`);
     debugDetailed(` -> vcfHeaderLines count: ${analysisParams.vcfHeaderLines?.length}`);
     debugDetailed(
-      ` -> pedigreeData keys: ${JSON.stringify(Array.from(analysisParams.pedigreeData?.keys() || []))}`
+      ` -> pedigreeData keys: ` +
+        `${JSON.stringify(Array.from(analysisParams.pedigreeData?.keys() || []))}`
     );
     debugDetailed(` -> sampleMap: ${JSON.stringify(analysisParams.sampleMap)}`);
     debugDetailed(` -> samples: ${JSON.stringify(analysisParams.samples)}`);

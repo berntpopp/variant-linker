@@ -139,7 +139,8 @@ function _groupAnnotationsByPosition(annotationData, vcfRecordMap) {
           );
         } else {
           debugOutput(
-            `_groupAnnotationsByPosition: Warning - Could not determine key for annotation: ${JSON.stringify(annotation)}`
+            `_groupAnnotationsByPosition: Warning - Could not determine key for annotation: ` +
+              `${JSON.stringify(annotation)}`
           );
         }
       }
@@ -209,7 +210,8 @@ function _groupAnnotationsByPosition(annotationData, vcfRecordMap) {
         }
       }
       debugOutput(
-        ` -> Updated group for PosKey='${posKey}', ALT='${alt}'. Annotations count: ${group.alts.get(alt)?.annotations.length || 0}`
+        ` -> Updated group for PosKey='${posKey}', ALT='${alt}'. ` +
+          `Annotations count: ${group.alts.get(alt)?.annotations.length || 0}`
       );
     }
   } else {
@@ -218,7 +220,8 @@ function _groupAnnotationsByPosition(annotationData, vcfRecordMap) {
     for (const annotation of annotationData) {
       if (!annotation || !annotation.vcfString) {
         debugOutput(
-          `Warning: Skipping annotation due to missing 'vcfString'. Input: ${annotation?.originalInput || annotation?.input}`
+          `Warning: Skipping annotation due to missing 'vcfString'. ` +
+            `Input: ${annotation?.originalInput || annotation?.input}`
         );
         continue;
       }
@@ -227,7 +230,8 @@ function _groupAnnotationsByPosition(annotationData, vcfRecordMap) {
       const parts = annotation.vcfString.split('-');
       if (parts.length !== 4) {
         debugOutput(
-          `Warning: Skipping due to unexpected vcfString format: '${annotation.vcfString}'. Expected CHROM-POS-REF-ALT. Input: ${annotation?.originalInput}`
+          `Warning: Skipping due to unexpected vcfString format: '${annotation.vcfString}'. ` +
+            `Expected CHROM-POS-REF-ALT. Input: ${annotation?.originalInput}`
         );
         continue;
       }
@@ -253,11 +257,13 @@ function _groupAnnotationsByPosition(annotationData, vcfRecordMap) {
           : '.';
 
       const posKey = `${chrom}:${pos}:${ref}`;
-      const key = annotation.variantKey || `${chrom}-${pos}-${ref}-${alt}`; // Use assigned key if available
+      // Use assigned key if available
+      const key = annotation.variantKey || `${chrom}-${pos}-${ref}-${alt}`;
 
       // *** DEBUG POINT 18: Processing Non-VCF Annotation ***
       debugOutput(
-        `_groupAnnotationsByPosition (Non-VCF Path): Processing annotation Key='${key}', PosKey='${posKey}', ALT='${alt}'`
+        `_groupAnnotationsByPosition (Non-VCF Path): Processing annotation ` +
+          `Key='${key}', PosKey='${posKey}', ALT='${alt}'`
       );
 
       if (!positionGroups.has(posKey)) {
@@ -284,13 +290,15 @@ function _groupAnnotationsByPosition(annotationData, vcfRecordMap) {
         group.alts.get(alt).annotations.push(annotation);
       }
       debugOutput(
-        ` -> Updated group for PosKey='${posKey}', ALT='${alt}'. Annotations count: ${group.alts.get(alt)?.annotations.length || 0}`
+        ` -> Updated group for PosKey='${posKey}', ALT='${alt}'. ` +
+          `Annotations count: ${group.alts.get(alt)?.annotations.length || 0}`
       );
     }
   }
   // *** DEBUG POINT 19: Final Position Groups ***
   debugOutput(
-    `_groupAnnotationsByPosition: Final positionGroups size=${positionGroups.size}. Keys: ${JSON.stringify(Array.from(positionGroups.keys()))}`
+    `_groupAnnotationsByPosition: Final positionGroups size=${positionGroups.size}. ` +
+      `Keys: ${JSON.stringify(Array.from(positionGroups.keys()))}`
   );
   return positionGroups;
 }
@@ -312,7 +320,8 @@ function _formatVcfInfoField(positionGroupData, vlCsqFormatFields) {
 
   // *** DEBUG POINT 20: Formatting INFO for Position ***
   debugOutput(
-    `_formatVcfInfoField: Formatting INFO for PosKey='${positionGroupData.chrom}:${positionGroupData.pos}:${positionGroupData.ref}'`
+    `_formatVcfInfoField: Formatting INFO for ` +
+      `PosKey='${positionGroupData.chrom}:${positionGroupData.pos}:${positionGroupData.ref}'`
   );
 
   // --- Collect CSQ and Inheritance Info ---
@@ -527,7 +536,8 @@ function _generateDefaultVcfHeader() {
 function formatAnnotationsToVcf(annotationData, vcfRecordMap, vcfHeaderLines, vlCsqFormatFields) {
   // *** DEBUG POINT 27: Starting VCF Formatting ***
   debugOutput(
-    `formatAnnotationsToVcf: Starting formatting. Annotation count=${annotationData?.length}, vcfRecordMap size=${vcfRecordMap?.size}`
+    `formatAnnotationsToVcf: Starting formatting. ` +
+      `Annotation count=${annotationData?.length}, vcfRecordMap size=${vcfRecordMap?.size}`
   );
   const finalHeaderLines = _prepareVcfHeader(vcfHeaderLines, vlCsqFormatFields);
 
