@@ -412,6 +412,6 @@ variant-linker \
 
 ## Next Steps
 
-- Explore the [API documentation](../api) for programmatic scoring access
+- Explore the [CLI usage guide](../getting-started/cli-usage.md) for more command examples
 - Learn about [benchmarking](../benchmarking.md) to measure scoring performance
 - Check out [inheritance analysis](./inheritance-analysis.md) for family-based prioritization

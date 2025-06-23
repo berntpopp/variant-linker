@@ -208,4 +208,4 @@ Common issues and solutions:
 
 - Learn about [inheritance analysis patterns](./inheritance-analysis.md)
 - Explore [custom scoring configuration](./scoring-engine.md)
-- Check out the [API reference](../api) for programmatic access
+- Check out the [CLI usage guide](../getting-started/cli-usage.md) for more examples

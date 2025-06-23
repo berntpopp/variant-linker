@@ -317,6 +317,6 @@ Document performance characteristics:
 
 ## Next Steps
 
-- Explore [API documentation](./api) for programmatic performance monitoring
+- Explore [contributing guidelines](./contributing.md) for development best practices
 - Learn about [configuration options](./getting-started/cli-usage.md) that affect performance
 - Check out [troubleshooting guides](./contributing.md) for performance issues

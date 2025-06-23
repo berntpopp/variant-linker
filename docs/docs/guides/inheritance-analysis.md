@@ -312,4 +312,4 @@ Debug output includes:
 
 - Explore [custom scoring configuration](./scoring-engine.md) to weight inheritance patterns
 - Learn about [VCF and PED file preparation](./vcf-and-ped-files.md)
-- Check the [API documentation](../api) for programmatic access to inheritance analysis
+- Check the [contributing guidelines](../contributing.md) for development guidelines
