@@ -374,10 +374,16 @@ DEBUG=variant-linker:* node src/main.js --variant "rs6025" --output JSON
 scoring/
   nephro_variant_score/
     formula_config.json       # Scoring formulas
-    variable_assignment_config.json  # Variable definitions
+    variable_assignment_config.json  # Variable definitions with scoped structure
 ```
 
+#### Variable Scoping and Configuration
+- **New scoped format**: Variables organized into `aggregates` and `transcriptFields` sections
+- **Legacy format**: Still supported for backward compatibility
+- **Transcript prioritization**: Uses pick > MANE > canonical > first transcript for annotation-level scoring
+
 #### Formula Types
-- **Annotation-level**: Applied to overall variant
-- **Transcript-level**: Applied per transcript consequence
+- **Annotation-level**: Applied to overall variant using prioritized transcript data for transcript-specific fields
+- **Transcript-level**: Applied per transcript consequence using individual transcript context
+- **Variable scoping**: Aggregated variables (variant-wide) vs transcript-specific fields clearly separated
 - Support for conditional logic and mathematical operations

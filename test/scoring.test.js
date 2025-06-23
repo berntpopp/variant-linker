@@ -329,4 +329,223 @@ describe('scoring.js', () => {
       expect(score).to.equal(59);
     });
   });
+
+  describe('Scoped Variable Extraction and Scoring', () => {
+    // Mock VEP annotation with transcript consequences having different picks and values
+    const mockVepAnnotationWithPicks = {
+      input: '1 65568 . A C . . .',
+      id: 'variant1_1_65568_A_C',
+      most_severe_consequence: 'missense_variant',
+      transcript_consequences: [
+        {
+          transcript_id: 'T1',
+          cadd_phred: 10,
+          polyphen_score: 0.2,
+          impact: 'LOW',
+          gene_symbol: 'GENE1'
+        }, // Non-picked
+        {
+          transcript_id: 'T2',
+          pick: 1,
+          cadd_phred: 25,
+          polyphen_score: 0.9,
+          impact: 'MODERATE',
+          gene_symbol: 'GENE2'
+        }, // The "picked" transcript
+        {
+          transcript_id: 'T3',
+          cadd_phred: 5,
+          polyphen_score: 0.5,
+          impact: 'HIGH',
+          gene_symbol: 'GENE3'
+        } // Non-picked
+      ],
+      colocated_variants: [
+        {
+          id: 'rs12345',
+          frequencies: {
+            gnomade: 0.001,
+            gnomadg: 0.002,
+          },
+        }
+      ],
+    };
+
+    describe('_findPrioritizedTranscript()', () => {
+      it('should find transcript with pick=1', () => {
+        const result = scoring._findPrioritizedTranscript(mockVepAnnotationWithPicks);
+        expect(result).to.not.be.null;
+        expect(result.transcript_id).to.equal('T2');
+        expect(result.pick).to.equal(1);
+      });
+
+      it('should find transcript with mane=1 when no pick=1', () => {
+        const annotation = {
+          transcript_consequences: [
+            { transcript_id: 'T1', cadd_phred: 10 },
+            { transcript_id: 'T2', mane: 1, cadd_phred: 25 },
+            { transcript_id: 'T3', cadd_phred: 5 }
+          ]
+        };
+        const result = scoring._findPrioritizedTranscript(annotation);
+        expect(result).to.not.be.null;
+        expect(result.transcript_id).to.equal('T2');
+        expect(result.mane).to.equal(1);
+      });
+
+      it('should find transcript with canonical=1 when no pick or mane', () => {
+        const annotation = {
+          transcript_consequences: [
+            { transcript_id: 'T1', cadd_phred: 10 },
+            { transcript_id: 'T2', canonical: 1, cadd_phred: 25 },
+            { transcript_id: 'T3', cadd_phred: 5 }
+          ]
+        };
+        const result = scoring._findPrioritizedTranscript(annotation);
+        expect(result).to.not.be.null;
+        expect(result.transcript_id).to.equal('T2');
+        expect(result.canonical).to.equal(1);
+      });
+
+      it('should return first transcript as fallback', () => {
+        const annotation = {
+          transcript_consequences: [
+            { transcript_id: 'T1', cadd_phred: 10 },
+            { transcript_id: 'T2', cadd_phred: 25 },
+            { transcript_id: 'T3', cadd_phred: 5 }
+          ]
+        };
+        const result = scoring._findPrioritizedTranscript(annotation);
+        expect(result).to.not.be.null;
+        expect(result.transcript_id).to.equal('T1');
+      });
+
+      it('should return null for empty transcript consequences', () => {
+        const annotation = { transcript_consequences: [] };
+        const result = scoring._findPrioritizedTranscript(annotation);
+        expect(result).to.be.null;
+      });
+    });
+
+    describe('Annotation-level scoring with prioritized transcript', () => {
+      it('should calculate annotation-level scores using the prioritized transcript\'s data', () => {
+        const scopedScoringConfig = {
+          variables: {
+            aggregates: {
+              'colocated_variants.0.frequencies.gnomade': 'gnomade_variant|default:0',
+            },
+            transcriptFields: {
+              'cadd_phred': 'cadd_phred_variant|default:0',
+              'impact': 'impact_variant'
+            }
+          },
+          formulas: {
+            annotationLevel: [{ variant_score: 'cadd_phred_variant + 10' }],
+            transcriptLevel: []
+          }
+        };
+
+        const result = scoring.applyScoring([mockVepAnnotationWithPicks], scopedScoringConfig);
+
+        // Should use CADD from picked transcript (T2: 25) not max CADD (25)
+        // Expected: 25 + 10 = 35
+        expect(result[0]).to.have.property('variant_score', 35);
+      });
+
+      it('should use globally aggregated variables for variant-level fields', () => {
+        const scopedScoringConfig = {
+          variables: {
+            aggregates: {
+              'colocated_variants.0.frequencies.gnomade': 'gnomade_variant|default:0',
+            },
+            transcriptFields: {
+              'cadd_phred': 'cadd_phred_variant|default:0'
+            }
+          },
+          formulas: {
+            annotationLevel: [{ variant_score: 'gnomade_variant * 1000 + cadd_phred_variant' }],
+            transcriptLevel: []
+          }
+        };
+
+        const result = scoring.applyScoring([mockVepAnnotationWithPicks], scopedScoringConfig);
+
+        // Should use gnomAD from variant (0.001) and CADD from picked transcript (25)
+        // Expected: 0.001 * 1000 + 25 = 1 + 25 = 26
+        expect(result[0]).to.have.property('variant_score', 26);
+      });
+    });
+
+    describe('Transcript-level scoring with individual transcript data', () => {
+      it('should calculate transcript-level scores using individual transcript data', () => {
+        const scopedScoringConfig = {
+          variables: {
+            aggregates: {
+              'colocated_variants.0.frequencies.gnomade': 'gnomade_variant|default:0',
+            },
+            transcriptFields: {
+              'polyphen_score': 'polyphen_score_variant|default:0'
+            }
+          },
+          formulas: {
+            annotationLevel: [],
+            transcriptLevel: [{ transcript_score: 'polyphen_score_variant * 10' }]
+          }
+        };
+
+        const result = scoring.applyScoring([mockVepAnnotationWithPicks], scopedScoringConfig);
+
+        // Each transcript should use its own polyphen_score
+        expect(result[0].transcript_consequences[0]).to.have.property('transcript_score', 2); // 0.2 * 10
+        expect(result[0].transcript_consequences[1]).to.have.property('transcript_score', 9); // 0.9 * 10
+        expect(result[0].transcript_consequences[2]).to.have.property('transcript_score', 5); // 0.5 * 10
+      });
+
+      it('should combine aggregated and transcript-specific variables in transcript scoring', () => {
+        const scopedScoringConfig = {
+          variables: {
+            aggregates: {
+              'colocated_variants.0.frequencies.gnomade': 'gnomade_variant|default:0',
+            },
+            transcriptFields: {
+              'cadd_phred': 'cadd_phred_variant|default:0'
+            }
+          },
+          formulas: {
+            annotationLevel: [],
+            transcriptLevel: [{ transcript_score: 'gnomade_variant * 1000 + cadd_phred_variant' }]
+          }
+        };
+
+        const result = scoring.applyScoring([mockVepAnnotationWithPicks], scopedScoringConfig);
+
+        // Each transcript should use the same gnomAD (0.001) but its own CADD
+        expect(result[0].transcript_consequences[0]).to.have.property('transcript_score', 11); // 0.001 * 1000 + 10
+        expect(result[0].transcript_consequences[1]).to.have.property('transcript_score', 26); // 0.001 * 1000 + 25
+        expect(result[0].transcript_consequences[2]).to.have.property('transcript_score', 6);  // 0.001 * 1000 + 5
+      });
+    });
+
+    describe('Legacy configuration support', () => {
+      it('should still work with legacy variable configuration format', () => {
+        const legacyScoringConfig = {
+          variables: {
+            'transcript_consequences.*.cadd_phred': 'max:cadd_phred_variant|default:25',
+            'colocated_variants.0.frequencies.gnomade': 'gnomade_variant|default:0',
+          },
+          formulas: {
+            annotationLevel: [{ variant_score: 'cadd_phred_variant * 0.1 + gnomade_variant * 100' }],
+            transcriptLevel: []
+          }
+        };
+
+        const result = scoring.applyScoring([mockVepAnnotationWithPicks], legacyScoringConfig);
+
+        // Legacy should still use max aggregation: max CADD (25) * 0.1 + gnomAD (0.001) * 100
+        // Expected: 25 * 0.1 + 0.001 * 100 = 2.5 + 0.1 = 2.6
+        expect(result[0]).to.have.property('variant_score');
+        expect(result[0].variant_score).to.be.closeTo(2.6, 0.1);
+      });
+    });
+  });
 });

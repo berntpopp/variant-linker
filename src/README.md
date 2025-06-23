@@ -52,12 +52,14 @@ Converts VCF notation to Ensembl region and allele format required by the VEP AP
 
 ### scoring.js
 
-Handles the application of scoring algorithms based on VEP annotations.
+Handles the application of scoring algorithms based on VEP annotations with clarified variable scoping.
 
 - **Functionality**:
-  - Reads and parses scoring configuration files.
-  - Applies scoring algorithms to VEP annotations.
-  - Extracts variables and calculates scores.
+  - Reads and parses scoring configuration files with support for both legacy and scoped formats.
+  - Implements transcript prioritization (pick > MANE > canonical > first) for annotation-level scoring.
+  - For annotation-level formulas: uses globally aggregated variables for variant-wide fields and prioritized transcript data for transcript-specific fields.
+  - For transcript-level formulas: uses globally aggregated variables for variant-wide fields and individual transcript data for transcript-specific fields.
+  - Extracts variables and calculates scores with context-aware variable scoping.
   - Logs the process at different debug levels.
 
 ### variantLinkerProcessor.js

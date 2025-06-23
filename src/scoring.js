@@ -347,10 +347,123 @@ function calculateScore(formulaStr, variables) {
 }
 
 /**
+ * Finds the prioritized transcript from annotation based on biological relevance.
+ * Priority order: pick=1 > mane=1 > canonical=1 > first transcript
+ *
+ * @param {Object} annotation - The VEP annotation data.
+ * @returns {Object|null} The prioritized transcript consequence or null if none found.
+ */
+function _findPrioritizedTranscript(annotation) {
+  if (!Array.isArray(annotation.transcript_consequences) || annotation.transcript_consequences.length === 0) {
+    return null;
+  }
+
+  const transcripts = annotation.transcript_consequences;
+
+  // 1. Find first transcript with pick === 1
+  let prioritized = transcripts.find(tc => tc.pick === 1);
+  if (prioritized) {
+    debugDetailed(`Found prioritized transcript with pick=1: ${prioritized.transcript_id}`);
+    return prioritized;
+  }
+
+  // 2. Find first transcript with mane === 1
+  prioritized = transcripts.find(tc => tc.mane === 1);
+  if (prioritized) {
+    debugDetailed(`Found prioritized transcript with mane=1: ${prioritized.transcript_id}`);
+    return prioritized;
+  }
+
+  // 3. Find first transcript with canonical === 1
+  prioritized = transcripts.find(tc => tc.canonical === 1);
+  if (prioritized) {
+    debugDetailed(`Found prioritized transcript with canonical=1: ${prioritized.transcript_id}`);
+    return prioritized;
+  }
+
+  // 4. Return first transcript as fallback
+  debugDetailed(`Using first transcript as fallback: ${transcripts[0].transcript_id}`);
+  return transcripts[0];
+}
+
+/**
+ * Extracts variables for annotation-level scoring using scoped variable extraction.
+ * Uses globally aggregated variables for variant-level fields and prioritized transcript
+ * data for transcript-specific fields.
+ *
+ * @param {Object} annotation - The VEP annotation data.
+ * @param {Object} variablesConfig - The variables configuration.
+ * @returns {Object} An object mapping variable names to their computed values.
+ */
+function _extractAnnotationVariables(annotation, variablesConfig) {
+  const variables = {};
+  const prioritizedTranscript = _findPrioritizedTranscript(annotation);
+
+  // Handle new scoped configuration format
+  if (variablesConfig.aggregates || variablesConfig.transcriptFields) {
+    // Extract globally aggregated variables (variant-level)
+    if (variablesConfig.aggregates) {
+      const aggregateVars = extractVariables(annotation, variablesConfig.aggregates);
+      Object.assign(variables, aggregateVars);
+    }
+
+    // Extract transcript-specific fields from prioritized transcript
+    if (variablesConfig.transcriptFields && prioritizedTranscript) {
+      const transcriptVars = extractVariables(prioritizedTranscript, variablesConfig.transcriptFields);
+      Object.assign(variables, transcriptVars);
+    }
+  } else {
+    // Legacy format - extract all variables from annotation with aggregation
+    const legacyVars = extractVariables(annotation, variablesConfig);
+    Object.assign(variables, legacyVars);
+  }
+
+  debugDetailed(`Annotation variables: ${JSON.stringify(variables)}`);
+  return variables;
+}
+
+/**
+ * Extracts variables for transcript-level scoring using scoped variable extraction.
+ * Uses globally aggregated variables for variant-level fields and individual transcript
+ * data for transcript-specific fields.
+ *
+ * @param {Object} transcript - The transcript consequence data.
+ * @param {Object} annotation - The full VEP annotation data for context.
+ * @param {Object} variablesConfig - The variables configuration.
+ * @returns {Object} An object mapping variable names to their computed values.
+ */
+function _extractTranscriptVariables(transcript, annotation, variablesConfig) {
+  const variables = {};
+
+  // Handle new scoped configuration format
+  if (variablesConfig.aggregates || variablesConfig.transcriptFields) {
+    // Extract globally aggregated variables (variant-level) from annotation
+    if (variablesConfig.aggregates) {
+      const aggregateVars = extractVariables(annotation, variablesConfig.aggregates);
+      Object.assign(variables, aggregateVars);
+    }
+
+    // Extract transcript-specific fields from this specific transcript
+    if (variablesConfig.transcriptFields) {
+      const transcriptVars = extractVariables(transcript, variablesConfig.transcriptFields);
+      Object.assign(variables, transcriptVars);
+    }
+  } else {
+    // Legacy format - extract variables with transcript as primary context
+    const legacyVars = extractVariables(transcript, variablesConfig, annotation);
+    Object.assign(variables, legacyVars);
+  }
+
+  debugDetailed(`Transcript variables: ${JSON.stringify(variables)}`);
+  return variables;
+}
+
+/**
  * Applies scoring algorithms to the provided VEP annotation data.
  *
- * For each annotation in the annotationData array, annotation-level formulas are applied.
- * In addition, if transcript-level consequences exist, transcript-level formulas are applied.
+ * For each annotation in the annotationData array, annotation-level formulas are applied
+ * using a prioritized transcript approach. Transcript-level formulas use individual
+ * transcript data for context-specific scoring.
  *
  * @param {Array} annotationData - The VEP annotation data.
  * @param {{ variables: Object, formulas: Object }} scoringConfig
@@ -367,8 +480,8 @@ function applyScoring(annotationData, scoringConfig) {
 
   // Process each annotation.
   annotationData.forEach((annotation) => {
-    // Annotation-level variables.
-    const annotationVariables = extractVariables(annotation, variablesConfig);
+    // Annotation-level scoring with prioritized transcript approach
+    const annotationVariables = _extractAnnotationVariables(annotation, variablesConfig);
 
     annotationLevel.forEach((formula) => {
       const scoreName = Object.keys(formula)[0];
@@ -378,10 +491,10 @@ function applyScoring(annotationData, scoringConfig) {
       debugDetailed(`Calculated ${scoreName} for annotation: ${scoreValue}`);
     });
 
-    // Transcript-level formulas.
+    // Transcript-level formulas with individual transcript context
     if (Array.isArray(annotation.transcript_consequences)) {
       annotation.transcript_consequences.forEach((transcript) => {
-        const transcriptVariables = extractVariables(transcript, variablesConfig, annotation);
+        const transcriptVariables = _extractTranscriptVariables(transcript, annotation, variablesConfig);
         transcriptLevel.forEach((formula) => {
           const scoreName = Object.keys(formula)[0];
           const formulaStr = formula[scoreName];
@@ -402,4 +515,8 @@ module.exports = {
   parseScoringConfig,
   // Export the rest of the functionality:
   applyScoring,
+  // Export helper functions for testing:
+  _findPrioritizedTranscript,
+  _extractAnnotationVariables,
+  _extractTranscriptVariables,
 };
