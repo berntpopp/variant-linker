@@ -6,7 +6,8 @@
       "vepRegions": "/vep/homo_sapiens/region",
       "vepHgvs": "/vep/human/hgvs", 
       "variantRecoder": "/variant_recoder/human",
-      "variantRecoderBase": "/variant_recoder"
+      "variantRecoderBase": "/variant_recoder",
+      "assemblyMap": "/map/human/GRCh37/:region/GRCh38"
     },
     "recoderPostChunkSize": 200,
     "vepPostChunkSize": 200

@@ -26,6 +26,9 @@ variant-linker --variant "rs6025" --output JSON
 # Process VCF file with inheritance analysis
 variant-linker --vcf-input sample.vcf --ped family.ped --calculate-inheritance --output VCF
 
+# Liftover hg19 coordinates to hg38 for annotation
+variant-linker --assembly hg19tohg38 --variant "chr17-7578406-C-A" --output JSON
+
 # Batch processing with custom scoring
 variant-linker --variants-file variants.txt --scoring_config_path scoring/nephro_variant_score/ --output CSV
 ```
@@ -33,6 +36,7 @@ variant-linker --variants-file variants.txt --scoring_config_path scoring/nephro
 ## Key Features
 - 🔄 **Variant Translation** - Convert between rsID, HGVS, and VCF formats
 - 📊 **VEP Annotations** - Comprehensive variant effect predictions
+- 🧬 **Genome Assembly Liftover** - Transparent hg19→hg38 coordinate conversion
 - 👨‍👩‍👧‍👦 **Family Analysis** - Inheritance pattern detection from PED files
 - 🗂️ **VCF Support** - Full VCF input/output with header preservation
 - ⚡ **Batch Processing** - Efficient handling of large variant datasets

@@ -17,6 +17,12 @@ const {
   addCustomFormats,
 } = require('./schemaMapper');
 const { filterAndFormatResults } = require('./variantLinkerProcessor');
+const {
+  liftOverCoordinates,
+  parseVcfVariant,
+  constructRegionString,
+  constructLiftedVariant,
+} = require('./assemblyConverter');
 
 const debug = require('debug')('variant-linker:core');
 const debugDetailed = require('debug')('variant-linker:detailed');
@@ -363,6 +369,108 @@ async function processBatchVariants(variants, params) {
 }
 
 /**
+ * Performs liftover from GRCh37/hg19 to GRCh38 for coordinate-based variants.
+ *
+ * @param {Array<string>} variants - Array of variants to lift over
+ * @param {boolean} cacheEnabled - Whether to enable caching for API requests
+ * @returns {Promise<Object>} Object containing lifted variants, metadata, and mapping
+ */
+async function performLiftover(variants, cacheEnabled) {
+  debug('Starting liftover process for variants');
+
+  const liftedVariants = [];
+  const liftoverMeta = {};
+  const originalToLiftedMap = {};
+
+  for (const originalVariant of variants) {
+    debug(`Processing variant for liftover: ${originalVariant}`);
+
+    // Check if the variant is coordinate-based (VCF format)
+    const inputFormat = detectInputFormat(originalVariant);
+    if (inputFormat !== 'VCF') {
+      liftoverMeta[originalVariant] = {
+        status: 'error',
+        message: 'Input is not coordinate-based (VCF format)',
+      };
+      debug(`Skipping non-VCF variant: ${originalVariant}`);
+      continue;
+    }
+
+    // Parse the VCF variant
+    const parsedVariant = parseVcfVariant(originalVariant);
+    if (!parsedVariant) {
+      liftoverMeta[originalVariant] = {
+        status: 'error',
+        message: 'Failed to parse VCF variant format',
+      };
+      debug(`Failed to parse variant: ${originalVariant}`);
+      continue;
+    }
+
+    // Construct the hg19 region string
+    const hg19Region = constructRegionString(parsedVariant);
+    debug(`Constructed hg19 region: ${hg19Region} for variant: ${originalVariant}`);
+
+    try {
+      // Call the liftover API
+      const liftoverResponse = await liftOverCoordinates(hg19Region, cacheEnabled);
+
+      if (!liftoverResponse.mappings || liftoverResponse.mappings.length === 0) {
+        // No mapping found
+        liftoverMeta[originalVariant] = {
+          status: 'failed',
+          message: 'No mapping found',
+        };
+        debug(`No mapping found for variant: ${originalVariant}`);
+        continue;
+      }
+
+      if (liftoverResponse.mappings.length > 1) {
+        // Ambiguous mapping (multiple results)
+        liftoverMeta[originalVariant] = {
+          status: 'failed',
+          message: 'Multiple mappings found',
+        };
+        debug(`Multiple mappings found for variant: ${originalVariant}`);
+        continue;
+      }
+
+      // Success: single mapping found
+      const mapping = liftoverResponse.mappings[0];
+      const liftedVariant = constructLiftedVariant(parsedVariant, mapping);
+
+      liftedVariants.push(liftedVariant);
+      liftoverMeta[originalVariant] = {
+        status: 'success',
+        mapped: `${mapping.mapped.seq_region_name}:${mapping.mapped.start}-${mapping.mapped.end}`,
+        originalRegion: hg19Region,
+        liftedVariant: liftedVariant,
+      };
+      originalToLiftedMap[liftedVariant] = originalVariant;
+
+      debug(`Successfully lifted variant: ${originalVariant} -> ${liftedVariant}`);
+    } catch (error) {
+      // API error
+      liftoverMeta[originalVariant] = {
+        status: 'error',
+        message: `API error: ${error.message}`,
+      };
+      debug(`API error for variant ${originalVariant}:`, error.message);
+    }
+  }
+
+  debug(
+    `Liftover completed. Successfully lifted ${liftedVariants.length} out of ${variants.length} variants`
+  );
+
+  return {
+    liftedVariants,
+    liftoverMeta,
+    originalToLiftedMap,
+  };
+}
+
+/**
  * Analyzes the given variant(s) by determining format, converting if needed,
  * calling the appropriate APIs, and optionally applying scoring and filtering.
  *
@@ -430,6 +538,25 @@ async function analyzeVariant(params) {
 
   // ** FIX: Calculate batchProcessing AFTER variants array is finalized **
   const batchProcessing = variants.length > 1 || Boolean(params.vcfInput); // vcfInput flag makes it batch
+
+  // Handle liftover mode for hg19tohg38
+  if (params.assembly === 'hg19tohg38') {
+    stepsPerformed.push('Starting liftover from hg19 to hg38');
+    const { liftedVariants, liftoverMeta, originalToLiftedMap } = await performLiftover(
+      variants,
+      params.cache
+    );
+
+    // Overwrite the variants list with the successfully lifted ones
+    variants = liftedVariants;
+
+    // Attach liftover metadata to be included in the final output
+    params.liftoverMeta = liftoverMeta;
+    params.originalToLiftedMap = originalToLiftedMap;
+
+    debug(`Liftover completed: ${liftedVariants.length} variants successfully lifted to GRCh38`);
+    stepsPerformed.push(`Successfully lifted ${liftedVariants.length} variants to GRCh38`);
+  }
 
   let result;
   let inheritanceCalculated = false; // Flag to track if inheritance was run
@@ -685,6 +812,30 @@ async function analyzeVariant(params) {
 
   // Ensure annotationData exists if result didn't provide it
   finalOutput.annotationData = finalOutput.annotationData || [];
+
+  // Add liftover metadata if present
+  if (params.liftoverMeta) {
+    finalOutput.meta.liftoverMeta = params.liftoverMeta;
+    debug('Added liftover metadata to final output');
+  }
+
+  // Replace originalInput with user's original hg19 variant strings if liftover was performed
+  if (params.originalToLiftedMap && finalOutput.annotationData) {
+    finalOutput.annotationData = finalOutput.annotationData.map((annotation) => {
+      // Check if this annotation corresponds to a lifted variant
+      const liftedVariant = annotation.variantKey || annotation.input;
+      if (params.originalToLiftedMap[liftedVariant]) {
+        // Replace the originalInput with the user's original hg19 input
+        return {
+          ...annotation,
+          originalInput: params.originalToLiftedMap[liftedVariant],
+          liftedFrom: liftedVariant, // Keep track of what it was lifted from
+        };
+      }
+      return annotation;
+    });
+    debug("Updated originalInput fields with user's original hg19 variants");
+  }
 
   // Add VCF data to finalOutput if present in params
   if (params.vcfRecordMap && params.vcfHeaderLines) {

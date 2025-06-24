@@ -123,6 +123,37 @@ function validateParams(params) {
   if (params.debug && (typeof params.debug !== 'number' || params.debug < 1 || params.debug > 3)) {
     throw new Error('Debug level must be a number between 1 and 3');
   }
+
+  // Validate hg19tohg38 assembly mode requirements
+  if (params.assembly === 'hg19tohg38') {
+    const hasCoordinateInput = hasVcfInput;
+
+    // Check if variants are in coordinate format (for non-VCF inputs)
+    let hasCoordinateVariants = false;
+    if (hasVariant && params.variant) {
+      // Check if single variant is coordinate-based
+      const vcfPattern = /^[0-9XYM]+-[0-9]+-[ACGT]+-[ACGT]+$/i;
+      hasCoordinateVariants = vcfPattern.test(params.variant.replace(/^chr/i, ''));
+    } else if (hasVariantsList && params.variants) {
+      // Check if all variants in the list are coordinate-based
+      const variantsList = params.variants.split(',').map((v) => v.trim());
+      const vcfPattern = /^[0-9XYM]+-[0-9]+-[ACGT]+-[ACGT]+$/i;
+      hasCoordinateVariants = variantsList.every((variant) =>
+        vcfPattern.test(variant.replace(/^chr/i, ''))
+      );
+    } else if (hasVariantsFile) {
+      // For file input, we'll need to check during runtime since we haven't read the file yet
+      // This will be validated later in the main function
+      hasCoordinateVariants = true; // Assume valid for now, check later
+    }
+
+    if (!hasCoordinateInput && !hasCoordinateVariants) {
+      throw new Error(
+        "Error: The 'hg19tohg38' assembly mode only supports coordinate-based input " +
+          "(e.g., '1-12345-A-G' or VCF files). rsIDs and HGVS notations are not supported in this mode."
+      );
+    }
+  }
 }
 
 /**
@@ -310,8 +341,9 @@ const argv = yargs(process.argv.slice(2)) // Use process.argv.slice(2) for bette
     type: 'boolean',
   })
   .option('assembly', {
-    description: 'Genome assembly (hg38 [default] or hg19)',
+    description: 'Genome assembly (hg38 [default], hg19, or hg19tohg38)',
     type: 'string',
+    choices: ['hg38', 'hg19', 'hg19tohg38'],
     default: 'hg38',
   })
   .option('filter', {
@@ -489,6 +521,21 @@ async function runAnalysis() {
 
     debug(`Final count of variants to process: ${variants.length}`);
     debugDetailed(`Variants list: ${JSON.stringify(variants.slice(0, 10))}...`);
+
+    // Additional validation for hg19tohg38 mode with file input
+    if (mergedParams.assembly === 'hg19tohg38' && mergedParams.variantsFile) {
+      const vcfPattern = /^[0-9XYM]+-[0-9]+-[ACGT]+-[ACGT]+$/i;
+      const invalidVariants = variants.filter(
+        (variant) => !vcfPattern.test(variant.replace(/^chr/i, ''))
+      );
+
+      if (invalidVariants.length > 0) {
+        throw new Error(
+          `Error: The 'hg19tohg38' assembly mode only supports coordinate-based input. ` +
+            `Found ${invalidVariants.length} non-coordinate variant(s) in file: ${invalidVariants.slice(0, 3).join(', ')}${invalidVariants.length > 3 ? '...' : ''}`
+        );
+      }
+    }
 
     // Read PED file if provided
     let pedigreeData = null;
