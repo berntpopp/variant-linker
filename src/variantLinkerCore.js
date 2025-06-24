@@ -23,6 +23,7 @@ const {
   constructRegionString,
   constructLiftedVariant,
 } = require('./assemblyConverter');
+const { annotateOverlaps } = require('./featureAnnotator');
 
 const debug = require('debug')('variant-linker:core');
 const debugDetailed = require('debug')('variant-linker:detailed');
@@ -791,6 +792,14 @@ async function analyzeVariant(params) {
       stepsPerformed.push('No inheritance patterns could be calculated (missing genotype data).');
       inheritanceCalculated = false; // Mark calculation as skipped/failed
     }
+  }
+
+  // Annotate variants with user-provided features if available
+  if (params.features) {
+    debug('Annotating overlaps with user-provided features');
+    stepsPerformed.push('Annotating overlaps with user-provided features.');
+    result.annotationData = annotateOverlaps(result.annotationData, params.features);
+    debug('Feature overlap annotation completed');
   }
 
   const processEndTime = new Date();

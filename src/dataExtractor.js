@@ -8,6 +8,7 @@
 
 const debug = require('debug')('variant-linker:data-extractor');
 // Removed: const { formatAnnotationsToVcf } = require('./vcfFormatter'); // Breaks circular dependency
+const { formatUserFeatureOverlaps } = require('./featureAnnotator');
 
 /**
  * Default column configuration for CSV/TSV output.
@@ -25,7 +26,7 @@ const debug = require('debug')('variant-linker:data-extractor');
  * @returns {Array} Array of column configuration objects
  */
 function getDefaultColumnConfig(options = {}) {
-  const { includeInheritance = false } = options;
+  const { includeInheritance = false, includeUserFeatures = false } = options;
 
   // Start with core columns that are always included
   const defaultColumns = [
@@ -219,6 +220,17 @@ function getDefaultColumnConfig(options = {}) {
     // Add any other custom score columns here if needed
     // e.g., from the scoring module output, which might be top-level or consequence-level
   );
+
+  // Add user feature overlap column if requested
+  if (includeUserFeatures) {
+    defaultColumns.push({
+      header: 'UserFeatureOverlap',
+      path: 'user_feature_overlap',
+      isConsequenceLevel: false,
+      defaultValue: '',
+      formatter: formatUserFeatureOverlaps,
+    });
+  }
 
   return defaultColumns;
 }

@@ -18,6 +18,7 @@ const {
   formatToTabular,
   getDefaultColumnConfig,
 } = require('./dataExtractor');
+const { hasUserFeatureOverlaps } = require('./featureAnnotator');
 const { getValueByPath } = require('./utils/pathUtils');
 const { formatAnnotationsToVcf } = require('./vcfFormatter');
 
@@ -363,7 +364,16 @@ function filterAndFormatResults(results, filterParam, format, params = {}) {
       // Check the flag set in variantLinkerCore.js
       const includeInheritanceCols = Boolean(filteredResults.meta?.inheritanceCalculated);
       debug(`Include inheritance columns in ${format.toUpperCase()}: ${includeInheritanceCols}`);
-      const columnConfig = getDefaultColumnConfig({ includeInheritance: includeInheritanceCols });
+
+      // *** FIX: Conditionally include user feature overlap columns ***
+      // Check if any annotations have user feature overlaps
+      const includeUserFeatureCols = hasUserFeatureOverlaps(annotationToUse);
+      debug(`Include user feature columns in ${format.toUpperCase()}: ${includeUserFeatureCols}`);
+
+      const columnConfig = getDefaultColumnConfig({
+        includeInheritance: includeInheritanceCols,
+        includeUserFeatures: includeUserFeatureCols,
+      });
 
       const flatRows = flattenAnnotationData(annotationToUse, columnConfig);
 

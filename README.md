@@ -42,6 +42,7 @@ variant-linker --variants-file variants.txt --scoring_config_path scoring/nephro
 - ⚡ **Batch Processing** - Efficient handling of large variant datasets
 - 🎯 **Custom Scoring** - Configurable variant prioritization models
 - 📋 **Multiple Formats** - JSON, CSV, TSV, and VCF output options
+- 🎨 **Custom Annotations** - Overlay variants with BED regions, gene lists, and JSON metadata
 
 ## Library Usage
 

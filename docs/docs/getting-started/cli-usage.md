@@ -70,6 +70,15 @@ variant-linker --vcf-input <vcf_file_path> --output <output_format>
 |--------|-------|-------------|
 | `--scoring_config_path` | `--scp` | Path to the scoring configuration directory |
 
+### Custom Annotation Options
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--bed-file` | `--bf` | Path to BED file(s) containing genomic regions. Can be used multiple times |
+| `--gene-list` | `--gl` | Path to text file(s) with gene symbols/IDs (one per line). Can be used multiple times |
+| `--json-genes` | `--jg` | Path to JSON file(s) containing gene information. Can be used multiple times |
+| `--json-gene-mapping` | | JSON string to map fields in JSON gene files (required with --json-genes) |
+
 ### Configuration Options
 
 | Option | Short | Description |
@@ -148,6 +157,30 @@ variant-linker --vcf-input trio.vcf --sample-map "PROBAND,MOTHER,FATHER" --calcu
 variant-linker --variants-file variants.txt --scoring_config_path scoring/nephro_variant_score/ --output CSV
 ```
 
+### Custom Annotation with Local Files
+
+```bash
+# Annotate with genomic regions from BED files
+variant-linker --variant "rs6025" --bed-file regulatory_regions.bed --output CSV
+
+# Filter by gene lists
+variant-linker --vcf-input variants.vcf --gene-list cancer_genes.txt --output JSON
+
+# Add structured gene metadata from JSON
+variant-linker --variants-file batch.txt \
+  --json-genes gene_panels.json \
+  --json-gene-mapping '{"identifier":"gene_symbol","dataFields":["panel","classification"]}' \
+  --output TSV
+
+# Combine multiple file types
+variant-linker --vcf-input sample.vcf \
+  --bed-file enhancers.bed \
+  --gene-list disease_genes.txt \
+  --json-genes clinical_data.json \
+  --json-gene-mapping '{"identifier":"gene","dataFields":["pathogenicity","evidence"]}' \
+  --output VCF
+```
+
 ### API Parameter Customization
 
 ```bash
@@ -201,3 +234,4 @@ The tool automatically handles API rate limits and temporary failures with expon
 - Learn about [VCF and PED file handling](../guides/vcf-and-ped-files.md)
 - Explore [inheritance analysis features](../guides/inheritance-analysis.md)  
 - Set up [custom scoring](../guides/scoring-engine.md)
+- Add [custom annotations with local files](../guides/custom-annotations.md)

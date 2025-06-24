@@ -14,6 +14,7 @@ const { analyzeVariant } = require('./variantLinkerCore');
 const { getBaseUrl } = require('./configHelper');
 const { readVariantsFromVcf } = require('./vcfReader');
 const { readPedigree } = require('./pedReader');
+const { loadFeatures } = require('./featureParser');
 
 // Set up debug loggers.
 const debug = require('debug')('variant-linker:main');
@@ -187,6 +188,9 @@ function mergeParams(configParams, cliParams) {
     'C',
     'of',
     'po',
+    'bf',
+    'gl',
+    'jg',
     'h',
     'V',
   ];
@@ -357,6 +361,27 @@ const argv = yargs(process.argv.slice(2)) // Use process.argv.slice(2) for bette
     description: 'Filter output to include only the VEP-picked consequence per variant',
     type: 'boolean',
     default: false,
+  })
+  .option('bed-file', {
+    description: 'Path to a BED file containing regions of interest. Can be used multiple times.',
+    type: 'array',
+    alias: 'bf',
+  })
+  .option('gene-list', {
+    description:
+      'Path to a text file with gene symbols or Ensembl IDs (one per line). Can be used multiple times.',
+    type: 'array',
+    alias: 'gl',
+  })
+  .option('json-genes', {
+    description: 'Path to a JSON file containing gene information. Requires --json-gene-mapping.',
+    type: 'array',
+    alias: 'jg',
+  })
+  .option('json-gene-mapping', {
+    description:
+      'JSON string to map fields in the json-genes file. e.g., \'{"identifier":"gene_symbol","dataFields":["panel_name"]}\'',
+    type: 'string',
   })
   .usage(
     'Usage: variant-linker [options]\n\nExample: variant-linker --variant "rs123" --output JSON'
@@ -608,6 +633,21 @@ async function runAnalysis() {
       debug('Inheritance pattern calculation is enabled.');
     }
 
+    // Load user-provided features if any are specified
+    let features = null;
+    if (mergedParams.bedFile || mergedParams.geneList || mergedParams.jsonGenes) {
+      try {
+        debug('Loading user-provided features for overlap annotation');
+        features = await loadFeatures(mergedParams);
+        debug('Feature loading completed successfully');
+      } catch (error) {
+        debug(`Error loading features: ${error.message}`);
+        console.error(`Warning: Could not load features: ${error.message}`);
+        // Continue without features rather than failing completely
+        features = null;
+      }
+    }
+
     // Prepare analysis parameters - *** THE FIX IS HERE ***
     const analysisParams = {
       // Source of variants determined above
@@ -634,6 +674,8 @@ async function runAnalysis() {
       samples: vcfData ? vcfData.samples : undefined, // Pass sample list from VCF
       // Scoring
       scoringConfigPath: mergedParams.scoringConfigPath,
+      // User-provided features for overlap annotation
+      features: features,
       // Note: Removed redundant vepParams/recoderParams and skipRecoder
     };
 
