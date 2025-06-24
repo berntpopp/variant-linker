@@ -17,5 +17,20 @@
       "baseDelayMs": 1000,
       "retryableStatusCodes": [429, 500, 502, 503, 504]
     }
+  },
+  "cache": {
+    "memory": {
+      "maxSize": 100,
+      "ttl": 300000,
+      "sizeCalculation": {
+        "enabled": false
+      }
+    },
+    "persistent": {
+      "enabled": false,
+      "location": "~/.cache/variant-linker",
+      "ttl": 86400000,
+      "maxSize": "100MB"
+    }
   }
 }
