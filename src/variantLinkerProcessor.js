@@ -192,6 +192,43 @@ async function processVariantLinking(
 }
 
 /**
+ * Filters annotation data to include only VEP-picked consequences.
+ * For each annotation, finds the transcript consequence with pick === 1
+ * and creates a new annotation with only that consequence.
+ *
+ * @param {Array<Object>} annotationData - Array of annotation objects.
+ * @returns {Array<Object>} Array of annotations with only picked consequences.
+ * @private
+ */
+function _pickConsequences(annotationData) {
+  debug('Applying --pick-output filtering to annotations');
+
+  if (!Array.isArray(annotationData)) {
+    debug('No annotation data provided for pick filtering');
+    return [];
+  }
+
+  return annotationData.map((annotation) => {
+    const newAnnotation = { ...annotation };
+
+    // Find the picked consequence
+    const pickedConsequence = annotation.transcript_consequences?.find((tc) => tc.pick === 1);
+
+    if (pickedConsequence) {
+      // Set consequences array to contain only the picked one
+      newAnnotation.transcript_consequences = [pickedConsequence];
+      debug(`Found picked consequence for variant ${annotation.variantKey || annotation.input}`);
+    } else {
+      // Set consequences array to be empty if no pick found
+      newAnnotation.transcript_consequences = [];
+      debug(`No picked consequence found for variant ${annotation.variantKey || annotation.input}`);
+    }
+
+    return newAnnotation;
+  });
+}
+
+/**
  * Filters and formats the results from the variant processing.
  *
  * An optional filter can be provided to transform the results before formatting.
@@ -206,12 +243,37 @@ async function processVariantLinking(
  * @param {Object} results - The results object from variant processing.
  * @param {(function|Object)} [filterParam] - An optional filter function or filter criteria object.
  * @param {string} format - The desired output format (e.g., 'JSON').
+ * @param {Object} [params] - Additional parameters including pickOutput flag.
  * @returns {string} The filtered and formatted results as a string.
  * @throws {Error} If an unsupported format is specified or if filtering fails.
  */
-function filterAndFormatResults(results, filterParam, format) {
+function filterAndFormatResults(results, filterParam, format, params = {}) {
   debug('Starting results filtering and formatting');
   let filteredResults = { ...results };
+
+  // Apply --pick-output filtering FIRST, before any other filtering
+  if (params.pickOutput === true) {
+    const originalConsequences = filteredResults.annotationData.reduce(
+      (sum, ann) => sum + (ann.transcript_consequences?.length || 0),
+      0
+    );
+
+    filteredResults.annotationData = _pickConsequences(filteredResults.annotationData);
+
+    const pickedConsequences = filteredResults.annotationData.reduce(
+      (sum, ann) => sum + (ann.transcript_consequences?.length || 0),
+      0
+    );
+
+    filteredResults.meta.stepsPerformed.push(
+      `Picked consequence filtering applied: ${originalConsequences} total consequences ` +
+        `reduced to ${pickedConsequences}.`
+    );
+
+    debug(
+      `Pick filtering: ${originalConsequences} consequences -> ${pickedConsequences} consequences`
+    );
+  }
 
   if (filterParam) {
     if (typeof filterParam === 'function') {

@@ -186,6 +186,7 @@ function mergeParams(configParams, cliParams) {
     'vi',
     'C',
     'of',
+    'po',
     'h',
     'V',
   ];
@@ -351,6 +352,12 @@ const argv = yargs(process.argv.slice(2)) // Use process.argv.slice(2) for bette
     description: 'Filtering criteria as a JSON string',
     type: 'string',
   })
+  .option('pick-output', {
+    alias: 'po',
+    description: 'Filter output to include only the VEP-picked consequence per variant',
+    type: 'boolean',
+    default: false,
+  })
   .usage(
     'Usage: variant-linker [options]\n\nExample: variant-linker --variant "rs123" --output JSON'
   )
@@ -465,6 +472,13 @@ async function runAnalysis() {
       merged: '1',
       mane: '1',
     });
+
+    // Add the pick flag if the CLI option is used
+    if (mergedParams.pickOutput) {
+      vepOptions.pick = '1';
+      debug('Enabling VEP pick flag (--pick-output specified).');
+    }
+
     // Log detailed options for debugging *after* parsing
     debugDetailed(
       `Parsed options -> recoderOptions: ${JSON.stringify(recoderOptions)},` +
@@ -603,6 +617,7 @@ async function runAnalysis() {
       // Output and filter params
       output: mergedParams.output,
       filter: mergedParams.filter,
+      pickOutput: mergedParams.pickOutput, // Pass the pick output flag
       // API options (use the parsed objects)
       recoderOptions: recoderOptions, // <-- CORRECTED: Use the parsed object
       vepOptions: vepOptions, // <-- CORRECTED: Use the parsed object

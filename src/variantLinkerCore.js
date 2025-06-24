@@ -889,10 +889,10 @@ async function analyzeVariant(params) {
       debugDetailed(` -> vcfHeaderLines count: ${finalOutput.vcfHeaderLines?.length}`);
     }
     // For CSV/TSV/VCF, return the formatted string directly
-    return filterAndFormatResults(finalOutput, filterParam, outputFormat);
-  } else if (outputFormat === 'JSON' && filterParam) {
-    // For JSON with filtering, parse the formatted JSON string back to an object
-    finalOutput = JSON.parse(filterAndFormatResults(finalOutput, filterParam, 'JSON'));
+    return filterAndFormatResults(finalOutput, filterParam, outputFormat, params);
+  } else if (outputFormat === 'JSON' && (filterParam || params.pickOutput)) {
+    // For JSON with filtering or pick output, parse the formatted JSON string back to an object
+    finalOutput = JSON.parse(filterAndFormatResults(finalOutput, filterParam, 'JSON', params));
   }
 
   // *** Add Debugging right before returning finalOutput ***

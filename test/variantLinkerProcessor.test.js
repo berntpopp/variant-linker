@@ -339,4 +339,228 @@ describe('variantLinkerProcessor', () => {
       }
     });
   });
+
+  describe('--pick-output functionality', () => {
+    // Test data with picked consequences
+    const testDataWithPick = {
+      meta: {
+        stepsPerformed: [],
+        variant: 'rs456',
+      },
+      annotationData: [
+        {
+          input: 'rs456',
+          variantKey: '1-123456-A-G',
+          seq_region_name: '1',
+          start: 123456,
+          transcript_consequences: [
+            {
+              impact: 'MODERATE',
+              gene_symbol: 'GENE1',
+              transcript_id: 'ENST00000456',
+              consequence_terms: ['missense_variant'],
+              pick: 1, // This is the picked consequence
+            },
+            {
+              impact: 'LOW',
+              gene_symbol: 'GENE1',
+              transcript_id: 'ENST00000789',
+              consequence_terms: ['downstream_gene_variant'],
+              // No pick flag - should be filtered out
+            },
+            {
+              impact: 'HIGH',
+              gene_symbol: 'GENE1',
+              transcript_id: 'ENST00000999',
+              consequence_terms: ['stop_gained'],
+              // No pick flag - should be filtered out even though HIGH impact
+            },
+          ],
+        },
+      ],
+    };
+
+    const testDataNoPick = {
+      meta: {
+        stepsPerformed: [],
+        variant: 'rs789',
+      },
+      annotationData: [
+        {
+          input: 'rs789',
+          variantKey: '2-234567-C-T',
+          seq_region_name: '2',
+          start: 234567,
+          transcript_consequences: [
+            {
+              impact: 'MODERATE',
+              gene_symbol: 'GENE2',
+              transcript_id: 'ENST00000111',
+              consequence_terms: ['missense_variant'],
+              // No pick flag
+            },
+            {
+              impact: 'LOW',
+              gene_symbol: 'GENE2',
+              transcript_id: 'ENST00000222',
+              consequence_terms: ['synonymous_variant'],
+              // No pick flag
+            },
+          ],
+        },
+      ],
+    };
+
+    it('should filter to only picked consequences when pick flag is present', () => {
+      const freshTestData = JSON.parse(JSON.stringify(testDataWithPick));
+      const result = filterAndFormatResults(freshTestData, null, 'JSON', { pickOutput: true });
+      const parsedResult = JSON.parse(result);
+
+      // Should have one annotation
+      expect(parsedResult.annotationData).to.have.lengthOf(1);
+
+      // The annotation should have only one transcript consequence (the picked one)
+      const annotation = parsedResult.annotationData[0];
+      expect(annotation.transcript_consequences).to.have.lengthOf(1);
+
+      // The remaining consequence should be the picked one
+      const consequence = annotation.transcript_consequences[0];
+      expect(consequence.pick).to.equal(1);
+      expect(consequence.transcript_id).to.equal('ENST00000456');
+      expect(consequence.impact).to.equal('MODERATE');
+      expect(consequence.consequence_terms).to.include('missense_variant');
+
+      // Check that meta tracking was updated
+      expect(parsedResult.meta.stepsPerformed).to.include.match(
+        /Picked consequence filtering applied/
+      );
+      expect(parsedResult.meta.stepsPerformed).to.include.match(
+        /3 total consequences reduced to 1/
+      );
+    });
+
+    it('should result in empty consequences when no pick flag is present', () => {
+      const freshTestData = JSON.parse(JSON.stringify(testDataNoPick));
+      const result = filterAndFormatResults(freshTestData, null, 'JSON', { pickOutput: true });
+      const parsedResult = JSON.parse(result);
+
+      // Should have one annotation
+      expect(parsedResult.annotationData).to.have.lengthOf(1);
+
+      // The annotation should have no transcript consequences
+      const annotation = parsedResult.annotationData[0];
+      expect(annotation.transcript_consequences).to.have.lengthOf(0);
+
+      // Check that meta tracking was updated
+      expect(parsedResult.meta.stepsPerformed).to.include.match(
+        /Picked consequence filtering applied/
+      );
+      expect(parsedResult.meta.stepsPerformed).to.include.match(
+        /2 total consequences reduced to 0/
+      );
+    });
+
+    it('should work with CSV output format', () => {
+      const freshTestData = JSON.parse(JSON.stringify(testDataWithPick));
+      const result = filterAndFormatResults(freshTestData, null, 'CSV', { pickOutput: true });
+
+      // Should be a CSV string
+      expect(result).to.be.a('string');
+
+      // Split into lines
+      const lines = result.trim().split('\n');
+
+      // Should have header + 1 data row (only the picked consequence)
+      expect(lines.length).to.equal(2);
+
+      // Check that the data row contains the picked consequence data
+      const dataRow = lines[1];
+      expect(dataRow).to.include('ENST00000456'); // picked transcript
+      expect(dataRow).to.include('GENE1');
+      expect(dataRow).to.include('MODERATE');
+    });
+
+    it('should not affect output when pickOutput is false', () => {
+      // Create fresh copies to avoid contamination from previous tests
+      const testDataFresh1 = JSON.parse(JSON.stringify(testDataWithPick));
+      const testDataFresh2 = JSON.parse(JSON.stringify(testDataWithPick));
+
+      const resultWithoutPick = filterAndFormatResults(testDataFresh1, null, 'JSON', {
+        pickOutput: false,
+      });
+      const resultDefault = filterAndFormatResults(testDataFresh2, null, 'JSON', {});
+
+      const parsedResultWithoutPick = JSON.parse(resultWithoutPick);
+      const parsedResultDefault = JSON.parse(resultDefault);
+
+      // Both should contain all 3 consequences
+      expect(parsedResultWithoutPick.annotationData[0].transcript_consequences).to.have.lengthOf(3);
+      expect(parsedResultDefault.annotationData[0].transcript_consequences).to.have.lengthOf(3);
+
+      // Should not have pick filtering step in meta for either
+      const hasPickStepWithoutPick = parsedResultWithoutPick.meta.stepsPerformed.some((step) =>
+        step.includes('Picked consequence filtering applied')
+      );
+      const hasPickStepDefault = parsedResultDefault.meta.stepsPerformed.some((step) =>
+        step.includes('Picked consequence filtering applied')
+      );
+
+      expect(hasPickStepWithoutPick).to.be.false;
+      expect(hasPickStepDefault).to.be.false;
+
+      // The annotation data should be identical
+      expect(parsedResultWithoutPick.annotationData).to.deep.equal(
+        parsedResultDefault.annotationData
+      );
+    });
+
+    it('should handle empty annotation data gracefully', () => {
+      const emptyData = {
+        meta: { stepsPerformed: [] },
+        annotationData: [],
+      };
+
+      const result = filterAndFormatResults(emptyData, null, 'JSON', { pickOutput: true });
+      const parsedResult = JSON.parse(result);
+
+      expect(parsedResult.annotationData).to.have.lengthOf(0);
+
+      // Should still add the pick filtering step
+      expect(parsedResult.meta.stepsPerformed).to.include.match(
+        /Picked consequence filtering applied/
+      );
+      expect(parsedResult.meta.stepsPerformed).to.include.match(
+        /0 total consequences reduced to 0/
+      );
+    });
+
+    it('should work in combination with other filters', () => {
+      // Apply pick filtering AND a custom filter
+      const customFilter = {
+        'transcript_consequences.impact': { eq: 'MODERATE' },
+      };
+
+      const freshTestData = JSON.parse(JSON.stringify(testDataWithPick));
+      const result = filterAndFormatResults(freshTestData, customFilter, 'JSON', {
+        pickOutput: true,
+      });
+      const parsedResult = JSON.parse(result);
+
+      // Should have the picked consequence (which happens to be MODERATE)
+      expect(parsedResult.annotationData).to.have.lengthOf(1);
+      expect(parsedResult.annotationData[0].transcript_consequences).to.have.lengthOf(1);
+      expect(parsedResult.annotationData[0].transcript_consequences[0].impact).to.equal('MODERATE');
+
+      // Should have both filtering steps in meta
+      const hasPickStep = parsedResult.meta.stepsPerformed.some((step) =>
+        step.includes('Picked consequence filtering applied')
+      );
+      const hasTranscriptFilter = parsedResult.meta.stepsPerformed.some((step) =>
+        step.includes('Transcript consequences filter applied')
+      );
+
+      expect(hasPickStep).to.be.true;
+      expect(hasTranscriptFilter).to.be.true;
+    });
+  });
 });
