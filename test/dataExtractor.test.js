@@ -5,7 +5,12 @@
 'use strict';
 
 const { expect } = require('chai');
-const { extractField, flattenAnnotationData, formatToTabular } = require('../src/dataExtractor');
+const {
+  extractField,
+  flattenAnnotationData,
+  formatToTabular,
+  formatVcfCsqString,
+} = require('../src/dataExtractor');
 
 describe('dataExtractor', () => {
   describe('extractField', () => {
@@ -232,6 +237,217 @@ describe('dataExtractor', () => {
       const result = formatToTabular(rowsWithSpecialChars, testConfig, '\t', true);
       const lines = result.split('\n');
       expect(lines[1]).to.equal('value,with,commas\tvalue with "quotes"\tnormal');
+    });
+  });
+
+  describe('formatVcfCsqString - Most Severe Consequence', () => {
+    // Mock annotation where most severe consequence is NOT in the first transcript
+    const mockAnnotationForCsqTest = {
+      most_severe_consequence: 'missense_variant',
+      transcript_consequences: [
+        {
+          // First consequence - less severe
+          impact: 'MODIFIER',
+          gene_symbol: 'WRONG_GENE',
+          gene_id: 'ENSG00000001',
+          feature_type: 'Transcript',
+          transcript_id: 'ENST00000001',
+          biotype: 'protein_coding',
+          consequence_terms: ['intron_variant'],
+          hgvsc: 'ENST00000001:c.100+5G>A',
+          hgvsp: '',
+          protein_start: null,
+          protein_end: null,
+          amino_acids: '',
+          codons: '',
+          sift_prediction: '',
+          polyphen_prediction: '',
+        },
+        {
+          // Second consequence - most severe
+          impact: 'MODERATE',
+          gene_symbol: 'CORRECT_GENE',
+          gene_id: 'ENSG00000002',
+          feature_type: 'Transcript',
+          transcript_id: 'ENST00000002',
+          biotype: 'protein_coding',
+          consequence_terms: ['missense_variant'],
+          hgvsc: 'ENST00000002:c.200A>G',
+          hgvsp: 'ENSP00000002:p.Thr67Ala',
+          protein_start: 67,
+          protein_end: 67,
+          amino_acids: 'T/A',
+          codons: 'aCc/gCc',
+          sift_prediction: 'deleterious',
+          polyphen_prediction: 'probably_damaging',
+        },
+        {
+          // Third consequence - also less severe
+          impact: 'LOW',
+          gene_symbol: 'ANOTHER_GENE',
+          gene_id: 'ENSG00000003',
+          feature_type: 'Transcript',
+          transcript_id: 'ENST00000003',
+          biotype: 'protein_coding',
+          consequence_terms: ['synonymous_variant'],
+          hgvsc: 'ENST00000003:c.300C>T',
+          hgvsp: 'ENSP00000003:p.Arg100=',
+          protein_start: 100,
+          protein_end: 100,
+          amino_acids: '',
+          codons: 'cgC/cgT',
+          sift_prediction: '',
+          polyphen_prediction: '',
+        },
+      ],
+    };
+
+    const csqFormatFields = [
+      'IMPACT',
+      'SYMBOL',
+      'Gene',
+      'Feature_type',
+      'Feature',
+      'BIOTYPE',
+      'HGVSc',
+      'HGVSp',
+      'Protein_position',
+      'Amino_acids',
+      'Codons',
+      'SIFT',
+      'PolyPhen',
+    ];
+
+    it('should extract CSQ fields from the most severe consequence', () => {
+      const result = formatVcfCsqString(mockAnnotationForCsqTest, csqFormatFields, 'G');
+
+      // Split by comma to get individual consequence strings
+      const csqStrings = result.split(',');
+      expect(csqStrings).to.have.lengthOf(3); // Should have 3 consequences
+
+      // Parse the first consequence string (should be from first transcript)
+      const firstCsqFields = csqStrings[0].split('|').map(decodeURIComponent);
+      expect(firstCsqFields[0]).to.equal('MODIFIER'); // IMPACT from first transcript
+      expect(firstCsqFields[1]).to.equal('WRONG_GENE'); // SYMBOL from first transcript
+
+      // Parse the second consequence string (should be from most severe transcript)
+      const secondCsqFields = csqStrings[1].split('|').map(decodeURIComponent);
+      expect(secondCsqFields[0]).to.equal('MODERATE'); // IMPACT from most severe
+      expect(secondCsqFields[1]).to.equal('CORRECT_GENE'); // SYMBOL from most severe
+      expect(secondCsqFields[2]).to.equal('ENSG00000002'); // Gene from most severe
+      expect(secondCsqFields[3]).to.equal('Transcript'); // Feature_type from most severe
+      expect(secondCsqFields[4]).to.equal('ENST00000002'); // Feature from most severe
+      expect(secondCsqFields[5]).to.equal('protein_coding'); // BIOTYPE from most severe
+      expect(secondCsqFields[6]).to.equal('ENST00000002:c.200A>G'); // HGVSc from most severe
+      expect(secondCsqFields[7]).to.equal('ENSP00000002:p.Thr67Ala'); // HGVSp from most severe
+      expect(secondCsqFields[8]).to.equal('67-67'); // Protein_position from most severe
+      expect(secondCsqFields[9]).to.equal('T/A'); // Amino_acids from most severe
+      expect(secondCsqFields[10]).to.equal('aCc/gCc'); // Codons from most severe
+      expect(secondCsqFields[11]).to.equal('deleterious'); // SIFT from most severe
+      expect(secondCsqFields[12]).to.equal('probably_damaging'); // PolyPhen from most severe
+    });
+
+    it('should fall back to first available data if most severe consequence not found', () => {
+      const mockWithUnknownSevere = {
+        ...mockAnnotationForCsqTest,
+        most_severe_consequence: 'unknown_consequence', // Not in any consequence_terms
+      };
+
+      const result = formatVcfCsqString(mockWithUnknownSevere, ['IMPACT', 'SYMBOL'], 'G');
+      const csqStrings = result.split(',');
+
+      // Parse the first consequence string
+      const firstCsqFields = csqStrings[0].split('|').map(decodeURIComponent);
+      expect(firstCsqFields[0]).to.equal('MODIFIER'); // Falls back to first transcript's impact
+      expect(firstCsqFields[1]).to.equal('WRONG_GENE'); // Falls back to first transcript with gene_symbol
+
+      // Parse the second consequence string
+      const secondCsqFields = csqStrings[1].split('|').map(decodeURIComponent);
+      expect(secondCsqFields[0]).to.equal('MODERATE'); // Second transcript's impact
+      expect(secondCsqFields[1]).to.equal('CORRECT_GENE'); // Second transcript's gene_symbol
+    });
+
+    it('should handle missing fields in most severe consequence', () => {
+      const mockWithMissingFields = {
+        most_severe_consequence: 'missense_variant',
+        transcript_consequences: [
+          {
+            impact: 'MODIFIER',
+            gene_symbol: 'FALLBACK_GENE',
+            consequence_terms: ['intron_variant'],
+            sift_prediction: 'tolerated',
+          },
+          {
+            impact: 'MODERATE',
+            gene_symbol: '', // Missing in most severe
+            consequence_terms: ['missense_variant'],
+            sift_prediction: '', // Missing in most severe
+          },
+        ],
+      };
+
+      const result = formatVcfCsqString(mockWithMissingFields, ['IMPACT', 'SYMBOL', 'SIFT'], 'G');
+      const csqStrings = result.split(',');
+
+      // Parse the first consequence string
+      const firstCsqFields = csqStrings[0].split('|').map(decodeURIComponent);
+      expect(firstCsqFields[0]).to.equal('MODIFIER'); // First transcript's impact
+      expect(firstCsqFields[1]).to.equal('FALLBACK_GENE'); // First transcript's gene_symbol
+      expect(firstCsqFields[2]).to.equal('tolerated'); // First transcript's SIFT
+
+      // Parse the second consequence string (most severe consequence)
+      const secondCsqFields = csqStrings[1].split('|').map(decodeURIComponent);
+      expect(secondCsqFields[0]).to.equal('MODERATE'); // Most severe's impact (available)
+      expect(secondCsqFields[1]).to.equal('FALLBACK_GENE'); // Should fallback to first available gene_symbol across all transcripts
+      expect(secondCsqFields[2]).to.equal('tolerated'); // Should fallback to first available SIFT across all transcripts
+    });
+
+    it('should handle annotation without transcript consequences', () => {
+      const mockWithoutConsequences = {
+        most_severe_consequence: 'intergenic_variant',
+      };
+
+      const result = formatVcfCsqString(mockWithoutConsequences, csqFormatFields, 'G');
+      expect(result).to.equal(''); // Should return empty string
+    });
+
+    it('should handle empty csqFormatFields array', () => {
+      const result = formatVcfCsqString(mockAnnotationForCsqTest, [], 'G');
+      expect(result).to.equal(''); // Should return empty string
+    });
+
+    it('should handle null annotation', () => {
+      const result = formatVcfCsqString(null, csqFormatFields, 'G');
+      expect(result).to.equal(''); // Should return empty string
+    });
+
+    it('should properly handle Protein_position with special logic', () => {
+      const mockForProteinPos = {
+        most_severe_consequence: 'missense_variant',
+        transcript_consequences: [
+          {
+            consequence_terms: ['intron_variant'],
+            protein_start: 100,
+            protein_end: 100,
+          },
+          {
+            consequence_terms: ['missense_variant'],
+            protein_start: 67,
+            protein_end: 67,
+          },
+        ],
+      };
+
+      const result = formatVcfCsqString(mockForProteinPos, ['Protein_position'], 'G');
+      const csqStrings = result.split(',');
+
+      // First consequence
+      const firstCsqFields = csqStrings[0].split('|').map(decodeURIComponent);
+      expect(firstCsqFields[0]).to.equal('100-100');
+
+      // Second consequence (most severe)
+      const secondCsqFields = csqStrings[1].split('|').map(decodeURIComponent);
+      expect(secondCsqFields[0]).to.equal('67-67');
     });
   });
 });

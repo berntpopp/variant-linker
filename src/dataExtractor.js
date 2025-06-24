@@ -446,86 +446,126 @@ function formatToTabular(
 }
 
 /**
+ * Helper function for CSQ handlers that prioritizes current consequence but falls back
+ * to most severe consequence logic when field is missing.
+ * @param {Object} annotation - The annotation object with current_consequence
+ * @param {string} fieldName - The field name to extract from the consequence
+ * @returns {*} The field value from current consequence or fallback logic
+ */
+function getConsequenceFieldWithFallback(annotation, fieldName) {
+  if (!annotation?.transcript_consequences?.length) {
+    return '';
+  }
+
+  const currentConsequence = annotation.current_consequence;
+
+  // First, try to get the field from the current consequence being processed
+  if (
+    currentConsequence &&
+    currentConsequence[fieldName] !== undefined &&
+    currentConsequence[fieldName] !== null &&
+    currentConsequence[fieldName] !== ''
+  ) {
+    return currentConsequence[fieldName];
+  }
+
+  // If current consequence doesn't have the field, apply most-severe-consequence fallback
+  const mostSevereConsequence = annotation.most_severe_consequence;
+
+  if (mostSevereConsequence) {
+    // Try to find the transcript consequence that matches the most severe consequence
+    const matchingCons = annotation.transcript_consequences.find((c) =>
+      c.consequence_terms?.includes(mostSevereConsequence)
+    );
+
+    if (
+      matchingCons &&
+      matchingCons[fieldName] !== undefined &&
+      matchingCons[fieldName] !== null &&
+      matchingCons[fieldName] !== ''
+    ) {
+      return matchingCons[fieldName];
+    }
+  }
+
+  // Final fallback: find the first consequence that has this field with a non-empty value
+  const fallbackCons = annotation.transcript_consequences.find(
+    (c) => c[fieldName] !== undefined && c[fieldName] !== null && c[fieldName] !== ''
+  );
+
+  return fallbackCons?.[fieldName] || '';
+}
+
+/**
  * Maps VCF CSQ field names (VEP style) to paths within the annotation object
  * or provides special handling logic.
+ * This mapping prioritizes extracting data from the transcript consequence that matches
+ * the top-level most_severe_consequence field. Falls back to the first available data
+ * if a match is not found.
  * Uses getDefaultColumnConfig() as a base where possible.
  */
 const csqFieldMapping = {
   Allele: (ann, alt) => alt || '', // Special case: Use provided ALT
   Consequence: (ann) => {
-    // Get consequence terms from the first transcript consequence
+    // Get consequence terms from the current transcript being processed
+    const currentConsequence = ann.current_consequence;
+    if (currentConsequence?.consequence_terms?.length > 0) {
+      return currentConsequence.consequence_terms.join('&');
+    }
+    // Fallback to first transcript consequence if current is not available
     const cons = ann?.transcript_consequences?.[0];
     if (cons?.consequence_terms?.length > 0) {
       return cons.consequence_terms.join('&');
     }
-    // Fallback to most_severe_consequence if no transcript consequences
+    // Final fallback to most_severe_consequence if no transcript consequences
     return ann?.most_severe_consequence || '';
   },
-  IMPACT: (ann) => {
-    // Find impact from the first transcript consequence matching the most severe consequence
-    const matchingCons = ann?.transcript_consequences?.find((c) =>
-      c.consequence_terms?.includes(ann.most_severe_consequence)
-    );
-    // Fallback to impact of the first consequence if no exact match
-    return matchingCons?.impact || ann?.transcript_consequences?.[0]?.impact || '';
-  },
-  SYMBOL: (ann) => {
-    const cons = ann?.transcript_consequences?.find((c) => c.gene_symbol);
-    return cons?.gene_symbol || '';
-  },
-  Gene: (ann) => {
-    const cons = ann?.transcript_consequences?.find((c) => c.gene_id);
-    return cons?.gene_id || '';
-  },
-  Feature_type: (ann) => {
-    const cons = ann?.transcript_consequences?.find((c) => c.feature_type);
-    return cons?.feature_type || '';
-  },
-  Feature: (ann) => {
-    // Usually transcript_id for transcripts
-    const cons = ann?.transcript_consequences?.find((c) => c.transcript_id);
-    return cons?.transcript_id || '';
-  },
-  BIOTYPE: (ann) => {
-    const cons = ann?.transcript_consequences?.find((c) => c.biotype);
-    return cons?.biotype || '';
-  },
-  HGVSc: (ann) => {
-    const cons = ann?.transcript_consequences?.find((c) => c.hgvsc);
-    return cons?.hgvsc || '';
-  },
-  HGVSp: (ann) => {
-    const cons = ann?.transcript_consequences?.find((c) => c.hgvsp);
-    return cons?.hgvsp || '';
-  },
+  IMPACT: (ann) => getConsequenceFieldWithFallback(ann, 'impact'),
+  SYMBOL: (ann) => getConsequenceFieldWithFallback(ann, 'gene_symbol'),
+  Gene: (ann) => getConsequenceFieldWithFallback(ann, 'gene_id'),
+  Feature_type: (ann) => getConsequenceFieldWithFallback(ann, 'feature_type'),
+  Feature: (ann) => getConsequenceFieldWithFallback(ann, 'transcript_id'),
+  BIOTYPE: (ann) => getConsequenceFieldWithFallback(ann, 'biotype'),
+  HGVSc: (ann) => getConsequenceFieldWithFallback(ann, 'hgvsc'),
+  HGVSp: (ann) => getConsequenceFieldWithFallback(ann, 'hgvsp'),
   Protein_position: (ann) => {
-    const cons = ann?.transcript_consequences?.find((c) => c.protein_start);
-    if (!cons?.protein_start) return '';
-    const end = cons.protein_end || cons.protein_start;
-    return `${cons.protein_start}-${end}`;
+    if (!ann?.transcript_consequences?.length) return '';
+
+    const currentConsequence = ann.current_consequence;
+
+    // First, try current consequence
+    if (currentConsequence?.protein_start) {
+      const end = currentConsequence.protein_end || currentConsequence.protein_start;
+      return `${currentConsequence.protein_start}-${end}`;
+    }
+
+    // If current consequence doesn't have protein_start, apply most-severe-consequence fallback
+    const mostSevereConsequence = ann.most_severe_consequence;
+    let targetCons = null;
+
+    if (mostSevereConsequence) {
+      targetCons = ann.transcript_consequences.find(
+        (c) => c.consequence_terms?.includes(mostSevereConsequence) && c.protein_start
+      );
+    }
+
+    if (!targetCons) {
+      targetCons = ann.transcript_consequences.find((c) => c.protein_start);
+    }
+
+    if (!targetCons?.protein_start) return '';
+    const end = targetCons.protein_end || targetCons.protein_start;
+    return `${targetCons.protein_start}-${end}`;
   },
-  Amino_acids: (ann) => {
-    const cons = ann?.transcript_consequences?.find((c) => c.amino_acids);
-    return cons?.amino_acids || '';
-  },
-  Codons: (ann) => {
-    const cons = ann?.transcript_consequences?.find((c) => c.codons);
-    return cons?.codons || '';
-  },
+  Amino_acids: (ann) => getConsequenceFieldWithFallback(ann, 'amino_acids'),
+  Codons: (ann) => getConsequenceFieldWithFallback(ann, 'codons'),
   Existing_variation: (ann) =>
     Array.isArray(ann?.existing_variation)
       ? ann.existing_variation.join('&')
       : ann?.existing_variation || '',
-  // Note: SIFT/PolyPhen often apply per-transcript. This gets the first one found.
-  // A more complex implementation might try to match the specific transcript.
-  SIFT: (ann) => {
-    const cons = ann?.transcript_consequences?.find((c) => c.sift_prediction);
-    return cons?.sift_prediction || '';
-  },
-  PolyPhen: (ann) => {
-    const cons = ann?.transcript_consequences?.find((c) => c.polyphen_prediction);
-    return cons?.polyphen_prediction || '';
-  },
+  // SIFT/PolyPhen are now extracted from the most severe consequence when possible
+  SIFT: (ann) => getConsequenceFieldWithFallback(ann, 'sift_prediction'),
+  PolyPhen: (ann) => getConsequenceFieldWithFallback(ann, 'polyphen_prediction'),
   // Add mappings for other VEP fields if needed
 };
 
@@ -556,16 +596,13 @@ function formatVcfCsqString(annotation, csqFormatFields, altAllele) {
       const handler = csqFieldMapping[fieldName];
       let value = '';
       if (typeof handler === 'function') {
-        // Create a temporary annotation object representing just this consequence
-        // This ensures the handler functions correctly find the data within the current consequence context
-        const tempAnnotationContext = {
-          ...annotation, // Include top-level fields
-          transcript_consequences: [consequence], // Focus on the current consequence
-          // Specifically pass the consequence itself if needed, though handlers should use the array
+        // Call the handler with the original annotation context so it can make decisions
+        // across all transcripts, but also provide the current consequence being processed
+        const contextWithCurrentConsequence = {
+          ...annotation,
           current_consequence: consequence,
         };
-        // Call the handler with the modified context
-        value = handler(tempAnnotationContext, altAllele);
+        value = handler(contextWithCurrentConsequence, altAllele);
       } else {
         // Basic fallback: Look for a direct property match (lowercase) in the consequence itself first
         value =
