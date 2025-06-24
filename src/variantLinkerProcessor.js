@@ -18,41 +18,8 @@ const {
   formatToTabular,
   getDefaultColumnConfig,
 } = require('./dataExtractor');
+const { getValueByPath } = require('./utils/pathUtils');
 const { formatAnnotationsToVcf } = require('./vcfFormatter');
-
-/**
- * Helper: Resolves a dot‐notation path from an object.
- *
- * This function supports wildcards (*) to collect values from arrays.
- *
- * For example, given an object with a property "transcript_consequences" that is an array,
- * a path "transcript_consequences.*.impact" returns an array of all impact values.
- *
- * @param {Object} obj - The object to query.
- * @param {string} path - The dot-separated path (e.g. "transcript_consequences.*.impact").
- * @returns {*} The value at the given path, or an array of values if wildcards are used.
- */
-function getValueByPath(obj, path) {
-  const parts = path.split('.');
-  // start with a one-element array (our root)
-  let current = [obj];
-
-  for (const part of parts) {
-    const next = [];
-    for (const item of current) {
-      if (part === '*') {
-        if (Array.isArray(item)) {
-          next.push(...item);
-        }
-      } else if (item != null && Object.prototype.hasOwnProperty.call(item, part)) {
-        next.push(item[part]);
-      }
-    }
-    current = next;
-  }
-  // If we end with a single value, return it; otherwise, return the array.
-  return current.length === 1 ? current[0] : current;
-}
 
 /**
  * Helper: Applies an operator to a value.

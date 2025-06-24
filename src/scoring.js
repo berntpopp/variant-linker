@@ -14,6 +14,7 @@ const fs = typeof window === 'undefined' ? require('fs') : null;
 const debug = require('debug')('variant-linker:main');
 const debugDetailed = require('debug')('variant-linker:detailed');
 const debugAll = require('debug')('variant-linker:all');
+const { getValueByPath } = require('./utils/pathUtils');
 
 /**
  * Parses scoring configuration from the provided JSON objects.
@@ -268,53 +269,6 @@ function extractVariables(obj, variablesConfig, context) {
  * @param {Object} [context] - Optional context object for relative lookups.
  * @returns {*} The value at the specified path, or undefined if not found.
  */
-function getValueByPath(obj, path, context) {
-  const parts = path.split('.');
-  let value = obj;
-
-  for (let i = 0; i < parts.length; i++) {
-    const part = parts[i];
-    if (part === '*') {
-      if (Array.isArray(value)) {
-        debugDetailed(`Wildcard found, iterating over array: ${JSON.stringify(value)}`);
-        const remainder = parts.slice(i + 1).join('.');
-        const results = value
-          .map((item) => getValueByPath(item, remainder, context))
-          .filter((v) => v !== null && v !== undefined);
-        return results.length === 1 ? results[0] : results;
-      } else if (value && typeof value === 'object') {
-        debugDetailed(`Wildcard encountered but value is not an array: ${JSON.stringify(value)}`);
-        const remainder = parts.slice(i + 1).join('.');
-        const results = [];
-        for (const key in value) {
-          if (Object.prototype.hasOwnProperty.call(value, key)) {
-            const nestedValue = getValueByPath(value[key], remainder, context);
-            if (nestedValue !== undefined) {
-              results.push(nestedValue);
-            }
-          }
-        }
-        return results.length === 1 ? results[0] : results;
-      } else {
-        debugDetailed(`Wildcard found but value is not traversable: ${JSON.stringify(value)}`);
-        return [];
-      }
-    } else if (value && Object.prototype.hasOwnProperty.call(value, part)) {
-      value = value[part];
-      debugDetailed(`Navigated to part: ${part}, value: ${JSON.stringify(value)}`);
-    } else if (context && Object.prototype.hasOwnProperty.call(context, part)) {
-      value = context[part];
-      debugDetailed(`Using context for part ${part}; value: ${JSON.stringify(value)}`);
-    } else {
-      // Log part not found in debug mode
-      debugAll(`Part not found: ${part}`);
-      return undefined;
-    }
-  }
-
-  debugAll(`Final value: ${JSON.stringify(value)}`);
-  return value;
-}
 
 /**
  * Calculates a score based on a formula string and a set of variables.
@@ -354,28 +308,31 @@ function calculateScore(formulaStr, variables) {
  * @returns {Object|null} The prioritized transcript consequence or null if none found.
  */
 function _findPrioritizedTranscript(annotation) {
-  if (!Array.isArray(annotation.transcript_consequences) || annotation.transcript_consequences.length === 0) {
+  if (
+    !Array.isArray(annotation.transcript_consequences) ||
+    annotation.transcript_consequences.length === 0
+  ) {
     return null;
   }
 
   const transcripts = annotation.transcript_consequences;
 
   // 1. Find first transcript with pick === 1
-  let prioritized = transcripts.find(tc => tc.pick === 1);
+  let prioritized = transcripts.find((tc) => tc.pick === 1);
   if (prioritized) {
     debugDetailed(`Found prioritized transcript with pick=1: ${prioritized.transcript_id}`);
     return prioritized;
   }
 
   // 2. Find first transcript with mane === 1
-  prioritized = transcripts.find(tc => tc.mane === 1);
+  prioritized = transcripts.find((tc) => tc.mane === 1);
   if (prioritized) {
     debugDetailed(`Found prioritized transcript with mane=1: ${prioritized.transcript_id}`);
     return prioritized;
   }
 
   // 3. Find first transcript with canonical === 1
-  prioritized = transcripts.find(tc => tc.canonical === 1);
+  prioritized = transcripts.find((tc) => tc.canonical === 1);
   if (prioritized) {
     debugDetailed(`Found prioritized transcript with canonical=1: ${prioritized.transcript_id}`);
     return prioritized;
@@ -409,7 +366,10 @@ function _extractAnnotationVariables(annotation, variablesConfig) {
 
     // Extract transcript-specific fields from prioritized transcript
     if (variablesConfig.transcriptFields && prioritizedTranscript) {
-      const transcriptVars = extractVariables(prioritizedTranscript, variablesConfig.transcriptFields);
+      const transcriptVars = extractVariables(
+        prioritizedTranscript,
+        variablesConfig.transcriptFields
+      );
       Object.assign(variables, transcriptVars);
     }
   } else {
@@ -494,7 +454,11 @@ function applyScoring(annotationData, scoringConfig) {
     // Transcript-level formulas with individual transcript context
     if (Array.isArray(annotation.transcript_consequences)) {
       annotation.transcript_consequences.forEach((transcript) => {
-        const transcriptVariables = _extractTranscriptVariables(transcript, annotation, variablesConfig);
+        const transcriptVariables = _extractTranscriptVariables(
+          transcript,
+          annotation,
+          variablesConfig
+        );
         transcriptLevel.forEach((formula) => {
           const scoreName = Object.keys(formula)[0];
           const formulaStr = formula[scoreName];
