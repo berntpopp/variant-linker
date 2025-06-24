@@ -23,7 +23,11 @@ module.exports = {
       // For browser builds, redirect Node's "fs" module to an empty module.
       fs: require.resolve('./src/empty.js'),
       // Use a browser-compatible version of "path".
-      path: require.resolve('path-browserify')
+      path: require.resolve('path-browserify'),
+      // Disable crypto for browser builds (cache will use memory-only mode)
+      crypto: false,
+      // Disable os module for browser builds
+      os: false
     }
   },
   module: {

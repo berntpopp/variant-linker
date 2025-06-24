@@ -7,10 +7,19 @@
  * @module cache/PersistentCache
  */
 
-const fs = require('fs');
-const path = require('path');
-const crypto = require('crypto');
-const os = require('os');
+// Browser environment detection and graceful fallbacks
+let fs;
+let path;
+let crypto;
+let os;
+try {
+  fs = require('fs');
+  path = require('path');
+  crypto = require('crypto');
+  os = require('os');
+} catch (e) {
+  // Browser environment - modules will be null/undefined
+}
 const debug = require('debug')('variant-linker:persistent-cache');
 
 /**
@@ -26,6 +35,15 @@ class PersistentCache {
    * @param {string} [config.maxSize] - Maximum cache size (e.g., "100MB")
    */
   constructor(config = {}) {
+    // Detect browser environment and disable persistent cache
+    this.isBrowser = typeof window !== 'undefined' || !fs || !path || !crypto || !os;
+
+    if (this.isBrowser) {
+      debug('Browser environment detected - persistent cache disabled');
+      this.disabled = true;
+      return;
+    }
+
     this.defaultTTL = config.ttl || 24 * 60 * 60 * 1000; // 24 hours default
     this.maxSize = this._parseSizeString(config.maxSize || '100MB');
 
