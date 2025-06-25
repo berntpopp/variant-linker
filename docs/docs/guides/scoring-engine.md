@@ -376,6 +376,85 @@ Debug output includes:
 - Formula evaluation steps
 - Error messages and stack traces
 
+## CNV Scoring
+
+Variant-Linker includes specialized support for scoring Copy Number Variants (CNVs) with access to structural variant-specific annotations.
+
+### CNV-Specific Variables
+
+CNV scoring configurations can access additional variables not available for point mutations:
+
+| Variable | Description | Source |
+|----------|-------------|---------|
+| `bp_overlap` | Base pairs overlapping with gene features | VEP transcript consequences |
+| `percentage_overlap` | Percentage of feature overlap | VEP transcript consequences |
+| `phenotypes` | Associated disease phenotypes | VEP top-level annotation |
+| `phaplo_score` | Haploinsufficiency score | VEP dosage sensitivity |
+| `ptriplo_score` | Triplosensitivity score | VEP dosage sensitivity |
+
+### Example CNV Scoring Configuration
+
+The included `cnv_score_example` demonstrates pathogenicity scoring for structural variants:
+
+**Variable Assignment** (`scoring/cnv_score_example/variable_assignment_config.json`):
+```json
+{
+  "aggregates": {
+    "consequence_terms": "transcript_consequences.*.consequence_terms:unique",
+    "bp_overlap": "transcript_consequences.*.bp_overlap:max",
+    "percentage_overlap": "transcript_consequences.*.percentage_overlap:max"
+  },
+  "transcriptFields": {
+    "dosage_gene": "dosage_sensitivity.gene_name",
+    "phaplo_score": "dosage_sensitivity.phaplo",
+    "ptriplo_score": "dosage_sensitivity.ptriplo",
+    "phenotypes": "phenotypes"
+  }
+}
+```
+
+**Scoring Formulas** (`scoring/cnv_score_example/formula_config.json`):
+```json
+{
+  "formulas": {
+    "annotationLevel": [{
+      "cnv_pathogenicity_score": "const baseScore = consequence_terms.includes('feature_truncation') ? 20 : (consequence_terms.includes('feature_elongation') ? 15 : 0); const overlapScore = Math.min(bp_overlap / 10000, 10); const dosageScore = (phaplo_score || 0) * 5 + (ptriplo_score || 0) * 3; const phenotypeScore = phenotypes && phenotypes.length > 0 ? 5 : 0; return baseScore + overlapScore + dosageScore + phenotypeScore;"
+    }],
+    "transcriptLevel": [{
+      "transcript_cnv_impact": "const hasFeatureTruncation = consequence_terms.includes('feature_truncation'); const hasHighOverlap = (bp_overlap || 0) > 50000; const isHighConfidenceGene = (phaplo_score || 0) >= 3 || (ptriplo_score || 0) >= 3; return hasFeatureTruncation && hasHighOverlap && isHighConfidenceGene ? 'HIGH_IMPACT' : (hasFeatureTruncation || (hasHighOverlap && isHighConfidenceGene) ? 'MODERATE_IMPACT' : 'LOW_IMPACT');"
+    }]
+  }
+}
+```
+
+### CNV Scoring Usage
+
+```bash
+# Score a deletion with CNV-specific model
+variant-linker \
+  --variant "7:117559600-117559609:DEL" \
+  --scoring_config_path scoring/cnv_score_example/ \
+  --vep_params "Phenotypes=1,numbers=1" \
+  --output JSON
+
+# Batch CNV scoring
+variant-linker \
+  --variants-file cnv_variants.txt \
+  --scoring_config_path scoring/cnv_score_example/ \
+  --output CSV
+```
+
+### CNV Scoring Strategy
+
+The example CNV scoring model considers:
+
+1. **Functional Impact**: Feature truncation/elongation consequences
+2. **Overlap Significance**: Base pairs and percentage overlap with gene features  
+3. **Dosage Sensitivity**: Haploinsufficiency and triplosensitivity scores
+4. **Clinical Relevance**: Associated disease phenotypes
+
+This multi-factor approach helps prioritize CNVs likely to have clinical significance.
+
 ## Integration with Other Features
 
 ### Inheritance Analysis

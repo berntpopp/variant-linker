@@ -23,6 +23,35 @@ const { getValueByPath } = require('./utils/pathUtils');
 const { formatAnnotationsToVcf } = require('./vcfFormatter');
 
 /**
+ * Helper function to check if annotations contain CNV data.
+ * @param {Array} annotationData - Array of annotation objects
+ * @returns {boolean} True if any annotation has CNV format or CNV-specific fields
+ */
+function hasCnvAnnotations(annotationData) {
+  if (!Array.isArray(annotationData) || annotationData.length === 0) {
+    return false;
+  }
+
+  return annotationData.some((annotation) => {
+    // Check if annotation has CNV input format
+    if (annotation.inputFormat === 'CNV') {
+      return true;
+    }
+
+    // Check if annotation has CNV-specific fields (for edge cases)
+    if (annotation.transcript_consequences && Array.isArray(annotation.transcript_consequences)) {
+      return annotation.transcript_consequences.some(
+        (consequence) =>
+          consequence.bp_overlap !== undefined || consequence.percentage_overlap !== undefined
+      );
+    }
+
+    // Check for top-level CNV fields
+    return annotation.phenotypes !== undefined || annotation.dosage_sensitivity !== undefined;
+  });
+}
+
+/**
  * Helper: Applies an operator to a value.
  *
  * @param {*} value - The value from the object.
@@ -370,9 +399,15 @@ function filterAndFormatResults(results, filterParam, format, params = {}) {
       const includeUserFeatureCols = hasUserFeatureOverlaps(annotationToUse);
       debug(`Include user feature columns in ${format.toUpperCase()}: ${includeUserFeatureCols}`);
 
+      // *** FIX: Conditionally include CNV-specific columns ***
+      // Check if any annotations are CNV variants
+      const includeCnvCols = hasCnvAnnotations(annotationToUse);
+      debug(`Include CNV columns in ${format.toUpperCase()}: ${includeCnvCols}`);
+
       const columnConfig = getDefaultColumnConfig({
         includeInheritance: includeInheritanceCols,
         includeUserFeatures: includeUserFeatureCols,
+        includeCnv: includeCnvCols,
       });
 
       const flatRows = flattenAnnotationData(annotationToUse, columnConfig);

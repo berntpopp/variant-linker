@@ -29,10 +29,10 @@ const debug = require('debug')('variant-linker:core');
 const debugDetailed = require('debug')('variant-linker:detailed');
 
 /**
- * Detects whether the input variant is in VCF or HGVS format.
+ * Detects whether the input variant is in VCF, HGVS, or CNV format.
  *
  * @param {string} variant - The input variant.
- * @return {string} 'VCF' if the input matches the VCF pattern; otherwise, 'HGVS'.
+ * @return {string} 'VCF' if the input matches the VCF pattern; 'CNV' if CNV format; otherwise, 'HGVS'.
  * @throws {Error} If no variant is provided.
  */
 function detectInputFormat(variant) {
@@ -40,6 +40,15 @@ function detectInputFormat(variant) {
     throw new Error('No variant provided.');
   }
   const cleanedVariant = variant.replace(/^chr/i, '');
+
+  // Check for CNV format: chr:start-end:TYPE (e.g., 7:117559600-117559609:DEL)
+  // Accept known CNV types and similar patterns, but be more restrictive to avoid false positives
+  const cnvPattern = /^[0-9XYM]+:\d+-\d+:(DEL|DUP|CNV|CUSTOM|INS|INV)$/i;
+  if (cnvPattern.test(cleanedVariant)) {
+    return 'CNV';
+  }
+
+  // Check for VCF format: chromosome-start-ref-alt
   const vcfPattern = /^[0-9XYM]+-[0-9]+-[ACGT]+-[ACGT]+$/i;
   return vcfPattern.test(cleanedVariant) ? 'VCF' : 'HGVS';
 }
@@ -73,6 +82,36 @@ async function processSingleVariant(variant, params) {
     inputInfo = formattedVariant;
     // The variant itself is the standard key for VCF input
     standardKey = variant;
+    annotationData = await vepRegionsAnnotation(
+      [formattedVariant],
+      params.vepOptions,
+      params.cache
+    );
+  } else if (inputFormat === 'CNV') {
+    // Handle CNV format: chr:start-end:TYPE
+    const cleanedVariant = variant.replace(/^chr/i, '');
+    const parts = cleanedVariant.match(/^([0-9XYM]+):(\d+)-(\d+):(DEL|DUP|CNV|CUSTOM|INS|INV)$/i);
+    if (!parts) {
+      throw new Error(
+        `Invalid CNV format for variant "${variant}": expected "chr:start-end:TYPE" ` +
+          `where TYPE is DEL, DUP, CNV, CUSTOM, INS, or INV`
+      );
+    }
+    const [, chrom, start, end, type] = parts;
+
+    // Map CNV types to VEP-compatible format
+    const vepTypeMapping = {
+      DEL: 'deletion',
+      DUP: 'duplication',
+      CNV: 'CNV',
+    };
+    const vepType = vepTypeMapping[type.toUpperCase()] || 'CNV';
+
+    // Format for VEP regions annotation: "chromosome start end variant_type allele_number"
+    const formattedVariant = `${chrom} ${start} ${end} ${vepType} 1`;
+    inputInfo = formattedVariant;
+    standardKey = variant; // Use original CNV format as key
+
     annotationData = await vepRegionsAnnotation(
       [formattedVariant],
       params.vepOptions,
@@ -170,8 +209,9 @@ async function processBatchVariants(variants, params) {
     format: detectInputFormat(variant),
   }));
 
-  // Process variants by format (separate VCF and HGVS)
+  // Process variants by format (separate VCF, CNV, and HGVS)
   const vcfVariants = inputFormats.filter((v) => v.format === 'VCF').map((v) => v.variant);
+  const cnvVariants = inputFormats.filter((v) => v.format === 'CNV').map((v) => v.variant);
   const hgvsVariants = inputFormats.filter((v) => v.format === 'HGVS').map((v) => v.variant);
 
   // Store mapping from original input to results
@@ -221,6 +261,76 @@ async function processBatchVariants(variants, params) {
         annotationData.push({
           originalInput: originalVariant,
           inputFormat: 'VCF',
+          input: mappingInfo.formattedVariant, // VEP input format
+          variantKey: key, // Use the standardized key
+          ...annotation,
+        });
+      });
+    }
+  }
+
+  // Process CNV variants directly (they don't need recoding)
+  if (cnvVariants.length > 0) {
+    const formattedCnvVariants = cnvVariants.map((variant) => {
+      const cleanedVariant = variant.replace(/^chr/i, '');
+      const parts = cleanedVariant.match(/^([0-9XYM]+):(\d+)-(\d+):(DEL|DUP|CNV|CUSTOM|INS|INV)$/i);
+      if (!parts) {
+        throw new Error(
+          `Invalid CNV format for variant "${variant}": expected "chr:start-end:TYPE" ` +
+            `where TYPE is DEL, DUP, CNV, CUSTOM, INS, or INV`
+        );
+      }
+      const [, chrom, start, end, type] = parts;
+
+      // Map CNV types to VEP-compatible format
+      const vepTypeMapping = {
+        DEL: 'deletion',
+        DUP: 'duplication',
+        CNV: 'CNV',
+      };
+      const vepType = vepTypeMapping[type.toUpperCase()] || 'CNV';
+
+      // Format for VEP regions annotation: "chromosome start end variant_type allele_number"
+      return `${chrom} ${start} ${end} ${vepType} 1`;
+    });
+
+    // Store the mapping for CNV variants
+    formattedCnvVariants.forEach((formatted, index) => {
+      variantMapping[cnvVariants[index]] = {
+        originalInput: cnvVariants[index],
+        inputFormat: 'CNV',
+        formattedVariant: formatted,
+      };
+    });
+
+    // Call VEP with all formatted CNV variants at once
+    const cnvAnnotations = await vepRegionsAnnotation(
+      formattedCnvVariants,
+      params.vepOptions,
+      params.cache
+    );
+
+    // Associate VEP results with original CNV variants
+    if (Array.isArray(cnvAnnotations)) {
+      cnvAnnotations.forEach((annotation, index) => {
+        const originalVariant = cnvVariants[index];
+        const mappingInfo = variantMapping[originalVariant];
+
+        // Safety check for mappingInfo
+        if (!mappingInfo) {
+          console.error(`No mapping info found for CNV variant: ${originalVariant}`);
+          console.error(`Available variants in mapping:`, Object.keys(variantMapping));
+          return; // Skip this annotation
+        }
+
+        const key = originalVariant; // Use the original CNV format as key
+        debugDetailed(
+          `processBatchVariants (CNV): Assigning variantKey='${key}' to annotation for ` +
+            `OrigInput='${originalVariant}', VEPInput='${mappingInfo.formattedVariant}'`
+        );
+        annotationData.push({
+          originalInput: originalVariant,
+          inputFormat: 'CNV',
           input: mappingInfo.formattedVariant, // VEP input format
           variantKey: key, // Use the standardized key
           ...annotation,

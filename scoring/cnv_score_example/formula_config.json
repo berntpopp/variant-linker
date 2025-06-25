@@ -1,0 +1,10 @@
+{
+  "formulas": {
+    "annotationLevel": [{
+      "cnv_pathogenicity_score": "const baseScore = consequence_terms.includes('feature_truncation') ? 20 : (consequence_terms.includes('feature_elongation') ? 15 : 0); const overlapScore = Math.min(bp_overlap / 10000, 10); const dosageScore = (phaplo_score || 0) * 5 + (ptriplo_score || 0) * 3; const phenotypeScore = phenotypes && phenotypes.length > 0 ? 5 : 0; return baseScore + overlapScore + dosageScore + phenotypeScore;"
+    }],
+    "transcriptLevel": [{
+      "transcript_cnv_impact": "const hasFeatureTruncation = consequence_terms.includes('feature_truncation'); const hasHighOverlap = (bp_overlap || 0) > 50000; const isHighConfidenceGene = (phaplo_score || 0) >= 3 || (ptriplo_score || 0) >= 3; return hasFeatureTruncation && hasHighOverlap && isHighConfidenceGene ? 'HIGH_IMPACT' : (hasFeatureTruncation || (hasHighOverlap && isHighConfidenceGene) ? 'MODERATE_IMPACT' : 'LOW_IMPACT');"
+    }]
+  }
+}

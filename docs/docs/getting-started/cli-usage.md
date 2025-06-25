@@ -16,6 +16,11 @@ variant-linker --variant <variant_input> --output <output_format> [--debug]
 variant-linker --variant "rs6025" --output JSON
 variant-linker --variant "ENST00000366667:c.803C>T" --output CSV
 variant-linker --variant "9 130716739 . G GT" --output TSV
+
+# Copy Number Variants (CNVs)
+variant-linker --variant "7:117559600-117559609:DEL" --output JSON
+variant-linker --variant "1:1000-5000:DUP" --output CSV
+variant-linker --variant "chr22:10000-20000:CNV" --output TSV
 ```
 
 ### Batch Processing
@@ -56,6 +61,55 @@ echo "1-65568-A-C" | variant-linker --output TSV --vep_params "CADD=1,hgvs=1"
 - Incremental output with header printed once
 - Compatible with TSV, CSV, and JSON output formats
 - Configurable chunk size via `--chunk-size` option
+
+## Copy Number Variant (CNV) Support
+
+Variant-Linker supports structural variants including copy number variants (CNVs) using a specialized format for regions annotation.
+
+### CNV Input Format
+
+CNVs use the format: `chr:start-end:TYPE` where:
+- **chr**: Chromosome (1-22, X, Y, M)
+- **start**: Start coordinate (1-based)
+- **end**: End coordinate (1-based, inclusive)
+- **TYPE**: Variant type (DEL, DUP, CNV, INS, INV, or custom types)
+
+### Supported CNV Types
+
+| Type | Description | VEP Format |
+|------|-------------|------------|
+| `DEL` | Deletion | `deletion` |
+| `DUP` | Duplication | `duplication` |
+| `CNV` | Generic copy number variant | `CNV` |
+| `INS` | Insertion | `CNV` (default) |
+| `INV` | Inversion | `CNV` (default) |
+
+### CNV Examples
+
+```bash
+# Single CNV analysis
+variant-linker --variant "7:117559600-117559609:DEL" --output JSON
+
+# CNV with phenotype and dosage sensitivity data
+variant-linker --variant "1:1000-5000:DUP" --vep_params "Phenotypes=1,numbers=1" --output CSV
+
+# Mixed batch with SNVs and CNVs
+echo -e "rs6025\n7:117559600-117559609:DEL\n1:1000-5000:DUP" | variant-linker --output TSV
+
+# CNV with custom scoring
+variant-linker --variant "22:10000-20000:CNV" --scoring_config_path scoring/cnv_score_example/ --output JSON
+```
+
+### CNV-Specific Output Fields
+
+When processing CNVs, additional columns are automatically included in CSV/TSV output:
+
+| Column | Description |
+|--------|-------------|
+| `BP_Overlap` | Base pairs overlapping with features |
+| `Percentage_Overlap` | Percentage of feature overlap |
+| `Phenotypes` | Associated phenotypes from databases |
+| `DosageSensitivity` | Gene dosage sensitivity scores |
 
 ## Command-Line Options
 

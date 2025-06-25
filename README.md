@@ -23,6 +23,9 @@ npm link  # Optional: for global CLI access
 # Analyze a single variant
 variant-linker --variant "rs6025" --output JSON
 
+# Analyze a copy number variant (CNV)
+variant-linker --variant "7:117559600-117559609:DEL" --output JSON
+
 # Process VCF file with inheritance analysis
 variant-linker --vcf-input sample.vcf --ped family.ped --calculate-inheritance --output VCF
 
@@ -34,8 +37,8 @@ variant-linker --variants-file variants.txt --scoring_config_path scoring/nephro
 ```
 
 ## Key Features
-- 🔄 **Variant Translation** - Convert between rsID, HGVS, and VCF formats
-- 📊 **VEP Annotations** - Comprehensive variant effect predictions
+- 🔄 **Variant Translation** - Convert between rsID, HGVS, VCF, and CNV formats
+- 📊 **VEP Annotations** - Comprehensive variant effect predictions including CNV-specific annotations
 - 🧬 **Genome Assembly Liftover** - Transparent hg19→hg38 coordinate conversion
 - 👨‍👩‍👧‍👦 **Family Analysis** - Inheritance pattern detection from PED files
 - 🗂️ **VCF Support** - Full VCF input/output with header preservation
@@ -58,9 +61,16 @@ const result = await analyzeVariant({
   output: 'JSON'
 });
 
-// Batch processing
+// Analyze a copy number variant (CNV)
+const cnvResult = await analyzeVariant({
+  variant: '7:117559600-117559609:DEL',
+  vepOptions: { Phenotypes: '1', numbers: '1' },
+  output: 'JSON'
+});
+
+// Batch processing with mixed variant types
 const batchResult = await analyzeVariant({
-  variants: ['rs123', 'ENST00000366667:c.803C>T'],
+  variants: ['rs123', 'ENST00000366667:c.803C>T', '1:1000-5000:DUP'],
   recoderOptions: { vcf_string: '1' },
   vepOptions: { CADD: '1', hgvs: '1' },
   output: 'JSON'

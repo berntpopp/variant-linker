@@ -30,6 +30,27 @@ describe('variantLinkerCore.js', () => {
       expect(detectInputFormat('rs123')).to.equal('HGVS');
     });
 
+    it('should correctly identify CNV format', () => {
+      expect(detectInputFormat('7:117559600-117559609:DEL')).to.equal('CNV');
+      expect(detectInputFormat('chr7:117559600-117559609:DEL')).to.equal('CNV');
+      expect(detectInputFormat('1:1000-5000:DUP')).to.equal('CNV');
+      expect(detectInputFormat('chr1:1000-5000:DUP')).to.equal('CNV');
+      expect(detectInputFormat('22:10000-20000:CNV')).to.equal('CNV');
+      expect(detectInputFormat('X:1000000-2000000:DEL')).to.equal('CNV');
+    });
+
+    it('should handle CNV format case insensitivity', () => {
+      expect(detectInputFormat('7:117559600-117559609:del')).to.equal('CNV');
+      expect(detectInputFormat('1:1000-5000:dup')).to.equal('CNV');
+      expect(detectInputFormat('22:10000-20000:cnv')).to.equal('CNV');
+    });
+
+    it('should not identify invalid CNV formats as CNV', () => {
+      expect(detectInputFormat('7:117559600-117559609:INVALID')).to.equal('HGVS');
+      expect(detectInputFormat('7-117559600-117559609-DEL')).to.equal('HGVS');
+      expect(detectInputFormat('7:start-end:DEL')).to.equal('HGVS');
+    });
+
     it('should throw error on empty input', () => {
       expect(() => detectInputFormat()).to.throw('No variant provided');
       expect(() => detectInputFormat('')).to.throw('No variant provided');

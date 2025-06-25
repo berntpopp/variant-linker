@@ -1,0 +1,13 @@
+{
+  "aggregates": {
+    "consequence_terms": "transcript_consequences.*.consequence_terms:unique",
+    "bp_overlap": "transcript_consequences.*.bp_overlap:max",
+    "percentage_overlap": "transcript_consequences.*.percentage_overlap:max"
+  },
+  "transcriptFields": {
+    "dosage_gene": "dosage_sensitivity.gene_name",
+    "phaplo_score": "dosage_sensitivity.phaplo",
+    "ptriplo_score": "dosage_sensitivity.ptriplo",
+    "phenotypes": "phenotypes"
+  }
+}

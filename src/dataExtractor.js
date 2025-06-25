@@ -26,7 +26,7 @@ const { formatUserFeatureOverlaps } = require('./featureAnnotator');
  * @returns {Array} Array of column configuration objects
  */
 function getDefaultColumnConfig(options = {}) {
-  const { includeInheritance = false, includeUserFeatures = false } = options;
+  const { includeInheritance = false, includeUserFeatures = false, includeCnv = false } = options;
 
   // Start with core columns that are always included
   const defaultColumns = [
@@ -230,6 +230,55 @@ function getDefaultColumnConfig(options = {}) {
       defaultValue: '',
       formatter: formatUserFeatureOverlaps,
     });
+  }
+
+  // Add CNV-specific columns if requested
+  if (includeCnv) {
+    defaultColumns.push(
+      {
+        header: 'BP_Overlap',
+        path: 'bp_overlap',
+        isConsequenceLevel: true, // This is a per-consequence field from VEP
+        defaultValue: '',
+      },
+      {
+        header: 'Percentage_Overlap',
+        path: 'percentage_overlap',
+        isConsequenceLevel: true, // This is a per-consequence field from VEP
+        defaultValue: '',
+      },
+      {
+        header: 'Phenotypes',
+        path: 'phenotypes',
+        isConsequenceLevel: false, // This is a top-level annotation field
+        defaultValue: '',
+        formatter: (value) => {
+          if (!value) return '';
+          if (Array.isArray(value)) {
+            return value.map((p) => p.phenotype || p).join(';');
+          }
+          return value;
+        },
+      },
+      {
+        header: 'DosageSensitivity',
+        path: 'dosage_sensitivity',
+        isConsequenceLevel: false, // This is a top-level annotation field
+        defaultValue: '',
+        formatter: (value) => {
+          if (!value) return '';
+          if (typeof value === 'object') {
+            // Format dosage sensitivity information
+            const parts = [];
+            if (value.gene_name) parts.push(`Gene:${value.gene_name}`);
+            if (value.phaplo) parts.push(`Haplo:${value.phaplo}`);
+            if (value.ptriplo) parts.push(`Triplo:${value.ptriplo}`);
+            return parts.join(';');
+          }
+          return value;
+        },
+      }
+    );
   }
 
   return defaultColumns;
