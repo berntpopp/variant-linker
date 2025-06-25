@@ -8,9 +8,11 @@
 'use strict';
 
 const fs = require('fs');
+const readline = require('readline');
 const yargs = require('yargs');
 const packageJson = require('../package.json');
 const { analyzeVariant } = require('./variantLinkerCore');
+const { filterAndFormatResults } = require('./variantLinkerProcessor');
 const { getBaseUrl } = require('./configHelper');
 const { readVariantsFromVcf } = require('./vcfReader');
 const { readPedigree } = require('./pedReader');
@@ -22,7 +24,7 @@ const debugDetailed = require('debug')('variant-linker:detailed');
 const debugAll = require('debug')('variant-linker:all');
 
 /**
- * Outputs error information as JSON and throws an enhanced error.
+ * Outputs error information as JSON.
  * @param {Error} error - The original error that occurred
  */
 function handleError(error) {
@@ -34,11 +36,6 @@ function handleError(error) {
     errorResponse.stack = error.stack;
   }
   console.error(JSON.stringify(errorResponse, null, 2));
-  // Instead of exiting, throw an enhanced error with status code for the caller to handle
-  const enhancedError = new Error(`Fatal error: ${error.message}`);
-  enhancedError.originalError = error;
-  enhancedError.statusCode = 1;
-  throw enhancedError;
 }
 
 /**
@@ -82,7 +79,20 @@ function readVariantsFromFile(filePath) {
 function validateParams(params) {
   const validOutputs = ['JSON', 'CSV', 'TSV', 'SCHEMA', 'VCF'];
 
-  // Check if at least one variant source is provided
+  // Streaming mode validation
+  if (params.isStreaming && (params.save || params.outputFile)) {
+    throw new Error(
+      '--save and --output-file options cannot be used with stdin streaming. Please pipe the output to a file instead.'
+    );
+  }
+
+  if (params.isStreaming && params.output.toUpperCase() === 'JSON') {
+    console.warn(
+      'Warning: JSON output is not ideal for streaming. Consider using TSV or CSV for better pipeline compatibility.'
+    );
+  }
+
+  // Check if at least one variant source is provided (skip for streaming mode)
   const hasVariant = Boolean(params.variant);
   const hasVariantsFile = Boolean(params.variantsFile); // Using camelCase
   const hasVcfInput = Boolean(params.vcfInput);
@@ -95,7 +105,7 @@ function validateParams(params) {
   const inputMethods = [hasVariant, hasVariantsFile, hasVariantsList, hasVcfInput];
   const inputMethodCount = inputMethods.filter(Boolean).length;
 
-  if (inputMethodCount === 0) {
+  if (inputMethodCount === 0 && !params.isStreaming) {
     throw new Error(
       'At least one variant source is required: --variant, --variants-file, --variants, or --vcf-input'
     );
@@ -191,6 +201,7 @@ function mergeParams(configParams, cliParams) {
     'bf',
     'gl',
     'jg',
+    'cs',
     'h',
     'V',
   ];
@@ -243,7 +254,7 @@ function parseOptionalParameters(paramString, defaultParams) {
     const paramsArray = paramString.split(',');
     paramsArray.forEach((param) => {
       const [key, value] = param.split('=');
-      const trimmedKey = key.trim();
+      const trimmedKey = key.trim(); // <<< FIX: Define trimmedKey here
       if (trimmedKey && value !== undefined) {
         // Check value is not undefined
         options[trimmedKey] = value.trim(); // Trim key/value
@@ -383,6 +394,12 @@ const argv = yargs(process.argv.slice(2)) // Use process.argv.slice(2) for bette
       'JSON string to map fields in the json-genes file. e.g., \'{"identifier":"gene_symbol","dataFields":["panel_name"]}\'',
     type: 'string',
   })
+  .option('chunk-size', {
+    alias: 'cs',
+    description: 'Number of variants to process per API batch in streaming mode.',
+    type: 'number',
+    default: 100,
+  })
   .usage(
     'Usage: variant-linker [options]\n\nExample: variant-linker --variant "rs123" --output JSON'
   )
@@ -454,12 +471,7 @@ try {
 // Merge CLI args over config file args
 const mergedParams = mergeParams(configParams, argv);
 
-try {
-  validateParams(mergedParams);
-} catch (error) {
-  handleError(error);
-  return; // Stop execution if validation fails
-}
+// Note: Validation is now done in runAnalysis after streaming mode detection
 
 // Enable debugging *after* validation and merging
 if (mergedParams.debug > 0) {
@@ -479,6 +491,136 @@ if (!process.env.ENSEMBL_BASE_URL) {
 }
 
 /**
+ * Processes a chunk of variants and outputs the formatted result.
+ * @param {Array<string>} chunk - Array of variant strings to process
+ * @param {boolean} isFirstChunk - Whether this is the first chunk (for header output)
+ * @param {Object} params - Processing parameters
+ * @returns {Promise<void>} Resolves when chunk processing is complete
+ */
+async function processAndOutputChunk(chunk, isFirstChunk, params) {
+  try {
+    debug(`Processing chunk of ${chunk.length} variants`);
+    const analysisParams = { ...params, variants: chunk, isStreaming: true };
+    const result = await analyzeVariant(analysisParams);
+
+    const formatted = filterAndFormatResults(result, null, params.output, params);
+
+    if (params.output.toUpperCase() === 'CSV' || params.output.toUpperCase() === 'TSV') {
+      // For tabular formats, write header once and data incrementally
+      if (isFirstChunk && formatted.header) {
+        process.stdout.write(formatted.header + '\n');
+      }
+      if (formatted.data) {
+        process.stdout.write(formatted.data + '\n');
+      }
+    } else {
+      // For JSON, just print the whole thing
+      process.stdout.write(formatted + '\n');
+    }
+  } catch (error) {
+    console.error(`Error processing chunk: ${error.message}`);
+    // Continue to the next chunk
+  }
+}
+
+/**
+ * Processes input from stdin in streaming mode.
+ * @param {Object} params - Processing parameters
+ * @returns {Promise<void>} Resolves when streaming is complete
+ */
+async function processStream(params) {
+  debug('Starting streaming mode processing');
+
+  // Parse optional parameters for streaming mode
+  const recoderOptions = parseOptionalParameters(params.recoder_params, {
+    vcf_string: '1',
+  });
+  const vepOptions = parseOptionalParameters(params.vep_params, {
+    CADD: '1',
+    hgvs: '1',
+    merged: '1',
+    mane: '1',
+  });
+
+  // Add the pick flag if the CLI option is used
+  if (params.pickOutput) {
+    vepOptions.pick = '1';
+    debug('Enabling VEP pick flag (--pick-output specified) for streaming mode.');
+  }
+
+  // Load user-provided features if any are specified
+  let features = null;
+  if (params.bedFile || params.geneList || params.jsonGenes) {
+    try {
+      debug('Loading user-provided features for overlap annotation in streaming mode');
+      features = await loadFeatures(params);
+      debug('Feature loading completed successfully for streaming mode');
+    } catch (error) {
+      debug(`Error loading features: ${error.message}`);
+      console.error(`Warning: Could not load features: ${error.message}`);
+      // Continue without features rather than failing completely
+      features = null;
+    }
+  }
+
+  // Prepare common parameters for all chunks
+  const commonParams = {
+    ...params,
+    recoderOptions,
+    vepOptions,
+    features,
+    isStreaming: true,
+  };
+
+  const rl = readline.createInterface({
+    input: process.stdin,
+    crlfDelay: Infinity,
+  });
+
+  let chunk = [];
+  const chunkSize = params.chunkSize || 100;
+  let isFirstChunk = true;
+
+  try {
+    for await (const line of rl) {
+      const trimmedLine = line.trim();
+      if (trimmedLine && !trimmedLine.startsWith('#')) {
+        chunk.push(trimmedLine);
+        if (chunk.length >= chunkSize) {
+          await processAndOutputChunk(chunk, isFirstChunk, commonParams);
+          isFirstChunk = false;
+          chunk = [];
+        }
+      }
+    }
+
+    // Process any remaining variants in the last chunk
+    if (chunk.length > 0) {
+      await processAndOutputChunk(chunk, isFirstChunk, commonParams);
+    } else if (
+      isFirstChunk &&
+      (params.output.toUpperCase() === 'CSV' || params.output.toUpperCase() === 'TSV')
+    ) {
+      // If no input was provided, still output the header for tabular formats
+      debug('No input received, outputting header only');
+      const { getDefaultColumnConfig } = require('./dataExtractor');
+      const { formatToTabular } = require('./dataExtractor');
+      const delimiter = params.output.toUpperCase() === 'CSV' ? ',' : '\t';
+      const columnConfig = getDefaultColumnConfig({
+        includeInheritance: false,
+        includeUserFeatures: false,
+      });
+      const header = formatToTabular([], columnConfig, delimiter, true);
+      process.stdout.write(header + '\n');
+    }
+  } finally {
+    rl.close();
+  }
+
+  debug('Streaming mode processing completed');
+}
+
+/**
  * Main async function for analysis.
  * @returns {Promise<void>} Resolves when processing is complete
  */
@@ -486,6 +628,52 @@ async function runAnalysis() {
   // Renamed to avoid conflict with module name
   try {
     debug('Starting variant analysis process');
+
+    // Detect streaming mode
+    // In spawned processes, process.stdin.isTTY might be undefined
+    // When stdin is piped, isTTY is typically undefined or false (not true)
+    const isStreaming =
+      !mergedParams.variant &&
+      !mergedParams.variants &&
+      !mergedParams.variantsFile &&
+      !mergedParams.vcfInput &&
+      !process.stdin.isTTY;
+    mergedParams.isStreaming = isStreaming; // Add to params for reuse in validation
+
+    // Debug logging for streaming detection
+    debug(
+      `Streaming mode detection: variant=${!!mergedParams.variant}, ` +
+        `variants=${!!mergedParams.variants}, variantsFile=${!!mergedParams.variantsFile}, ` +
+        `vcfInput=${!!mergedParams.vcfInput}, isTTY=${process.stdin.isTTY}, isStreaming=${isStreaming}`
+    );
+
+    // Re-validate with streaming context
+    validateParams(mergedParams);
+
+    if (isStreaming) {
+      debug('Streaming mode detected, processing stdin');
+      await processStream(mergedParams);
+      return;
+    } else {
+      debug('File-based mode detected, processing traditional inputs');
+      await processFileBased(mergedParams);
+    }
+  } catch (error) {
+    // Use handleError which includes console.error
+    handleError(error);
+    // <<< FIX: Explicitly exit on error to terminate the process for tests
+    throw error;
+  }
+}
+
+/**
+ * Processes file-based inputs (non-streaming mode).
+ * @param {Object} mergedParams - Merged CLI and config parameters
+ * @returns {Promise<void>} Resolves when processing is complete
+ */
+async function processFileBased(mergedParams) {
+  try {
+    debug('Processing file-based input');
 
     // Parse optional parameters *after* merging CLI and config
     const recoderOptions = parseOptionalParameters(mergedParams.recoder_params, {
@@ -725,16 +913,15 @@ async function runAnalysis() {
       }
     }
 
-    debug('Variant analysis process completed successfully');
+    debug('File-based variant analysis process completed successfully');
   } catch (error) {
-    // Use handleError which includes console.error and throws
-    handleError(error);
+    throw error; // Re-throw to be handled by runAnalysis
   }
 }
 
 // Execute the main analysis function
 runAnalysis().catch((err) => {
-  // handleError already prints details, just ensure process exits with error code
-  // if the enhanced error was thrown
-  process.exitCode = err.statusCode || 1;
+  handleError(err);
+  // eslint-disable-next-line no-process-exit
+  process.exit(1);
 });

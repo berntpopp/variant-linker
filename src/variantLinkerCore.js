@@ -889,7 +889,7 @@ async function analyzeVariant(params) {
 
   // Apply formatting based on output format
   const outputFormat = params.output ? params.output.toUpperCase() : 'JSON';
-  if (['CSV', 'TSV', 'VCF'].includes(outputFormat)) {
+  if (['CSV', 'TSV', 'VCF'].includes(outputFormat) && !params.isStreaming) {
     // *** DEBUG POINT 14: Data Passed to VCF Formatter ***
     if (outputFormat === 'VCF') {
       debugDetailed(`analyzeVariant: Passing data to filterAndFormatResults for VCF output.`);
@@ -897,7 +897,7 @@ async function analyzeVariant(params) {
       debugDetailed(` -> vcfRecordMap size: ${finalOutput.vcfRecordMap?.size}`);
       debugDetailed(` -> vcfHeaderLines count: ${finalOutput.vcfHeaderLines?.length}`);
     }
-    // For CSV/TSV/VCF, return the formatted string directly
+    // For CSV/TSV/VCF, return the formatted string directly (only in non-streaming mode)
     return filterAndFormatResults(finalOutput, filterParam, outputFormat, params);
   } else if (outputFormat === 'JSON' && (filterParam || params.pickOutput)) {
     // For JSON with filtering or pick output, parse the formatted JSON string back to an object

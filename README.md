@@ -40,6 +40,7 @@ variant-linker --variants-file variants.txt --scoring_config_path scoring/nephro
 - 👨‍👩‍👧‍👦 **Family Analysis** - Inheritance pattern detection from PED files
 - 🗂️ **VCF Support** - Full VCF input/output with header preservation
 - ⚡ **Batch Processing** - Efficient handling of large variant datasets
+- 🌊 **Streaming Support** - Memory-efficient stdin processing for pipeline integration
 - 🎯 **Custom Scoring** - Configurable variant prioritization models
 - 📋 **Multiple Formats** - JSON, CSV, TSV, and VCF output options
 - 🎨 **Custom Annotations** - Overlay variants with BED regions, gene lists, and JSON metadata

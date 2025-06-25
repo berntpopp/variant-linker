@@ -377,8 +377,16 @@ function filterAndFormatResults(results, filterParam, format, params = {}) {
 
       const flatRows = flattenAnnotationData(annotationToUse, columnConfig);
 
-      // Format the flattened data as CSV/TSV
-      formattedResults = formatToTabular(flatRows, columnConfig, delimiter, true);
+      // Check if this is called from streaming mode
+      if (params.isStreaming) {
+        // Return structured object for streaming
+        const header = formatToTabular([], columnConfig, delimiter, true); // Get only the header
+        const data = formatToTabular(flatRows, columnConfig, delimiter, false); // Get only the data rows
+        formattedResults = { header, data };
+      } else {
+        // Format the flattened data as CSV/TSV
+        formattedResults = formatToTabular(flatRows, columnConfig, delimiter, true);
+      }
 
       // Update meta message
       const inheritanceMsg = includeInheritanceCols ? ' with inheritance columns' : '';

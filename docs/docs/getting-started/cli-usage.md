@@ -31,6 +31,32 @@ variant-linker --variants <variant1,variant2,variant3> --output <output_format>
 variant-linker --vcf-input <vcf_file_path> --output <output_format>
 ```
 
+### Streaming from stdin
+
+For pipeline integration and large datasets, Variant-Linker supports streaming input from stdin:
+
+```bash
+# Basic streaming
+cat variants.txt | variant-linker --output TSV
+
+# Stream and filter high-impact variants
+cat variants.txt | variant-linker --output TSV | grep 'HIGH'
+
+# Use in complex pipelines
+bcftools query -f '%CHROM-%POS-%REF-%ALT\n' input.vcf | \
+  variant-linker --output CSV --chunk-size 50 > annotated.csv
+
+# Stream with custom API options
+echo "1-65568-A-C" | variant-linker --output TSV --vep_params "CADD=1,hgvs=1"
+```
+
+**Streaming Features:**
+- Automatic detection when no input files are specified and stdin is available
+- Memory-efficient chunked processing (default: 100 variants per API call)
+- Incremental output with header printed once
+- Compatible with TSV, CSV, and JSON output formats
+- Configurable chunk size via `--chunk-size` option
+
 ## Command-Line Options
 
 ### Input Options
@@ -85,6 +111,7 @@ variant-linker --vcf-input <vcf_file_path> --output <output_format>
 |--------|-------|-------------|
 | `--config` | `-c` | Path to JSON configuration file |
 | `--debug` | `-d` | Enable debug mode for detailed logging |
+| `--chunk-size` | `-cs` | Number of variants to process per API batch in streaming mode (default: 100) |
 
 ## Configuration File Usage
 
@@ -228,6 +255,40 @@ Variant-Linker automatically detects the appropriate genome assembly (GRCh37/GRC
 
 ### Retry and Rate Limiting
 The tool automatically handles API rate limits and temporary failures with exponential backoff retry logic.
+
+## Streaming Considerations
+
+When using streaming mode with stdin input, keep these considerations in mind:
+
+### Output Format Recommendations
+- **TSV/CSV**: Optimal for streaming pipelines due to incremental output and easy parsing
+- **JSON**: Works but outputs complete JSON objects, less ideal for line-by-line processing
+
+### Performance Tuning
+- **Chunk Size**: Adjust `--chunk-size` based on your use case:
+  - Smaller chunks (10-50): Better for real-time processing and faster initial output
+  - Larger chunks (100-200): Better throughput for batch processing
+  - Default 100 provides a good balance for most use cases
+
+### Limitations in Streaming Mode
+- File output options (`--save`, `--output-file`) are disabled in streaming mode
+- Use shell redirection instead: `cat input.txt | variant-linker --output TSV > output.tsv`
+- VCF output in streaming mode has limited header preservation capabilities
+
+### Pipeline Integration
+Streaming mode is designed for Unix-style pipeline integration:
+
+```bash
+# Extract variants from VCF and annotate
+bcftools query -f '%CHROM-%POS-%REF-%ALT\n' input.vcf | \
+  variant-linker --output TSV | \
+  awk '$6=="HIGH"' > high_impact.tsv
+
+# Process large datasets in memory-efficient manner
+gunzip -c huge_variants.txt.gz | \
+  variant-linker --output CSV --chunk-size 50 | \
+  grep "protein_coding" > coding_variants.csv
+```
 
 ## Next Steps
 
