@@ -6,6 +6,7 @@ const chai = require('chai');
 const expect = chai.expect;
 const nock = require('nock');
 const apiConfig = require('../config/apiConfig.json');
+const fs = require('fs');
 
 /**
  * Standard mock responses for common API endpoints
@@ -203,12 +204,302 @@ function getApiBaseUrl() {
   return process.env.ENSEMBL_BASE_URL || apiConfig.ensembl.baseUrl;
 }
 
+/**
+ * Finds VEP baseline data for a given input variant by trying multiple matching strategies
+ * @param {string} inputVariant - Variant in CHR-POS-REF-ALT format
+ * @param {Map} parsedVepData - Parsed VEP data map
+ * @returns {Array|null} VEP consequences or null if not found
+ */
+function findVepDataForVariant(inputVariant, parsedVepData) {
+  const [chrom, pos, ref, alt] = inputVariant.split('-');
+  const position = parseInt(pos);
+
+  // Strategy 1: Direct match (for SNVs and simple cases)
+  if (parsedVepData.has(inputVariant)) {
+    return parsedVepData.get(inputVariant);
+  }
+
+  // Strategy 2: Look for any VEP key that matches this genomic region and variant type
+  for (const [vepKey, consequences] of parsedVepData.entries()) {
+    const [vepChrom, vepPos] = vepKey.split('-');
+
+    // Must be same chromosome
+    if (vepChrom !== chrom) continue;
+
+    const vepPosition = parseInt(vepPos);
+
+    // Check if this VEP entry could represent our input variant
+    if (Math.abs(vepPosition - position) <= Math.max(ref.length, alt.length)) {
+      // Check if the variant type and change make sense
+      const firstConsequence = consequences[0];
+      if (firstConsequence) {
+        // For deletions: input GT->G should match VEP showing T deletion
+        if (ref.length > alt.length) {
+          const deleted = ref.substring(alt.length);
+          // VEP often represents deletions at the actual deleted position
+          // Input: 12-110628749-GT-G means delete T at pos 110628750
+          // VEP:   12:110628749-110628750 with T/- means delete T at that span
+          if (firstConsequence.Allele === '-' || firstConsequence.Allele === '') {
+            // Check if the deleted bases match
+            if (
+              firstConsequence.REF_ALLELE === deleted ||
+              firstConsequence.REF_ALLELE.includes(deleted) ||
+              deleted.includes(firstConsequence.REF_ALLELE)
+            ) {
+              return consequences;
+            }
+            // Also check position offset for VCF vs VEP coordinate differences
+            if (
+              Math.abs(vepPosition - (position + alt.length)) <= 1 &&
+              firstConsequence.REF_ALLELE === deleted
+            ) {
+              return consequences;
+            }
+          }
+        }
+        // For insertions: input G->GT should match VEP showing T insertion
+        else if (alt.length > ref.length) {
+          const inserted = alt.substring(ref.length);
+          if (firstConsequence.Allele === inserted || firstConsequence.Allele.includes(inserted)) {
+            return consequences;
+          }
+        }
+        // For SNVs: should match exactly
+        else if (ref.length === alt.length) {
+          if (firstConsequence.REF_ALLELE === ref && firstConsequence.Allele === alt) {
+            return consequences;
+          }
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Parses the VEP web tool's tab-separated output file.
+ * @param {string} filePath - The path to the VEP TSV output file.
+ * @returns {Map<string, Array<Object>>} A map where keys are the 'Uploaded_variation'
+ *   and values are arrays of consequence objects.
+ */
+function parseVepWebOutput(filePath) {
+  const content = fs.readFileSync(filePath, 'utf8');
+  const lines = content
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith('##'));
+
+  if (lines.length < 2) {
+    return new Map();
+  }
+
+  const header = lines[0].split('\t');
+  const data = lines.slice(1);
+  const parsed = new Map();
+
+  data.forEach((line) => {
+    const values = line.split('\t');
+    const consequence = {};
+
+    header.forEach((key, index) => {
+      const value = values[index] || '';
+      // Convert numeric values
+      if (value && !isNaN(value) && value !== '-') {
+        consequence[key] = parseFloat(value);
+      } else {
+        consequence[key] = value === '-' ? '' : value;
+      }
+    });
+
+    // Use location to map variants since Uploaded_variation might be '.'
+    const location = consequence.Location;
+
+    let variantKey = consequence.Uploaded_variation;
+
+    // If Uploaded_variation is '.', construct key from location and alleles
+    if (!variantKey || variantKey === '.') {
+      if (location) {
+        // Parse location format like "6:52025536-52025536" or "12:110628749-110628750"
+        const locationMatch = location.match(/^(\w+):(\d+)-(\d+)$/);
+        if (locationMatch) {
+          const [, chrom, startPos, endPos] = locationMatch;
+          const start = parseInt(startPos);
+          const end = parseInt(endPos);
+
+          // Get allele information
+          const refAllele = consequence.REF_ALLELE || '';
+          const altAllele = consequence.Allele || '';
+          const uploadedAllele = consequence.UPLOADED_ALLELE || '';
+
+          // Handle different variant types based on VEP's representation
+          if (altAllele === '-' && uploadedAllele.includes('/')) {
+            // This is a deletion - try to reconstruct from UPLOADED_ALLELE
+            const [origRef, origAlt] = uploadedAllele.split('/');
+            if (origAlt === '-') {
+              // Pure deletion: REF_ALLELE is what's deleted, need to find context
+              // For deletions like GT->G, VEP shows T/- at the deleted position
+              // We need to reconstruct the original REF and ALT
+
+              // Common pattern: if this is a single-base deletion within a larger context
+              // Try to match against known patterns
+              if (end - start === 0) {
+                // Single position deletion - might be GT->G represented as T->''
+                variantKey = `${chrom}-${start}-${origRef}${refAllele}-${origRef}`;
+              } else {
+                // Multi-position deletion
+                variantKey = `${chrom}-${start}-${origRef}-${origAlt === '-' ? '' : origAlt}`;
+              }
+            }
+          } else if (uploadedAllele && uploadedAllele.includes('/')) {
+            // Handle normal SNVs and complex variants with UPLOADED_ALLELE
+            const [ref, alt] = uploadedAllele.split('/');
+            variantKey = `${chrom}-${start}-${ref}-${alt}`;
+          } else {
+            // Fallback to basic format
+            variantKey = `${chrom}-${start}-${refAllele}-${altAllele}`;
+          }
+        }
+      }
+    }
+
+    if (variantKey && variantKey !== '.') {
+      if (!parsed.has(variantKey)) {
+        parsed.set(variantKey, []);
+      }
+      parsed.get(variantKey).push(consequence);
+    }
+  });
+
+  return parsed;
+}
+
+/**
+ * Transforms parsed VEP web output into the JSON format expected by VEP REST API.
+ * This creates a mock VEP REST API response from baseline TSV data.
+ * @param {Array<Object>} consequences - Array of consequence objects from parseVepWebOutput
+ * @param {string} variantKey - The variant key (chromosome-position-ref-alt format)
+ * @returns {Array<Object>} VEP REST API compatible response
+ */
+function transformBaselineToVepJson(consequences, variantKey) {
+  if (!consequences || consequences.length === 0) {
+    return [];
+  }
+
+  // Extract variant info from the key
+  const [chrom, pos, ref, alt] = variantKey.split('-');
+
+  // Group consequences by location to create annotation objects
+  const annotationMap = new Map();
+
+  consequences.forEach((consequence) => {
+    const location = consequence.Location || `${chrom}:${pos}-${pos}`;
+
+    if (!annotationMap.has(location)) {
+      // Create base annotation object
+      annotationMap.set(location, {
+        input: `${chrom} ${pos} . ${ref} ${alt} . . .`,
+        id: `${chrom}_${pos}_${ref}_${alt}`,
+        seq_region_name: chrom,
+        start: parseInt(pos),
+        end: parseInt(pos),
+        strand: 1,
+        allele_string: `${ref}/${alt}`,
+        most_severe_consequence: consequence.Consequence,
+        transcript_consequences: [],
+        // Add top-level fields
+        existing_variation: consequence.Existing_variation ? [consequence.Existing_variation] : [],
+        cadd_phred: consequence.CADD_PHRED || undefined,
+        cadd_raw: consequence.CADD_RAW || undefined,
+        clin_sig: consequence.CLIN_SIG ? consequence.CLIN_SIG.split(',') : undefined,
+        // Add frequency data at top level
+        gnomad_genome_af: consequence.gnomADg_AF || undefined,
+        gnomad_exome_af: consequence.gnomADe_AF || undefined,
+      });
+    }
+
+    const annotation = annotationMap.get(location);
+
+    // Create transcript consequence object
+    if (consequence.Feature && consequence.Feature_type === 'Transcript') {
+      const transcriptConsequence = {
+        transcript_id: consequence.Feature,
+        gene_id: consequence.Gene,
+        gene_symbol: consequence.SYMBOL,
+        consequence_terms: consequence.Consequence ? consequence.Consequence.split('&') : [],
+        impact: consequence.IMPACT,
+        feature_type: consequence.Feature_type,
+        biotype: consequence.BIOTYPE,
+        hgvsc: consequence.HGVSc || undefined,
+        hgvsp: consequence.HGVSp || undefined,
+        protein_start: consequence.Protein_position
+          ? typeof consequence.Protein_position === 'string'
+            ? parseInt(consequence.Protein_position.split('-')[0])
+            : consequence.Protein_position
+          : undefined,
+        protein_end: consequence.Protein_position
+          ? typeof consequence.Protein_position === 'string'
+            ? parseInt(
+                consequence.Protein_position.split('-')[1] ||
+                  consequence.Protein_position.split('-')[0]
+              )
+            : consequence.Protein_position
+          : undefined,
+        amino_acids: consequence.Amino_acids || undefined,
+        codons: consequence.Codons || undefined,
+        strand: parseInt(consequence.STRAND) || 1,
+        // Add prediction scores at transcript level
+        sift_prediction: consequence.SIFT_pred || undefined,
+        sift_score: consequence.SIFT_score || undefined,
+        polyphen_prediction: consequence.PolyPhen_pred || undefined,
+        polyphen_score: consequence.PolyPhen_score || undefined,
+        // Add frequency data at transcript level
+        gnomad_genome_af: consequence.gnomADg_AF || undefined,
+        gnomad_exome_af: consequence.gnomADe_AF || undefined,
+        cadd_phred: consequence.CADD_PHRED || undefined,
+        cadd_raw: consequence.CADD_RAW || undefined,
+        // Add additional frequency breakdowns
+        gnomad_genome_afr_af: consequence.gnomADg_AFR_AF || undefined,
+        gnomad_genome_amr_af: consequence.gnomADg_AMR_AF || undefined,
+        gnomad_genome_asj_af: consequence.gnomADg_ASJ_AF || undefined,
+        gnomad_genome_eas_af: consequence.gnomADg_EAS_AF || undefined,
+        gnomad_genome_fin_af: consequence.gnomADg_FIN_AF || undefined,
+        gnomad_genome_nfe_af: consequence.gnomADg_NFE_AF || undefined,
+        gnomad_genome_oth_af: consequence.gnomADg_OTH_AF || undefined,
+        gnomad_genome_sas_af: consequence.gnomADg_SAS_AF || undefined,
+        gnomad_exome_afr_af: consequence.gnomADe_AFR_AF || undefined,
+        gnomad_exome_amr_af: consequence.gnomADe_AMR_AF || undefined,
+        gnomad_exome_asj_af: consequence.gnomADe_ASJ_AF || undefined,
+        gnomad_exome_eas_af: consequence.gnomADe_EAS_AF || undefined,
+        gnomad_exome_fin_af: consequence.gnomADe_FIN_AF || undefined,
+        gnomad_exome_nfe_af: consequence.gnomADe_NFE_AF || undefined,
+        gnomad_exome_oth_af: consequence.gnomADe_OTH_AF || undefined,
+        gnomad_exome_sas_af: consequence.gnomADe_SAS_AF || undefined,
+      };
+
+      // Remove undefined values to match real API response
+      Object.keys(transcriptConsequence).forEach((key) => {
+        if (transcriptConsequence[key] === undefined) {
+          delete transcriptConsequence[key];
+        }
+      });
+
+      annotation.transcript_consequences.push(transcriptConsequence);
+    }
+  });
+
+  return Array.from(annotationMap.values());
+}
+
 module.exports = {
   expect,
   mockResponses,
   setupMock,
   createVepAnnotation,
   getApiBaseUrl,
+  parseVepWebOutput,
+  transformBaselineToVepJson,
+  findVepDataForVariant,
   // Export variant format constants for direct use in tests
   vcfVariant,
   hgvsVariant,
