@@ -8,6 +8,7 @@
   },
   "scripts": {
     "test": "mocha --recursive",
+    "test:ci": "mocha --config .mocharc.ci.json --recursive",
     "start": "node ./src/main.js",
     "build": "webpack --mode production",
     "serve": "webpack serve --mode development --open",

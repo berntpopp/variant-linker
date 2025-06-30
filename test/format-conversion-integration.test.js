@@ -12,11 +12,9 @@ const { analyzeVariant } = require('../src/variantLinkerCore');
 
 // Test suite for format conversion functionality
 describe('Format Conversion Integration Tests', function () {
-  // Set timeout for all tests in this suite via beforeEach hook
-  beforeEach(function () {
-    // eslint-disable-next-line no-invalid-this
-    this.timeout(30000);
-  });
+  // Set a longer timeout for CI environments or slow API responses
+  // eslint-disable-next-line no-invalid-this
+  this.timeout(process.env.CI ? 120000 : 60000);
 
   // Helper function to write output to temp file and read it back
   function writeAndReadOutput(output, format) {

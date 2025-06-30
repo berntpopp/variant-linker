@@ -10,8 +10,10 @@ const { expect } = require('chai');
 const { analyzeVariant } = require('../src/variantLinkerCore');
 
 // Set timeout for all tests in this suite - defined in mocharc.json
-describe('Fixture-based output format integration tests', () => {
-  // Mocha timeout is configured in .mocharc.json
+describe('Fixture-based output format integration tests', function () {
+  // Set a longer timeout for CI environments or slow API responses
+  // eslint-disable-next-line no-invalid-this
+  this.timeout(process.env.CI ? 120000 : 60000);
 
   // Helper function to retry API calls that might fail temporarily
   async function retryApiCall(apiCall, maxRetries = 2, retryDelay = 2000) {

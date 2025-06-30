@@ -36,6 +36,7 @@ benchmark_*.log*
 !examples/*.txt
 !examples/benchmark_data/*.txt
 !sample_variants.txt
+!test/fixtures/consistency/*.txt
 
 # npm package files
 *.tgz
