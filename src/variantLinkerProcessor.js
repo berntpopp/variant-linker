@@ -17,6 +17,7 @@ const {
   flattenAnnotationData,
   formatToTabular,
   getDefaultColumnConfig,
+  detectScoringFields,
 } = require('./dataExtractor');
 const { hasUserFeatureOverlaps } = require('./featureAnnotator');
 const { getValueByPath } = require('./utils/pathUtils');
@@ -404,10 +405,18 @@ function filterAndFormatResults(results, filterParam, format, params = {}) {
       const includeCnvCols = hasCnvAnnotations(annotationToUse);
       debug(`Include CNV columns in ${format.toUpperCase()}: ${includeCnvCols}`);
 
+      // *** FIX: Detect and include scoring columns ***
+      // Check for any scoring fields added to the annotation data
+      const scoringFields = detectScoringFields(annotationToUse);
+      debug(
+        `Detected scoring fields in ${format.toUpperCase()}: ${scoringFields.join(', ') || 'none'}`
+      );
+
       const columnConfig = getDefaultColumnConfig({
         includeInheritance: includeInheritanceCols,
         includeUserFeatures: includeUserFeatureCols,
         includeCnv: includeCnvCols,
+        scoringFields: scoringFields,
       });
 
       const flatRows = flattenAnnotationData(annotationToUse, columnConfig);

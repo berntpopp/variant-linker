@@ -198,10 +198,23 @@ function extractVariables(obj, variablesConfig, context) {
     }
 
     let rawValue = getValueByPath(obj, path, context);
+
+    // Wrap scalar values in array if using an aggregator to avoid substitution with default value
+    if (config.aggregator && rawValue !== undefined && !Array.isArray(rawValue)) {
+      rawValue = [rawValue];
+      debugDetailed(`Wrapped scalar value in array for aggregation: ${JSON.stringify(rawValue)}`);
+    }
+
     debugDetailed(
       `Raw value for mapping "${mapping}" (target: ${config.target})` +
         ` from path "${path}": ${JSON.stringify(rawValue)}`
     );
+
+    // Normalize [] to undefined
+    if (Array.isArray(rawValue) && rawValue.length === 0) {
+      rawValue = undefined;
+      debugDetailed(`Normalized raw value = [] to undefined`);
+    }
 
     if (Array.isArray(rawValue) && rawValue.some((item) => Array.isArray(item))) {
       rawValue = rawValue.flat(Infinity);

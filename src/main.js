@@ -861,7 +861,7 @@ async function processFileBased(mergedParams) {
       vcfHeaderLines: vcfHeaderLines, // Pass the array or undefined
       samples: vcfData ? vcfData.samples : undefined, // Pass sample list from VCF
       // Scoring
-      scoringConfigPath: mergedParams.scoringConfigPath,
+      scoringConfigPath: mergedParams.scoring_config_path,
       // User-provided features for overlap annotation
       features: features,
       // Note: Removed redundant vepParams/recoderParams and skipRecoder

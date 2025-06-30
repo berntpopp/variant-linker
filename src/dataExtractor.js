@@ -11,6 +11,78 @@ const debug = require('debug')('variant-linker:data-extractor');
 const { formatUserFeatureOverlaps } = require('./featureAnnotator');
 
 /**
+ * Detects scoring fields present in annotation data.
+ * Scoring fields are those that don't exist in the standard VEP output
+ * and are typically added by the scoring module.
+ *
+ * @param {Array<Object>} annotationData - Array of annotation objects
+ * @returns {Array<string>} Array of scoring field names found
+ */
+function detectScoringFields(annotationData) {
+  if (!Array.isArray(annotationData) || annotationData.length === 0) {
+    return [];
+  }
+
+  // Standard VEP fields that should be excluded
+  const standardFields = new Set([
+    'input',
+    'originalInput',
+    'inputFormat',
+    'variantKey',
+    'seq_region_name',
+    'start',
+    'end',
+    'strand',
+    'allele_string',
+    'most_severe_consequence',
+    'transcript_consequences',
+    'colocated_variants',
+    'regulatory_feature_consequences',
+    'motif_feature_consequences',
+    'intergenic_consequences',
+    'id',
+    'assembly_name',
+    'ancestral',
+    'minor_allele',
+    'minor_allele_freq',
+    'pubmed',
+    'failed',
+    'somatic',
+    'frequencies',
+    'existing_variation',
+    'error',
+    'warning',
+    'deducedInheritancePattern',
+    'recoderData',
+    'allele',
+    'vcfString',
+    'phenotypes',
+    'dosage_sensitivity',
+    'userFeatureOverlaps',
+    'user_feature_overlap',
+  ]);
+
+  const scoringFields = new Set();
+
+  // Check first few annotations for scoring fields
+  const samplesToCheck = Math.min(3, annotationData.length);
+  for (let i = 0; i < samplesToCheck; i++) {
+    const annotation = annotationData[i];
+    if (annotation && typeof annotation === 'object') {
+      Object.keys(annotation).forEach((key) => {
+        if (!standardFields.has(key) && !key.startsWith('_')) {
+          // Check if it looks like a scoring field (typically ends with _score or contains score)
+          // or is a field added by scoring formulas
+          scoringFields.add(key);
+        }
+      });
+    }
+  }
+
+  return Array.from(scoringFields).sort();
+}
+
+/**
  * Default column configuration for CSV/TSV output.
  * Each entry defines a column with:
  * - header: The column header name
@@ -23,10 +95,18 @@ const { formatUserFeatureOverlaps } = require('./featureAnnotator');
  * Gets the default column configuration for data extraction.
  * @param {Object} options - Optional settings for column generation
  * @param {boolean} options.includeInheritance - Whether to include inheritance pattern columns
+ * @param {boolean} options.includeUserFeatures - Whether to include user feature overlap columns
+ * @param {boolean} options.includeCnv - Whether to include CNV-specific columns
+ * @param {Array<string>} options.scoringFields - List of scoring field names to include
  * @returns {Array} Array of column configuration objects
  */
 function getDefaultColumnConfig(options = {}) {
-  const { includeInheritance = false, includeUserFeatures = false, includeCnv = false } = options;
+  const {
+    includeInheritance = false,
+    includeUserFeatures = false,
+    includeCnv = false,
+    scoringFields = [],
+  } = options;
 
   // Start with core columns that are always included
   const defaultColumns = [
@@ -279,6 +359,21 @@ function getDefaultColumnConfig(options = {}) {
         },
       }
     );
+  }
+
+  // Add scoring columns if provided
+  if (scoringFields && scoringFields.length > 0) {
+    scoringFields.forEach((fieldName) => {
+      defaultColumns.push({
+        header: fieldName
+          .split('_')
+          .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(''),
+        path: fieldName,
+        isConsequenceLevel: false, // Scoring fields are typically annotation-level
+        defaultValue: '',
+      });
+    });
   }
 
   return defaultColumns;
@@ -702,4 +797,5 @@ module.exports = {
   formatToTabular,
   formatVcfCsqString, // Export the function
   getDefaultColumnConfig, // Export the function
+  detectScoringFields, // Export the new function
 };

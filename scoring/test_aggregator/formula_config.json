@@ -1,0 +1,12 @@
+{
+  "@context": "https://schema.org/",
+  "@type": "Configuration",
+  "formulas": {
+    "annotationLevel": [
+      {
+        "test_score": "gnomade_variant === 0.2267 ? 0.000 : 0.75",
+        "actual_gnomade_value": "gnomade_variant"
+      }
+    ]
+  }
+}
