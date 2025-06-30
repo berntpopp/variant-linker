@@ -43,7 +43,7 @@ jobs:
           # Clean install for docs
           rm -rf node_modules package-lock.json
           npm cache clean --force
-          npm install --legacy-peer-deps
+          npm install
 
       - name: Build documentation site
         run: |
@@ -54,7 +54,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: docs-build
-          path: docs/build
+          path: docs/.vitepress/dist
 
       - name: Setup GitHub Pages
         if: github.ref == 'refs/heads/main'
@@ -64,7 +64,7 @@ jobs:
         if: github.ref == 'refs/heads/main'
         uses: actions/upload-pages-artifact@v3
         with:
-          path: './docs/build'
+          path: './docs/.vitepress/dist'
 
   # Deploy job (only on main branch)
   deploy:

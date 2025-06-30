@@ -1,6 +1,0 @@
-<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
-  <rect width="200" height="200" fill="#f8f9fa"/>
-  <rect x="90" y="120" width="20" height="60" fill="#8b4513"/>
-  <circle cx="100" cy="80" r="40" fill="#228b22"/>
-  <text x="100" y="190" text-anchor="middle" font-family="Arial" font-size="12" fill="#333">Powered by Ensembl</text>
-</svg>

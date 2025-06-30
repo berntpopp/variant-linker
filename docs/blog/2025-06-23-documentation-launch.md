@@ -1,13 +1,16 @@
 ---
-slug: documentation-launch
 title: Introducing the New Variant-Linker Documentation
-authors: [berntpopp]
-tags: [documentation, launch, docusaurus]
+date: 2025-06-23
+author: Bernt Popp
+tags:
+  - documentation
+  - launch
+  - vitepress
 ---
 
-We're excited to announce the launch of the new Variant-Linker documentation website! Built with Docusaurus, our new docs provide comprehensive guides, API references, and examples to help you get the most out of Variant-Linker.
+We're excited to announce the launch of the new Variant-Linker documentation website! Built with VitePress, our new docs provide comprehensive guides, API references, and examples to help you get the most out of Variant-Linker.
 
-<!-- truncate -->
+<!-- more -->
 
 ## What's New
 
@@ -35,16 +38,16 @@ The documentation is automatically built and deployed on every push to the main 
 
 Visit the new documentation at [https://berntpopp.github.io/variant-linker/](https://berntpopp.github.io/variant-linker/) and explore:
 
-1. **[Installation Guide](/docs/getting-started/installation)** - Get up and running quickly
-2. **[CLI Usage](/docs/getting-started/cli-usage)** - Master the command-line interface
-3. **[Family Analysis](/docs/guides/inheritance-analysis)** - Learn about inheritance pattern detection
-4. **[Custom Scoring](/docs/guides/scoring-engine)** - Configure variant prioritization models
+1. **[Installation Guide](/getting-started/installation)** - Get up and running quickly
+2. **[CLI Usage](/getting-started/cli-usage)** - Master the command-line interface
+3. **[Family Analysis](/guides/inheritance-analysis)** - Learn about inheritance pattern detection
+4. **[Custom Scoring](/guides/scoring-engine)** - Configure variant prioritization models
 
 ## Contributing to Documentation
 
 The documentation is open source and lives alongside the code. We welcome contributions! Whether it's fixing typos, adding examples, or improving explanations, every contribution helps make Variant-Linker more accessible to researchers worldwide.
 
-Check out our [Contributing Guide](/docs/contributing) to get started.
+Check out our [Contributing Guide](/contributing) to get started.
 
 ## What's Next
 
