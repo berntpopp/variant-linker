@@ -221,7 +221,11 @@ describe('Fixture-based output format integration tests', function () {
   });
 
   // Tests for batch processing with filtering
-  describe('Multiple variants with filtering', () => {
+  describe('Multiple variants with filtering', function () {
+    // Increase timeout for batch processing tests
+    // eslint-disable-next-line no-invalid-this
+    this.timeout(180000); // 3 minutes for batch processing
+    
     // Test runs longer due to batch processing
     it('should generate matching CSV output with filtering', async () => {
       const result = await retryApiCall(() =>
