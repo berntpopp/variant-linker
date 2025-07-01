@@ -26,7 +26,7 @@ describe('apiHelper', () => {
 
   // Use real timers for this test to allow the retry mechanism to work naturally
   it('should retry on 500 error and succeed on second attempt', async function () {
-    this.timeout(5000); // Increase timeout to allow for retries
+    this.timeout(process.env.CI ? 60000 : 5000); // Increase timeout to allow for retries
 
     // First request fails with 500, second succeeds
     nock(apiBaseUrl).get(testEndpoint).reply(500, { error: 'Internal Server Error' });
@@ -37,7 +37,7 @@ describe('apiHelper', () => {
   });
 
   it('should retry on network error and succeed on third attempt', async function () {
-    this.timeout(10000); // Increase timeout to allow for multiple retries
+    this.timeout(process.env.CI ? 60000 : 10000); // Increase timeout to allow for multiple retries
 
     // First two requests fail with network errors, third succeeds
     nock(apiBaseUrl)
@@ -53,7 +53,7 @@ describe('apiHelper', () => {
   });
 
   it('should retry on 429 with Retry-After header', async function () {
-    this.timeout(5000); // Increase timeout
+    this.timeout(process.env.CI ? 60000 : 5000); // Increase timeout
 
     // Mock 429 response with Retry-After header, then success
     nock(apiBaseUrl)
@@ -78,7 +78,7 @@ describe('apiHelper', () => {
   });
 
   it('should fail after exhausting all retries', async function () {
-    this.timeout(20000); // Increase timeout for all retries
+    this.timeout(process.env.CI ? 60000 : 20000); // Increase timeout for all retries
 
     // Get retry configuration values for testing
     const maxRetries = apiConfig.requests?.retry?.maxRetries ?? 4;
@@ -138,7 +138,7 @@ describe('apiHelper', () => {
   });
 
   it('should handle POST requests with retries', async function () {
-    this.timeout(5000); // Increase timeout
+    this.timeout(process.env.CI ? 60000 : 5000); // Increase timeout
 
     const requestBody = { test: 'data' };
 

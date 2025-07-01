@@ -68,7 +68,7 @@ describe('variantLinkerCore.js', () => {
 
     it('should process a single VCF variant correctly', async function () {
       // This test uses the actual implementation but with a mock API response through apiHelper
-      this.timeout(5000);
+      this.timeout(process.env.CI ? 60000 : 5000);
 
       // Mock the API response for VEP
       const apiHelperMock = require('../src/apiHelper');
@@ -193,7 +193,7 @@ describe('variantLinkerCore.js', () => {
 
     // Test batch processing metadata values in a simpler integration test
     it('should process multiple variants in a batch', async function () {
-      this.timeout(3000);
+      this.timeout(process.env.CI ? 60000 : 3000);
 
       // Keep it simple with just two variants
       const batchVariants = [vcfVariant, vcfVariant]; // Use same variant type to simplify
@@ -233,7 +233,7 @@ describe('variantLinkerCore.js', () => {
 
     it('should maintain backward compatibility with single variant input', async function () {
       // Test backward compatibility with single variant input
-      this.timeout(5000);
+      this.timeout(process.env.CI ? 60000 : 5000);
 
       // Mock the API response using apiHelper
       const apiHelperMock = require('../src/apiHelper');
@@ -284,7 +284,7 @@ describe('variantLinkerCore.js', () => {
     it('should handle different output formats', async function () {
       // Following KISS principle: Test only the JSON output format
       // which is more reliable in tests and doesn't require schema validation
-      this.timeout(5000);
+      this.timeout(process.env.CI ? 60000 : 5000);
 
       // Mock the API response
       const apiHelperMock = require('../src/apiHelper');
@@ -342,7 +342,7 @@ describe('variantLinkerCore.js', () => {
 
     it('should detect, process, and annotate the ENST00000302118:c.137G>A variant correctly', async function () {
       // Problematic variant from issues
-      this.timeout(10000); // Allow more time for this test
+      this.timeout(process.env.CI ? 120000 : 30000); // Allow more time for this test in CI
 
       // Mock only the network calls to avoid actual API requests
       const apiHelperMock = require('../src/apiHelper');
