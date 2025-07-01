@@ -13,7 +13,7 @@ const { analyzeVariant } = require('../src/variantLinkerCore');
 describe('Fixture-based output format integration tests', function () {
   // Set a longer timeout for CI environments or slow API responses
   // eslint-disable-next-line no-invalid-this
-  this.timeout(process.env.CI ? 120000 : 60000);
+  this.timeout(process.env.CI ? 240000 : 60000);
 
   // Helper function to retry API calls that might fail temporarily
   async function retryApiCall(apiCall, maxRetries = 2, retryDelay = 2000) {
@@ -222,10 +222,6 @@ describe('Fixture-based output format integration tests', function () {
 
   // Tests for batch processing with filtering
   describe('Multiple variants with filtering', function () {
-    // Increase timeout for batch processing tests
-    // eslint-disable-next-line no-invalid-this
-    this.timeout(180000); // 3 minutes for batch processing
-    
     // Test runs longer due to batch processing
     it('should generate matching CSV output with filtering', async () => {
       const result = await retryApiCall(() =>
