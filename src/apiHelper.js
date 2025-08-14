@@ -44,6 +44,48 @@ function formatRequestBodyForLog(body) {
 }
 
 /**
+ * Parses a proxy URL into axios-compatible configuration.
+ * @param {string} proxyUrl - Proxy URL (e.g., http://user:pass@proxy:8080)
+ * @param {string} [proxyAuth] - Optional separate authentication (user:pass)
+ * @returns {Object|boolean} Proxy configuration object or false to disable proxy
+ */
+function parseProxyConfig(proxyUrl, proxyAuth = null) {
+  if (!proxyUrl) {
+    return false; // No proxy configuration
+  }
+
+  try {
+    const url = new URL(proxyUrl);
+    const config = {
+      protocol: url.protocol.slice(0, -1), // Remove trailing ':'
+      host: url.hostname,
+      port: parseInt(url.port) || (url.protocol === 'https:' ? 443 : 80),
+    };
+
+    // Handle authentication from URL
+    if (url.username && url.password) {
+      config.auth = {
+        username: decodeURIComponent(url.username),
+        password: decodeURIComponent(url.password),
+      };
+    } else if (proxyAuth) {
+      // Handle separate authentication parameter
+      const [username, password] = proxyAuth.split(':', 2);
+      if (username && password) {
+        config.auth = { username, password };
+      }
+    }
+
+    debugDetailed(`Proxy configuration: ${config.protocol}://${config.host}:${config.port}`);
+    return config;
+  } catch (error) {
+    throw new Error(
+      `Invalid proxy URL format: ${proxyUrl}. Expected format: http://[user:pass@]host:port`
+    );
+  }
+}
+
+/**
  * Fetch data from an API endpoint using axios with optional caching.
  * Implements exponential backoff retry for transient errors (5xx status codes, network errors).
  *
@@ -52,6 +94,7 @@ function formatRequestBodyForLog(body) {
  * @param {boolean} [cacheEnabled=false] - If true, cache the response.
  * @param {string} [method='GET'] - HTTP method: 'GET' or 'POST'.
  * @param {Object|null} [requestBody=null] - For POST requests, the JSON body.
+ * @param {Object} [proxyConfig=null] - Proxy configuration object.
  * @returns {Promise<Object>} The API response data.
  * @throws {Error} If the request fails after all retry attempts or for non-retryable errors.
  */
@@ -60,7 +103,8 @@ async function fetchApi(
   queryOptions = {},
   cacheEnabled = false,
   method = 'GET',
-  requestBody = null
+  requestBody = null,
+  proxyConfig = null
 ) {
   try {
     // Remove any content-type header from queryOptions.
@@ -145,10 +189,16 @@ async function fetchApi(
 
       try {
         let response;
+        // Build axios config with headers and optional proxy
+        const axiosConfig = { headers: requestHeaders };
+        if (proxyConfig) {
+          axiosConfig.proxy = proxyConfig;
+        }
+
         if (method.toUpperCase() === 'POST') {
-          response = await axios.post(url, requestBody, { headers: requestHeaders });
+          response = await axios.post(url, requestBody, axiosConfig);
         } else {
-          response = await axios.get(url, { headers: requestHeaders });
+          response = await axios.get(url, axiosConfig);
         }
 
         // If we get here, the request succeeded
@@ -223,4 +273,4 @@ async function fetchApi(
   }
 }
 
-module.exports = { fetchApi };
+module.exports = { fetchApi, parseProxyConfig };

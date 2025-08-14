@@ -152,4 +152,58 @@ describe('apiHelper', () => {
 
     expect(result).to.deep.equal(mockResponse);
   });
+
+  describe('parseProxyConfig', () => {
+    it('should parse basic proxy URL', () => {
+      const proxyConfig = apiHelper.parseProxyConfig('http://proxy.company.com:8080');
+      expect(proxyConfig).to.deep.equal({
+        protocol: 'http',
+        host: 'proxy.company.com',
+        port: 8080,
+      });
+    });
+
+    it('should parse proxy URL with authentication', () => {
+      const proxyConfig = apiHelper.parseProxyConfig('http://user:pass@proxy.company.com:8080');
+      expect(proxyConfig).to.deep.equal({
+        protocol: 'http',
+        host: 'proxy.company.com',
+        port: 8080,
+        auth: {
+          username: 'user',
+          password: 'pass',
+        },
+      });
+    });
+
+    it('should parse proxy URL with separate authentication', () => {
+      const proxyConfig = apiHelper.parseProxyConfig('http://proxy.company.com:8080', 'user:pass');
+      expect(proxyConfig).to.deep.equal({
+        protocol: 'http',
+        host: 'proxy.company.com',
+        port: 8080,
+        auth: {
+          username: 'user',
+          password: 'pass',
+        },
+      });
+    });
+
+    it('should use default ports for protocols', () => {
+      const httpConfig = apiHelper.parseProxyConfig('http://proxy.company.com');
+      expect(httpConfig.port).to.equal(80);
+
+      const httpsConfig = apiHelper.parseProxyConfig('https://proxy.company.com');
+      expect(httpsConfig.port).to.equal(443);
+    });
+
+    it('should return false for empty proxy URL', () => {
+      const proxyConfig = apiHelper.parseProxyConfig('');
+      expect(proxyConfig).to.be.false;
+    });
+
+    it('should throw error for invalid proxy URL', () => {
+      expect(() => apiHelper.parseProxyConfig('not-a-url')).to.throw('Invalid proxy URL format');
+    });
+  });
 });

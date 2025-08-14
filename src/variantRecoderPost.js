@@ -28,11 +28,17 @@ const yieldToEventLoop = () => new Promise((resolve) => setImmediate(resolve));
  * @param {Object} [options={}] - Optional parameters for the Variant Recoder API request.
  *                                (Example: { vcf_string: '1' } )
  * @param {boolean} [cacheEnabled=false] - If true, cache the API response.
+ * @param {Object} [proxyConfig=null] - Optional proxy configuration object.
  * @returns {Promise<Array<Object>>} A promise that resolves to an array of recoded variant
  * information.
  * @throws {Error} If the request to the Variant Recoder API fails.
  */
-async function variantRecoderPost(variants, options = {}, cacheEnabled = false) {
+async function variantRecoderPost(
+  variants,
+  options = {},
+  cacheEnabled = false,
+  proxyConfig = null
+) {
   if (!Array.isArray(variants) || variants.length === 0) {
     throw new Error('Variants must be provided as a non-empty array');
   }
@@ -65,7 +71,14 @@ async function variantRecoderPost(variants, options = {}, cacheEnabled = false) 
       const requestBody = { ids: variants };
       debugDetailed(`Request body: ${JSON.stringify(requestBody)}`);
 
-      const data = await fetchApi(endpoint, queryOptions, cacheEnabled, 'POST', requestBody);
+      const data = await fetchApi(
+        endpoint,
+        queryOptions,
+        cacheEnabled,
+        'POST',
+        requestBody,
+        proxyConfig
+      );
       return data;
     } else {
       // If the number of variants exceeds the chunk size, we need to chunk the requests
@@ -98,7 +111,8 @@ async function variantRecoderPost(variants, options = {}, cacheEnabled = false) 
           queryOptions,
           cacheEnabled,
           'POST',
-          requestBody
+          requestBody,
+          proxyConfig
         );
         // Debug log indicating which chunk has been processed
         console.log(

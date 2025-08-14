@@ -21,11 +21,12 @@ const apiConfig = require('../config/apiConfig.json');
  * @param {Object} [options={}] - Optional parameters for the Variant Recoder API request.
  *                               (Example: { vcf_string: '1' } )
  * @param {boolean} [cacheEnabled=false] - If true, cache the API response.
+ * @param {Object} [proxyConfig=null] - Optional proxy configuration object.
  * @returns {Promise<Object>} A promise that resolves to the recoded variant information,
  *                            including various IDs and HGVS notations.
  * @throws {Error} If the request to the Variant Recoder API fails.
  */
-async function variantRecoder(variant, options = {}, cacheEnabled = false) {
+async function variantRecoder(variant, options = {}, cacheEnabled = false, proxyConfig = null) {
   try {
     const defaultOptions = { vcf_string: '1' };
     const queryOptions = { ...defaultOptions, ...options };
@@ -37,7 +38,7 @@ async function variantRecoder(variant, options = {}, cacheEnabled = false) {
     debug(`Requesting Variant Recoder for variant: ${variant}`);
     debugDetailed(`Using endpoint: ${endpoint} with query: ${JSON.stringify(queryOptions)}`);
 
-    const data = await fetchApi(endpoint, queryOptions, cacheEnabled);
+    const data = await fetchApi(endpoint, queryOptions, cacheEnabled, 'GET', null, proxyConfig);
     return data;
   } catch (error) {
     debugAll(`Error in variantRecoder: ${error.message}`);

@@ -85,7 +85,8 @@ async function processSingleVariant(variant, params) {
     annotationData = await vepRegionsAnnotation(
       [formattedVariant],
       params.vepOptions,
-      params.cache
+      params.cache,
+      params.proxyConfig
     );
   } else if (inputFormat === 'CNV') {
     // Handle CNV format: chr:start-end:TYPE
@@ -115,10 +116,16 @@ async function processSingleVariant(variant, params) {
     annotationData = await vepRegionsAnnotation(
       [formattedVariant],
       params.vepOptions,
-      params.cache
+      params.cache,
+      params.proxyConfig
     );
   } else {
-    variantData = await variantRecoder(variant, params.recoderOptions, params.cache);
+    variantData = await variantRecoder(
+      variant,
+      params.recoderOptions,
+      params.cache,
+      params.proxyConfig
+    );
     // Ensure variantData is an array and has elements
     if (!Array.isArray(variantData) || variantData.length === 0) {
       throw new Error(`Variant Recoder did not return valid data for variant "${variant}"`);
@@ -150,7 +157,8 @@ async function processSingleVariant(variant, params) {
     annotationData = await vepRegionsAnnotation(
       [formattedVariant],
       params.vepOptions,
-      params.cache
+      params.cache,
+      params.proxyConfig
     );
   }
 
@@ -244,7 +252,8 @@ async function processBatchVariants(variants, params) {
     const vcfAnnotations = await vepRegionsAnnotation(
       formattedVcfVariants,
       params.vepOptions,
-      params.cache
+      params.cache,
+      params.proxyConfig
     );
 
     // Associate VEP results with original variants
@@ -307,7 +316,8 @@ async function processBatchVariants(variants, params) {
     const cnvAnnotations = await vepRegionsAnnotation(
       formattedCnvVariants,
       params.vepOptions,
-      params.cache
+      params.cache,
+      params.proxyConfig
     );
 
     // Associate VEP results with original CNV variants
@@ -345,7 +355,8 @@ async function processBatchVariants(variants, params) {
     const recoderResults = await variantRecoderPost(
       hgvsVariants,
       params.recoderOptions,
-      params.cache
+      params.cache,
+      params.proxyConfig
     );
 
     // Extract VCF strings from recoder results
@@ -430,7 +441,8 @@ async function processBatchVariants(variants, params) {
       const hgvsAnnotations = await vepRegionsAnnotation(
         uniqueVcfSet,
         params.vepOptions,
-        params.cache
+        params.cache,
+        params.proxyConfig
       );
 
       // Associate VEP results with original variants through the mapping
@@ -683,7 +695,8 @@ async function analyzeVariant(params) {
     const vepAnnotations = await vepRegionsAnnotation(
       formattedVepInput,
       params.vepOptions,
-      params.cache
+      params.cache,
+      params.proxyConfig
     );
     // Need to associate annotations back to the original CHR-POS-REF-ALT key
     result = { annotationData: [] };

@@ -17,6 +17,7 @@ const { getBaseUrl } = require('./configHelper');
 const { readVariantsFromVcf } = require('./vcfReader');
 const { readPedigree } = require('./pedReader');
 const { loadFeatures } = require('./featureParser');
+const { parseProxyConfig } = require('./apiHelper');
 
 // Set up debug loggers.
 const debug = require('debug')('variant-linker:main');
@@ -164,6 +165,18 @@ function validateParams(params) {
           "(e.g., '1-12345-A-G' or VCF files). rsIDs and HGVS notations are not supported in this mode."
       );
     }
+  }
+
+  // Validate proxy configuration
+  if (params.proxy) {
+    try {
+      // This will throw an error if the proxy URL is invalid
+      parseProxyConfig(params.proxy, params.proxyAuth);
+    } catch (error) {
+      throw new Error(`Invalid proxy configuration: ${error.message}`);
+    }
+  } else if (params.proxyAuth) {
+    throw new Error('--proxy-auth requires --proxy to be specified');
   }
 }
 
@@ -400,6 +413,16 @@ const argv = yargs(process.argv.slice(2)) // Use process.argv.slice(2) for bette
     type: 'number',
     default: 100,
   })
+  .option('proxy', {
+    description:
+      'HTTP/HTTPS proxy URL (e.g., http://proxy.company.com:8080 or http://user:pass@proxy:8080)',
+    type: 'string',
+  })
+  .option('proxy-auth', {
+    description:
+      'Proxy authentication in user:password format (alternative to embedding in proxy URL)',
+    type: 'string',
+  })
   .usage(
     'Usage: variant-linker [options]\n\nExample: variant-linker --variant "rs123" --output JSON'
   )
@@ -415,6 +438,14 @@ const argv = yargs(process.argv.slice(2)) // Use process.argv.slice(2) for bette
   .example(
     'variant-linker --vcf-input input.vcf --output VCF --save output.vcf',
     'Annotate a VCF file and save the output'
+  )
+  .example(
+    'variant-linker --variant "rs123" --proxy http://proxy.company.com:8080 --output JSON',
+    'Use HTTP proxy for API requests'
+  )
+  .example(
+    'variant-linker --variant "rs123" --proxy http://proxy:8080 --proxy-auth user:pass --output JSON',
+    'Use proxy with separate authentication'
   )
   .epilogue('For more information, see https://github.com/berntpopp/variant-linker')
   .help()
@@ -490,6 +521,20 @@ if (!process.env.ENSEMBL_BASE_URL) {
   debug(`Using existing ENSEMBL_BASE_URL from environment: ${process.env.ENSEMBL_BASE_URL}`);
 }
 
+// Parse proxy configuration if provided
+let proxyConfig = null;
+if (mergedParams.proxy || mergedParams.proxyAuth) {
+  try {
+    proxyConfig = parseProxyConfig(mergedParams.proxy, mergedParams.proxyAuth);
+    if (proxyConfig) {
+      debug(`Proxy configured: ${proxyConfig.protocol}://${proxyConfig.host}:${proxyConfig.port}`);
+    }
+  } catch (error) {
+    console.error(`Error: ${error.message}`);
+    throw error;
+  }
+}
+
 /**
  * Processes a chunk of variants and outputs the formatted result.
  * @param {Array<string>} chunk - Array of variant strings to process
@@ -500,7 +545,7 @@ if (!process.env.ENSEMBL_BASE_URL) {
 async function processAndOutputChunk(chunk, isFirstChunk, params) {
   try {
     debug(`Processing chunk of ${chunk.length} variants`);
-    const analysisParams = { ...params, variants: chunk, isStreaming: true };
+    const analysisParams = { ...params, variants: chunk, isStreaming: true, proxyConfig };
     const result = await analyzeVariant(analysisParams);
 
     const formatted = filterAndFormatResults(result, null, params.output, params);
@@ -864,6 +909,8 @@ async function processFileBased(mergedParams) {
       scoringConfigPath: mergedParams.scoring_config_path,
       // User-provided features for overlap annotation
       features: features,
+      // Proxy configuration
+      proxyConfig: proxyConfig,
       // Note: Removed redundant vepParams/recoderParams and skipRecoder
     };
 

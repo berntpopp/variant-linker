@@ -48,6 +48,12 @@ variant-linker --assembly hg19tohg38 --variant "chr17-7578406-C-A" --output JSON
 
 # Batch processing with custom scoring
 variant-linker --variants-file variants.txt --scoring_config_path scoring/nephro_variant_score/ --output CSV
+
+# Use HTTP proxy for API requests
+variant-linker --variant "rs6025" --proxy http://proxy.company.com:8080 --output JSON
+
+# Use authenticated proxy
+variant-linker --variant "rs6025" --proxy http://user:pass@proxy.company.com:8080 --output JSON
 ```
 
 ## Key Features

@@ -190,7 +190,7 @@ describe('VEP Consistency Tests', function () {
     try {
       // Path to nephro scoring configuration
       const nephroConfigPath = path.join(__dirname, '..', 'scoring', 'nephro_variant_score');
-      
+
       // Load scoring configuration from files
       const { readScoringConfigFromFiles } = require('../src/scoring');
       const scoringConfig = readScoringConfigFromFiles(nephroConfigPath);

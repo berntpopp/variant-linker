@@ -27,10 +27,16 @@ const apiConfig = require('../config/apiConfig.json');
  * @param {Array<string>} variants - An array of variant strings in the required POST format.
  * @param {Object} [options={}] - Optional query parameters for the VEP API request.
  * @param {boolean} [cacheEnabled=false] - If true, cache the API response.
+ * @param {Object} [proxyConfig=null] - Optional proxy configuration object.
  * @returns {Promise<Object>} A promise that resolves to the annotation data.
  * @throws {Error} If the request to the VEP API fails.
  */
-async function vepRegionsAnnotation(variants, options = {}, cacheEnabled = false) {
+async function vepRegionsAnnotation(
+  variants,
+  options = {},
+  cacheEnabled = false,
+  proxyConfig = null
+) {
   try {
     // For the POST endpoint we simply use the base endpoint defined in our config.
     const endpoint = apiConfig.ensembl.endpoints.vepRegions; // e.g. "/vep/homo_sapiens/region"
@@ -48,7 +54,14 @@ async function vepRegionsAnnotation(variants, options = {}, cacheEnabled = false
       const requestBody = { variants };
       debugDetailed(`Request body: ${JSON.stringify(requestBody)}`);
 
-      const data = await fetchApi(endpoint, options, cacheEnabled, 'POST', requestBody);
+      const data = await fetchApi(
+        endpoint,
+        options,
+        cacheEnabled,
+        'POST',
+        requestBody,
+        proxyConfig
+      );
       return data;
     } else {
       // If the number of variants exceeds the chunk size, we need to chunk the requests
@@ -65,7 +78,14 @@ async function vepRegionsAnnotation(variants, options = {}, cacheEnabled = false
         );
         debugDetailed(`Chunk request body: ${JSON.stringify(requestBody)}`);
 
-        const chunkResults = await fetchApi(endpoint, options, cacheEnabled, 'POST', requestBody);
+        const chunkResults = await fetchApi(
+          endpoint,
+          options,
+          cacheEnabled,
+          'POST',
+          requestBody,
+          proxyConfig
+        );
         allResults.push(...chunkResults);
 
         // Add a small delay between chunks to be polite to the API

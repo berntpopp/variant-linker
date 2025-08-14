@@ -33,5 +33,13 @@
       "ttl": 86400000,
       "maxSize": "100MB"
     }
+  },
+  "proxy": {
+    "enabled": false,
+    "url": null,
+    "auth": {
+      "username": null,
+      "password": null
+    }
   }
 }
