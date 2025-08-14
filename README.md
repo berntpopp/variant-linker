@@ -18,6 +18,20 @@ npm install
 npm link  # Optional: for global CLI access
 ```
 
+#### Windows Installation Issues
+If the `variant-linker` command isn't recognized on Windows PowerShell:
+
+**Option 1: Use npx (recommended)**
+```powershell
+npx variant-linker --help
+```
+
+**Option 2: Reinstall globally**
+```powershell
+npm uninstall -g variant-linker
+npm install -g variant-linker
+```
+
 ### Basic Usage
 ```bash
 # Analyze a single variant
