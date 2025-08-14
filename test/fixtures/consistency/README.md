@@ -5,11 +5,11 @@ This directory contains baseline data used to validate the scientific accuracy o
 ## Files
 
 ### Input Data
-- **`test_variants_vcf_format_2024-06-20.txt`** - Test variants in VCF format (chromosome-position-ref-alt)
-- **`test_variants_input_2024-06-20.txt`** - Original input variants (may be in different formats)
+- **`test_variants_vcf_format_2025-07-21.txt`** - Test variants in VCF format (chromosome-position-ref-alt)
+- **`test_variants_input_2025-07-21.txt`** - Original input variants (may be in different formats)
 
 ### Baseline Reference Data
-- **`VEP_online_output_test_variants_2024-06-20.txt`** - VEP web tool output in TSV format
+- **`VEP_online_output_test_variants_2025-07-21.txt`** - VEP web tool output in TSV format
 - **`VEP_SETTINGS.md`** - Detailed documentation of VEP web tool settings used
 
 ## Purpose
@@ -65,7 +65,7 @@ Update the baseline data when:
 
 1. **Prepare Input Variants**
    ```bash
-   # Edit test_variants_vcf_format_2024-06-20.txt with new variants
+   # Edit test_variants_vcf_format_2025-07-21.txt with new variants
    # Ensure variants are in format: chromosome-position-ref-alt
    ```
 
@@ -131,7 +131,7 @@ To manually verify a specific variant:
 node src/main.js --variant "6-52025536-A-C" --output JSON
 
 # Compare with baseline data
-grep "6-52025536-A-C" test/fixtures/consistency/VEP_online_output_test_variants_2024-06-20.txt
+grep "6-52025536-A-C" test/fixtures/consistency/VEP_online_output_test_variants_2025-07-21.txt
 ```
 
 ## Contributing

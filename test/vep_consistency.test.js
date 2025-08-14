@@ -35,13 +35,13 @@ describe('VEP Consistency Tests', function () {
       __dirname,
       'fixtures',
       'consistency',
-      'test_variants_vcf_format_2024-06-20.txt'
+      'test_variants_vcf_format_2025-07-21.txt'
     );
     const vepOutputPath = path.join(
       __dirname,
       'fixtures',
       'consistency',
-      'VEP_online_output_test_variants_2024-06-20.txt'
+      'VEP_online_output_test_variants_2025-07-21.txt'
     );
 
     try {
@@ -190,13 +190,19 @@ describe('VEP Consistency Tests', function () {
     try {
       // Path to nephro scoring configuration
       const nephroConfigPath = path.join(__dirname, '..', 'scoring', 'nephro_variant_score');
+      
+      // Load scoring configuration from files
+      const { readScoringConfigFromFiles } = require('../src/scoring');
+      const scoringConfig = readScoringConfigFromFiles(nephroConfigPath);
 
-      // Apply scoring to linker result
-      const linkerScored = applyScoring(linkerAnnotation, nephroConfigPath);
+      // Apply scoring to linker result (applyScoring expects arrays)
+      const linkerScoredArray = applyScoring([linkerAnnotation], scoringConfig);
+      const linkerScored = linkerScoredArray[0];
 
       // Create a mock annotation from baseline data for scoring
       const baselineAnnotation = transformBaselineToVepJson(baselineConsequences, variantKey)[0];
-      const baselineScored = applyScoring(baselineAnnotation, nephroConfigPath);
+      const baselineScoredArray = applyScoring([baselineAnnotation], scoringConfig);
+      const baselineScored = baselineScoredArray[0];
 
       // Compare final scores (with tolerance for calculation differences)
       if (

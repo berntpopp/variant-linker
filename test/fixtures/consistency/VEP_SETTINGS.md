@@ -1,6 +1,6 @@
 # VEP Web Tool Settings Used for Baseline Generation
 
-This document records the exact settings used in the VEP web tool to generate the baseline output file `VEP_online_output_test_variants_2024-06-20.txt`.
+This document records the exact settings used in the VEP web tool to generate the baseline output file `VEP_online_output_test_variants_2025-07-21.txt`.
 
 ## Settings Used
 
@@ -46,9 +46,9 @@ const vepOptions = {
 ```
 
 ## File Generation Date
-- **Generated**: 2024-06-20
+- **Generated**: 2025-07-21
 - **VEP Version**: Web tool version as of June 2024
-- **Input File**: test_variants_vcf_format_2024-06-20.txt
+- **Input File**: test_variants_vcf_format_2025-07-21.txt
 
 ## Maintenance Notes
 
