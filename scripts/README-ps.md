@@ -24,7 +24,7 @@ This script processes JSON output from variant-linker and extracts specific info
 
 ### Basic Syntax
 ```powershell
-.\extract-mane.ps1 -InputPath <path-to-json-file-or-directory> [-OutputFile <output-path>] [-IncludeHeader] [-LogFile <log-path>] [-IncludeFilename]
+.\extract-mane.ps1 -InputPath <path-to-json-file-or-directory> [-OutputFile <output-path>] [-IncludeHeader] [-LogFile <log-path>] [-IncludeFilename] [-StrongestImpactOnly]
 ```
 
 ### Getting Help
@@ -48,6 +48,7 @@ Get-Help .\extract-mane.ps1 -Parameter InputPath
 | `IncludeHeader` | Switch | No | Include column headers in the output |
 | `LogFile` | String | No | Path to log file for detailed processing information |
 | `IncludeFilename` | Switch | No | Include source filename column (auto-enabled for directories) |
+| `StrongestImpactOnly` | Switch | No | Filter to show only consequences with the strongest impact (HIGH > MODERATE > LOW > MODIFIER) |
 
 ### Examples
 
@@ -71,7 +72,16 @@ Get-Help .\extract-mane.ps1 -Parameter InputPath
 .\extract-mane.ps1 -InputPath ".\json_files\" -OutputFile "results.tsv" -IncludeHeader -Verbose
 ```
 
-#### 5. Complete workflow example
+#### 5. Filter for strongest impact only
+```powershell
+# Show only the most severe consequences (e.g., MODERATE over MODIFIER)
+.\extract-mane.ps1 -InputPath "variant_output.json" -StrongestImpactOnly -IncludeHeader
+
+# Directory processing with strongest impact filtering
+.\extract-mane.ps1 -InputPath ".\json_files\" -OutputFile "strongest_impacts.tsv" -StrongestImpactOnly -IncludeHeader
+```
+
+#### 6. Complete workflow example
 ```powershell
 # Generate multiple JSON files
 variant-linker --variant "ENST00000366667:c.803C>T" --output JSON > variant1.json
@@ -124,9 +134,11 @@ variant2.json	rs123	NM_000456.1:c.123A>G	NP_000447.1:p.Lys41Arg	2-456789-A-G
 
 ### Single File Mode
 1. **Reads JSON**: Parses variant-linker JSON output file
-2. **Filters transcripts**: Identifies MANE_Select RefSeq transcripts (NM_*)
-3. **Extracts data**: Pulls relevant annotation fields
-4. **Outputs results**: TSV format to console or file
+2. **Filters transcripts**: Identifies RefSeq/NCBI transcripts (NM_*, NR_*, NP_*, or source=RefSeq)
+3. **Prioritizes MANE**: Prefers MANE_Select transcripts when available
+4. **Impact filtering**: Optionally filters to strongest impact only (HIGH > MODERATE > LOW > MODIFIER)
+5. **Extracts data**: Pulls relevant annotation fields
+6. **Outputs results**: TSV format to console or file
 
 ### Directory Mode
 1. **Scans directory**: Finds all .json files in the specified directory
@@ -137,6 +149,8 @@ variant2.json	rs123	NM_000456.1:c.123A>G	NP_000447.1:p.Lys41Arg	2-456789-A-G
 
 ### Key Features
 - **Automatic mode detection**: File vs directory input
+- **Transcript filtering**: RefSeq/NCBI transcripts with MANE Select prioritization
+- **Impact hierarchy**: Strongest impact filtering (HIGH > MODERATE > LOW > MODIFIER)
 - **Progress tracking**: Visual progress bar for directory processing
 - **Error resilience**: Individual file failures don't stop batch processing
 - **Comprehensive logging**: Optional detailed log files

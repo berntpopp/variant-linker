@@ -12,7 +12,10 @@ param(
     [string]$LogFile,
     
     [Parameter(Mandatory=$false, HelpMessage="Include filename column when processing directories")]
-    [switch]$IncludeFilename
+    [switch]$IncludeFilename,
+    
+    [Parameter(Mandatory=$false, HelpMessage="Only show consequences with the strongest impact")]
+    [switch]$StrongestImpactOnly
 )
 
 # Logging function
@@ -38,6 +41,42 @@ function Write-Log {
             "ERROR" { Write-Host $logEntry -ForegroundColor Red }
         }
     }
+}
+
+# Impact hierarchy for strongest impact filtering
+$ImpactHierarchy = @{
+    'HIGH' = 4
+    'MODERATE' = 3
+    'LOW' = 2
+    'MODIFIER' = 1
+}
+
+# Function to get strongest impact from consequences
+function Get-StrongestImpact {
+    param([array]$Consequences)
+    
+    $maxImpactValue = 0
+    foreach ($consequence in $Consequences) {
+        $impactValue = $ImpactHierarchy[$consequence.impact]
+        if ($impactValue -gt $maxImpactValue) {
+            $maxImpactValue = $impactValue
+        }
+    }
+    
+    foreach ($impact in $ImpactHierarchy.Keys) {
+        if ($ImpactHierarchy[$impact] -eq $maxImpactValue) {
+            return $impact
+        }
+    }
+    return 'MODIFIER'
+}
+
+# Function to filter consequences by strongest impact
+function Filter-ByStrongestImpact {
+    param([array]$Consequences)
+    
+    $strongestImpact = Get-StrongestImpact -Consequences $Consequences
+    return $Consequences | Where-Object { $_.impact -eq $strongestImpact }
 }
 
 # Function to process a single JSON file
@@ -68,12 +107,32 @@ function Process-JsonFile {
             return @{ Results = $errorResults; ProcessedCount = 0; ErrorCount = 1 }
         }
         
-        # Extract MANE Select RefSeq transcripts
+        # Extract and filter transcript consequences
         $transcriptResults = $json.annotationData | ForEach-Object {
             $anno = $_
-            $anno.transcript_consequences | Where-Object {
-                $_.mane -and ($_.mane -contains "MANE_Select") -and ($_.transcript_id -like "NM_*")
-            } | ForEach-Object {
+            
+            # Filter for RefSeq/NCBI transcripts first
+            $refseqConsequences = $anno.transcript_consequences | Where-Object {
+                $_.transcript_id -and (($_.transcript_id -like "NM_*") -or 
+                                      ($_.transcript_id -like "NR_*") -or 
+                                      ($_.transcript_id -like "NP_*") -or 
+                                      ($_.source -eq "RefSeq"))
+            }
+            
+            # Prefer MANE Select transcripts if available
+            $maneConsequences = $refseqConsequences | Where-Object {
+                $_.mane -and ($_.mane -contains "MANE_Select")
+            }
+            
+            $consequencesToProcess = if ($maneConsequences.Count -gt 0) { $maneConsequences } else { $refseqConsequences }
+            
+            # Apply strongest impact filter if requested
+            if ($StrongestImpactOnly -and $consequencesToProcess.Count -gt 0) {
+                $consequencesToProcess = Filter-ByStrongestImpact -Consequences $consequencesToProcess
+            }
+            
+            # Format output for each consequence
+            $consequencesToProcess | ForEach-Object {
                 if ($IncludeFilename) {
                     "$FileName`t$($anno.originalInput)`t$($_.hgvsc)`t$(if ($_.hgvsp) { $_.hgvsp } else { 'N/A' })`t$($anno.variantKey)"
                 } else {
@@ -83,7 +142,7 @@ function Process-JsonFile {
         }
         
         if ($transcriptResults.Count -eq 0) {
-            $warningMsg = "No MANE Select RefSeq transcripts found"
+            $warningMsg = "No RefSeq/NCBI transcripts found"
             Write-Log "$FilePath - $warningMsg" -Level "WARNING" -ToConsole
             
             if ($IncludeFilename) {
@@ -93,7 +152,8 @@ function Process-JsonFile {
             }
         } else {
             $results += $transcriptResults
-            Write-Log "$FilePath - Found $($transcriptResults.Count) MANE Select RefSeq transcript(s)" -Level "INFO"
+            $filterMsg = if ($StrongestImpactOnly) { " (strongest impact only)" } else { "" }
+            Write-Log "$FilePath - Found $($transcriptResults.Count) RefSeq transcript(s)$filterMsg" -Level "INFO"
         }
         
         return @{ Results = $results; ProcessedCount = $transcriptResults.Count; ErrorCount = 0 }
