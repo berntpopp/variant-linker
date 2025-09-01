@@ -61,6 +61,5 @@ clinvar_*.txt
 *.ped
 !test/fixtures/inheritance/*.ped
 
-# claude files and folders
-.claude/
-CLAUDE.md
+# local data folder
+local_data/
