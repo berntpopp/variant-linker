@@ -54,6 +54,61 @@ function detectInputFormat(variant) {
 }
 
 /**
+ * Checks if an HGVS variant has a transcript version (e.g., NM_001009944.3:c.540dup).
+ *
+ * @param {string} variant - The HGVS variant to check.
+ * @return {boolean} True if the variant has a transcript version, false otherwise.
+ */
+function hasTranscriptVersion(variant) {
+  // Pattern matches transcript ID with version: NM_123456.1, NR_123456.2, etc.
+  const transcriptVersionPattern = /^[A-Z]{2}_\d+\.\d+:/;
+  return transcriptVersionPattern.test(variant);
+}
+
+/**
+ * Strips the transcript version from an HGVS variant.
+ * Converts NM_001009944.3:c.540dup to NM_001009944:c.540dup.
+ *
+ * @param {string} variant - The HGVS variant with version.
+ * @return {string} The variant with the transcript version removed.
+ */
+function stripTranscriptVersion(variant) {
+  // Replace transcript version (.n) with nothing, but keep the transcript ID
+  return variant.replace(/(\.[0-9]+)(:)/, '$2');
+}
+
+/**
+ * Processes and validates the response from the Variant Recoder API.
+ *
+ * @param {Object} variantData - The response from the Variant Recoder API.
+ * @param {string} variant - The variant that was processed.
+ * @return {Object} Object containing the validated vcfString.
+ * @throws {Error} If the response is invalid or missing required data.
+ */
+async function processVariantRecoderResponse(variantData, variant) {
+  // Ensure variantData is an array and has elements
+  if (!Array.isArray(variantData) || variantData.length === 0) {
+    throw new Error(`Variant Recoder did not return valid data for variant "${variant}"`);
+  }
+  const firstKey = Object.keys(variantData[0])[0];
+  const recoderEntry = variantData[0][firstKey];
+  if (!recoderEntry || !recoderEntry.vcf_string || !Array.isArray(recoderEntry.vcf_string)) {
+    throw new Error(
+      `Variant Recoder response is missing a valid vcf_string array for variant "${variant}"`
+    );
+  }
+  const vcfString = recoderEntry.vcf_string.find((vcf) =>
+    /^[0-9XYM]+-[0-9]+-[ACGT]+-[ACGT]+$/i.test(vcf)
+  );
+  if (!vcfString) {
+    throw new Error(
+      `No valid VCF string found in Variant Recoder response for variant "${variant}"`
+    );
+  }
+  return { vcfString };
+}
+
+/**
  * Processes a single variant through the annotation pipeline.
  *
  * @param {string} variant - The single variant to process.
@@ -120,46 +175,102 @@ async function processSingleVariant(variant, params) {
       params.proxyConfig
     );
   } else {
-    variantData = await variantRecoder(
-      variant,
-      params.recoderOptions,
-      params.cache,
-      params.proxyConfig
-    );
-    // Ensure variantData is an array and has elements
-    if (!Array.isArray(variantData) || variantData.length === 0) {
-      throw new Error(`Variant Recoder did not return valid data for variant "${variant}"`);
-    }
-    const firstKey = Object.keys(variantData[0])[0];
-    const recoderEntry = variantData[0][firstKey];
-    if (!recoderEntry || !recoderEntry.vcf_string || !Array.isArray(recoderEntry.vcf_string)) {
-      throw new Error(
-        `Variant Recoder response is missing a valid vcf_string array for variant "${variant}"`
+    // Initialize fallback tracking variables
+    let transcriptVersionFallback = null;
+    let currentVariant = variant;
+
+    try {
+      // Try with the original variant first
+      variantData = await variantRecoder(
+        currentVariant,
+        params.recoderOptions,
+        params.cache,
+        params.proxyConfig
       );
-    }
-    const vcfString = recoderEntry.vcf_string.find((vcf) =>
-      /^[0-9XYM]+-[0-9]+-[ACGT]+-[ACGT]+$/i.test(vcf)
-    );
-    if (!vcfString) {
-      throw new Error(
-        `No valid VCF string found in Variant Recoder response for variant "${variant}"`
+      // Validate the recoder response and process VCF string
+      const { vcfString } = await processVariantRecoderResponse(variantData, currentVariant);
+      const parts = vcfString.replace(/^chr/i, '').split('-');
+      if (parts.length !== 4) {
+        throw new Error(`Invalid VCF format from Variant Recoder for variant "${currentVariant}"`);
+      }
+      const [chrom, pos, ref, alt] = parts;
+      const formattedVariant = `${chrom} ${pos} . ${ref} ${alt} . . .`;
+      inputInfo = formattedVariant;
+      standardKey = vcfString;
+
+      annotationData = await vepRegionsAnnotation(
+        [formattedVariant],
+        params.vepOptions,
+        params.cache,
+        params.proxyConfig
       );
+    } catch (originalError) {
+      // Check if this is a transcript version related error and the variant has a version
+      if (
+        hasTranscriptVersion(variant) &&
+        originalError.message.includes('No valid VCF string found')
+      ) {
+        debug(
+          `Variant Recoder failed for versioned transcript "${variant}". Attempting fallback without version.`
+        );
+
+        // Try without the transcript version
+        const fallbackVariant = stripTranscriptVersion(variant);
+        currentVariant = fallbackVariant;
+
+        try {
+          variantData = await variantRecoder(
+            fallbackVariant,
+            params.recoderOptions,
+            params.cache,
+            params.proxyConfig
+          );
+          // Validate the recoder response and process VCF string
+          const { vcfString } = await processVariantRecoderResponse(variantData, fallbackVariant);
+          const parts = vcfString.replace(/^chr/i, '').split('-');
+          if (parts.length !== 4) {
+            throw new Error(
+              `Invalid VCF format from Variant Recoder for variant "${fallbackVariant}"`
+            );
+          }
+          const [chrom, pos, ref, alt] = parts;
+          const formattedVariant = `${chrom} ${pos} . ${ref} ${alt} . . .`;
+          inputInfo = formattedVariant;
+          standardKey = vcfString;
+
+          annotationData = await vepRegionsAnnotation(
+            [formattedVariant],
+            params.vepOptions,
+            params.cache,
+            params.proxyConfig
+          );
+
+          // Track that we used the fallback
+          transcriptVersionFallback = {
+            originalVariant: variant,
+            fallbackVariant: fallbackVariant,
+            reason: 'Transcript version caused Variant Recoder failure',
+          };
+
+          debug(`Successfully processed variant using fallback: "${fallbackVariant}"`);
+        } catch (fallbackError) {
+          // Both original and fallback failed, throw the original error with more context
+          throw new Error(
+            `Variant Recoder failed for both original variant "${variant}" and ` +
+              `fallback variant "${fallbackVariant}". ` +
+              `Original error: ${originalError.message}. Fallback error: ${fallbackError.message}`
+          );
+        }
+      } else {
+        // Re-throw the original error if it's not transcript version related or no version present
+        throw originalError;
+      }
     }
-    const parts = vcfString.replace(/^chr/i, '').split('-');
-    if (parts.length !== 4) {
-      throw new Error(`Invalid VCF format from Variant Recoder for variant "${variant}"`);
+
+    // Store fallback info for metadata inclusion
+    if (transcriptVersionFallback) {
+      params._transcriptVersionFallback = transcriptVersionFallback;
     }
-    const [chrom, pos, ref, alt] = parts;
-    const formattedVariant = `${chrom} ${pos} . ${ref} ${alt} . . .`;
-    inputInfo = formattedVariant;
-    // For HGVS, the recoded vcfString becomes the standard key
-    standardKey = vcfString;
-    annotationData = await vepRegionsAnnotation(
-      [formattedVariant],
-      params.vepOptions,
-      params.cache,
-      params.proxyConfig
-    );
   }
 
   // Add input info and standardized key to each annotation
@@ -197,6 +308,9 @@ async function processSingleVariant(variant, params) {
     inputFormat,
     variantData,
     annotationData,
+    ...(params._transcriptVersionFallback && {
+      transcriptVersionFallback: params._transcriptVersionFallback,
+    }),
   };
 }
 
@@ -937,8 +1051,11 @@ async function analyzeVariant(params) {
     inheritanceCalculated, // Add the flag here
   };
 
+  // Destructure result to exclude transcriptVersionFallback from top-level spreading
+  const { transcriptVersionFallback, ...resultWithoutFallback } = result;
+
   let finalOutput = {
-    ...result, // Spread the result from processing (contains annotationData, potentially variantData)
+    ...resultWithoutFallback, // Spread the result from processing (contains annotationData, potentially variantData)
     meta: metaInfo, // Explicitly set the correct meta object
   };
 
@@ -949,6 +1066,12 @@ async function analyzeVariant(params) {
   if (params.liftoverMeta) {
     finalOutput.meta.liftoverMeta = params.liftoverMeta;
     debug('Added liftover metadata to final output');
+  }
+
+  // Add transcript version fallback metadata if present
+  if (transcriptVersionFallback) {
+    finalOutput.meta.transcriptVersionFallback = transcriptVersionFallback;
+    debug('Added transcript version fallback metadata to final output');
   }
 
   // Replace originalInput with user's original hg19 variant strings if liftover was performed
@@ -1039,4 +1162,6 @@ async function analyzeVariant(params) {
 module.exports = {
   analyzeVariant,
   detectInputFormat,
+  hasTranscriptVersion,
+  stripTranscriptVersion,
 };
