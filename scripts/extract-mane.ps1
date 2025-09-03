@@ -15,7 +15,10 @@ param(
     [switch]$IncludeFilename,
     
     [Parameter(Mandatory=$false, HelpMessage="Only show consequences with the strongest impact")]
-    [switch]$StrongestImpactOnly
+    [switch]$StrongestImpactOnly,
+    
+    [Parameter(Mandatory=$false, HelpMessage="Only show MANE Select transcripts (exclude other RefSeq)")]
+    [switch]$MANEOnly
 )
 
 # Logging function
@@ -111,12 +114,14 @@ function Process-JsonFile {
         $transcriptResults = $json.annotationData | ForEach-Object {
             $anno = $_
             
-            # Filter for RefSeq/NCBI transcripts first
+            # Filter for RefSeq/NCBI transcripts first (exclude predicted XM_/XP_/XR_ transcripts)
             $refseqConsequences = $anno.transcript_consequences | Where-Object {
                 $_.transcript_id -and (($_.transcript_id -like "NM_*") -or 
                                       ($_.transcript_id -like "NR_*") -or 
-                                      ($_.transcript_id -like "NP_*") -or 
-                                      ($_.source -eq "RefSeq"))
+                                      ($_.transcript_id -like "NP_*")) -and
+                                      ($_.transcript_id -notlike "XM_*") -and
+                                      ($_.transcript_id -notlike "XR_*") -and
+                                      ($_.transcript_id -notlike "XP_*")
             }
             
             # Prefer MANE Select transcripts if available
@@ -124,36 +129,61 @@ function Process-JsonFile {
                 $_.mane -and ($_.mane -contains "MANE_Select")
             }
             
-            $consequencesToProcess = if ($maneConsequences.Count -gt 0) { $maneConsequences } else { $refseqConsequences }
+            # Choose which transcripts to process based on parameters
+            if ($MANEOnly) {
+                # Only MANE Select transcripts
+                $consequencesToProcess = $maneConsequences
+            } else {
+                # MANE Select preferred, fall back to other standard RefSeq
+                $consequencesToProcess = if ($maneConsequences.Count -gt 0) { $maneConsequences } else { $refseqConsequences }
+            }
             
             # Apply strongest impact filter if requested
             if ($StrongestImpactOnly -and $consequencesToProcess.Count -gt 0) {
                 $consequencesToProcess = Filter-ByStrongestImpact -Consequences $consequencesToProcess
             }
             
+            # Filter out consequences with empty hgvsc and deduplicate by transcript_id
+            if ($consequencesToProcess.Count -gt 0) {
+                # First filter out consequences without hgvsc
+                $consequencesToProcess = $consequencesToProcess | Where-Object { $_.hgvsc -and $_.hgvsc.Trim() -ne "" }
+                
+                # Then deduplicate by transcript_id (in case there are still duplicates)
+                $uniqueTranscripts = @{}
+                foreach ($consequence in $consequencesToProcess) {
+                    $transcriptId = $consequence.transcript_id
+                    if ($transcriptId -and -not $uniqueTranscripts.ContainsKey($transcriptId)) {
+                        $uniqueTranscripts[$transcriptId] = $consequence
+                    }
+                }
+                $consequencesToProcess = @($uniqueTranscripts.Values)
+            }
+            
             # Format output for each consequence
             $consequencesToProcess | ForEach-Object {
+                $geneSymbol = if ($_.gene_symbol) { $_.gene_symbol } else { 'N/A' }
                 if ($IncludeFilename) {
-                    "$FileName`t$($anno.originalInput)`t$($_.hgvsc)`t$(if ($_.hgvsp) { $_.hgvsp } else { 'N/A' })`t$($anno.variantKey)"
+                    "$FileName`t$($anno.originalInput)`t$($_.hgvsc)`t$(if ($_.hgvsp) { $_.hgvsp } else { 'N/A' })`t$geneSymbol`t$($anno.variantKey)"
                 } else {
-                    "$($anno.originalInput)`t$($_.hgvsc)`t$(if ($_.hgvsp) { $_.hgvsp } else { 'N/A' })`t$($anno.variantKey)"
+                    "$($anno.originalInput)`t$($_.hgvsc)`t$(if ($_.hgvsp) { $_.hgvsp } else { 'N/A' })`t$geneSymbol`t$($anno.variantKey)"
                 }
             }
         }
         
         if ($transcriptResults.Count -eq 0) {
-            $warningMsg = "No RefSeq/NCBI transcripts found"
+            $warningMsg = if ($MANEOnly) { "No MANE Select transcripts found" } else { "No standard RefSeq/NCBI transcripts found" }
             Write-Log "$FilePath - $warningMsg" -Level "WARNING" -ToConsole
             
             if ($IncludeFilename) {
-                $results += "$FileName`tWARNING`t$warningMsg`tN/A`tN/A"
+                $results += "$FileName`tWARNING`t$warningMsg`tN/A`tN/A`tN/A"
             } else {
-                $results += "WARNING`t$warningMsg`tN/A`tN/A"
+                $results += "WARNING`t$warningMsg`tN/A`tN/A`tN/A"
             }
         } else {
             $results += $transcriptResults
+            $typeMsg = if ($MANEOnly) { "MANE Select" } else { "standard RefSeq" }
             $filterMsg = if ($StrongestImpactOnly) { " (strongest impact only)" } else { "" }
-            Write-Log "$FilePath - Found $($transcriptResults.Count) RefSeq transcript(s)$filterMsg" -Level "INFO"
+            Write-Log "$FilePath - Found $($transcriptResults.Count) $typeMsg transcript(s)$filterMsg" -Level "INFO"
         }
         
         return @{ Results = $results; ProcessedCount = $transcriptResults.Count; ErrorCount = 0 }
@@ -238,9 +268,9 @@ try {
     $output = @()
     if ($IncludeHeader) {
         if ($IncludeFilename) {
-            $output += "Source_File`tOriginal_Input`tHGVS_Coding`tHGVS_Protein`tVCF_Coordinates"
+            $output += "Source_File`tOriginal_Input`tHGVS_Coding`tHGVS_Protein`tGene_Symbol`tVCF_Coordinates"
         } else {
-            $output += "Original_Input`tHGVS_Coding`tHGVS_Protein`tVCF_Coordinates"
+            $output += "Original_Input`tHGVS_Coding`tHGVS_Protein`tGene_Symbol`tVCF_Coordinates"
         }
     }
     $output += $allResults

@@ -24,7 +24,7 @@ This script processes JSON output from variant-linker and extracts specific info
 
 ### Basic Syntax
 ```powershell
-.\extract-mane.ps1 -InputPath <path-to-json-file-or-directory> [-OutputFile <output-path>] [-IncludeHeader] [-LogFile <log-path>] [-IncludeFilename] [-StrongestImpactOnly]
+.\extract-mane.ps1 -InputPath <path-to-json-file-or-directory> [-OutputFile <output-path>] [-IncludeHeader] [-LogFile <log-path>] [-IncludeFilename] [-StrongestImpactOnly] [-MANEOnly]
 ```
 
 ### Getting Help
@@ -49,6 +49,7 @@ Get-Help .\extract-mane.ps1 -Parameter InputPath
 | `LogFile` | String | No | Path to log file for detailed processing information |
 | `IncludeFilename` | Switch | No | Include source filename column (auto-enabled for directories) |
 | `StrongestImpactOnly` | Switch | No | Filter to show only consequences with the strongest impact (HIGH > MODERATE > LOW > MODIFIER) |
+| `MANEOnly` | Switch | No | Only show MANE Select transcripts (exclude other RefSeq transcripts) |
 
 ### Examples
 
@@ -81,7 +82,16 @@ Get-Help .\extract-mane.ps1 -Parameter InputPath
 .\extract-mane.ps1 -InputPath ".\json_files\" -OutputFile "strongest_impacts.tsv" -StrongestImpactOnly -IncludeHeader
 ```
 
-#### 6. Complete workflow example
+#### 6. MANE Select only filtering
+```powershell
+# Show only MANE Select transcripts, skip variants without MANE
+.\extract-mane.ps1 -InputPath "variant_output.json" -MANEOnly -IncludeHeader
+
+# Combined: MANE only with strongest impact filtering
+.\extract-mane.ps1 -InputPath ".\json_files\" -OutputFile "mane_select_only.tsv" -MANEOnly -StrongestImpactOnly -IncludeHeader
+```
+
+#### 7. Complete workflow example
 ```powershell
 # Generate multiple JSON files
 variant-linker --variant "ENST00000366667:c.803C>T" --output JSON > variant1.json
@@ -104,6 +114,7 @@ The script produces tab-separated values (TSV) with the following columns:
 | Original_Input | Input variant provided to variant-linker | `ENST00000366667:c.803C>T` |
 | HGVS_Coding | RefSeq coding sequence notation | `NM_001384479.1:c.803C>T` |
 | HGVS_Protein | RefSeq protein sequence notation | `NP_001371408.1:p.Ala268Val` |
+| Gene_Symbol | Gene symbol for the transcript | `SEPT9` |
 | VCF_Coordinates | VCF-style coordinates | `1-230710021-G-A` |
 
 ### Directory Mode (includes source filename)
@@ -113,21 +124,22 @@ The script produces tab-separated values (TSV) with the following columns:
 | Original_Input | Input variant provided to variant-linker | `ENST00000366667:c.803C>T` |
 | HGVS_Coding | RefSeq coding sequence notation | `NM_001384479.1:c.803C>T` |
 | HGVS_Protein | RefSeq protein sequence notation | `NP_001371408.1:p.Ala268Val` |
+| Gene_Symbol | Gene symbol for the transcript | `SEPT9` |
 | VCF_Coordinates | VCF-style coordinates | `1-230710021-G-A` |
 
 ### Sample Output
 
 **Single file:**
 ```
-Original_Input	HGVS_Coding	HGVS_Protein	VCF_Coordinates
-ENST00000366667:c.803C>T	NM_001384479.1:c.803C>T	NP_001371408.1:p.Ala268Val	1-230710021-G-A
+Original_Input	HGVS_Coding	HGVS_Protein	Gene_Symbol	VCF_Coordinates
+ENST00000366667:c.803C>T	NM_001384479.1:c.803C>T	NP_001371408.1:p.Ala268Val	SEPT9	1-230710021-G-A
 ```
 
 **Directory mode:**
 ```
-Source_File	Original_Input	HGVS_Coding	HGVS_Protein	VCF_Coordinates
-variant1.json	ENST00000366667:c.803C>T	NM_001384479.1:c.803C>T	NP_001371408.1:p.Ala268Val	1-230710021-G-A
-variant2.json	rs123	NM_000456.1:c.123A>G	NP_000447.1:p.Lys41Arg	2-456789-A-G
+Source_File	Original_Input	HGVS_Coding	HGVS_Protein	Gene_Symbol	VCF_Coordinates
+variant1.json	ENST00000366667:c.803C>T	NM_001384479.1:c.803C>T	NP_001371408.1:p.Ala268Val	SEPT9	1-230710021-G-A
+variant2.json	rs123	NM_000456.1:c.123A>G	NP_000447.1:p.Lys41Arg	BRCA1	2-456789-A-G
 ```
 
 ## What the Script Does
