@@ -4,6 +4,16 @@ This directory contains utility scripts for the variant-linker project.
 
 ## Available Scripts
 
+### Processing Scripts
+
+For batch processing variants and extracting MANE annotations, see the comprehensive guide:
+
+📖 **[Processing Scripts Documentation](README-processing-scripts.md)**
+
+The processing scripts include:
+- **Batch Processing**: Process multiple variants from CSV files (PowerShell & Bash)
+- **MANE Extraction**: Extract MANE Select RefSeq transcript annotations from JSON files (PowerShell & Bash)
+
 ### Benchmark Script (`benchmark.js`)
 
 A comprehensive benchmarking tool that measures variant-linker performance across different scenarios.
