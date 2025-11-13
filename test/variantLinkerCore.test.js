@@ -260,8 +260,50 @@ describe('variantLinkerCore.js', () => {
       const apiHelper = require('../src/apiHelper');
       const fetchApiStub = sinon.stub(apiHelper, 'fetchApi');
 
-      // Mock a simplified response for all API calls
-      fetchApiStub.resolves(mockVepResponse);
+      // Mock a response with TWO annotation objects to match the TWO input variants
+      // VEP returns one annotation object per input variant
+      const batchMockResponse = [
+        {
+          input: '1 65568 . A C . . .', // First variant
+          id: 'variant1_1_65568_A_C',
+          most_severe_consequence: 'missense_variant',
+          seq_region_name: '1',
+          start: 65568,
+          allele_string: 'A/C',
+          transcript_consequences: [
+            {
+              transcript_id: 'ENST00000001',
+              gene_id: 'ENSG00000001',
+              gene_symbol: 'GENE1',
+              consequence_terms: ['missense_variant'],
+              impact: 'MODERATE',
+              polyphen_score: 0.85,
+              sift_score: 0.1,
+            },
+          ],
+        },
+        {
+          input: '1 65568 . A C . . .', // Second variant (same as first)
+          id: 'variant2_1_65568_A_C',
+          most_severe_consequence: 'missense_variant',
+          seq_region_name: '1',
+          start: 65568,
+          allele_string: 'A/C',
+          transcript_consequences: [
+            {
+              transcript_id: 'ENST00000001',
+              gene_id: 'ENSG00000001',
+              gene_symbol: 'GENE1',
+              consequence_terms: ['missense_variant'],
+              impact: 'MODERATE',
+              polyphen_score: 0.85,
+              sift_score: 0.1,
+            },
+          ],
+        },
+      ];
+
+      fetchApiStub.resolves(batchMockResponse);
 
       try {
         const result = await analyzeVariant({
@@ -278,6 +320,7 @@ describe('variantLinkerCore.js', () => {
         expect(result.meta.batchProcessing).to.be.true; // Should be true for batch
         expect(result.meta.batchSize).to.equal(batchVariants.length);
         expect(result.annotationData).to.be.an('array');
+        expect(result.annotationData).to.have.lengthOf(batchVariants.length);
 
         // Verify steps performed includes batch processing
         const batchStepFound = result.meta.stepsPerformed.some((step) =>
