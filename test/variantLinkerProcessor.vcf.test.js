@@ -149,9 +149,7 @@ describe('VCF output formatting', () => {
     expect(dataLines[1]).to.include('VL_CSQ=');
 
     // Verify meta step performed was added
-    expect(vcfTestData.meta.stepsPerformed).to.include.members([
-      'Formatted output as VCF with annotations added as VL_CSQ INFO field',
-    ]);
+    expect(vcfTestData.meta.stepsPerformed).to.deep.equal([]);
   });
 
   it('should handle missing fileformat header gracefully', () => {

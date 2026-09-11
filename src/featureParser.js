@@ -9,14 +9,14 @@
 
 const fs = require('fs').promises;
 const path = require('path');
-const IntervalTree = require('node-interval-tree');
+const IntervalTree = require('node-interval-tree').default;
 const debug = require('debug')('variant-linker:feature-parser');
 
 /**
  * Parses a BED file into an array of region objects.
  * Supports 3, 4, and 6+ column BED formats.
  * @param {string} filePath - Path to the BED file.
- * @returns {Promise<Array<Object>>} Parsed region objects.
+ * @returns {Promise<import('./dataTypes').BedRegion[]>} Parsed region objects.
  */
 async function parseBedFile(filePath) {
   debug(`Parsing BED file: ${filePath}`);
@@ -66,7 +66,8 @@ async function parseBedFile(filePath) {
     debug(`Parsed ${regions.length} regions from ${filePath}`);
     return regions;
   } catch (error) {
-    throw new Error(`Error parsing BED file ${filePath}: ${error.message}`);
+    if (!(error instanceof Error)) throw error;
+    throw new Error(`Error parsing BED file ${filePath}: ${error.message}`, { cause: error });
   }
 }
 
@@ -74,7 +75,7 @@ async function parseBedFile(filePath) {
  * Parses a simple text file containing a list of genes.
  * Each line should contain one gene symbol or Ensembl ID.
  * @param {string} filePath - Path to the gene list file.
- * @returns {Promise<Array<Object>>} Parsed gene objects.
+ * @returns {Promise<import('./dataTypes').GeneRecord[]>} Parsed gene objects.
  */
 async function parseGeneListFile(filePath) {
   debug(`Parsing gene list file: ${filePath}`);
@@ -98,15 +99,16 @@ async function parseGeneListFile(filePath) {
     debug(`Parsed ${genes.length} genes from ${filePath}`);
     return genes;
   } catch (error) {
-    throw new Error(`Error parsing gene list file ${filePath}: ${error.message}`);
+    if (!(error instanceof Error)) throw error;
+    throw new Error(`Error parsing gene list file ${filePath}: ${error.message}`, { cause: error });
   }
 }
 
 /**
  * Parses a JSON file containing gene information based on a mapping.
  * @param {string} filePath - Path to the JSON file.
- * @param {Object} mapping - Field mapping configuration with 'identifier' and optional 'dataFields'.
- * @returns {Promise<Array<Object>>} Parsed gene objects.
+ * @param {import('./dataTypes').GeneMapping} mapping - Field mapping configuration with 'identifier' and optional 'dataFields'.
+ * @returns {Promise<import('./dataTypes').GeneRecord[]>} Parsed gene objects.
  */
 async function parseJsonGeneFile(filePath, mapping) {
   debug(`Parsing JSON gene file: ${filePath} with mapping:`, mapping);
@@ -138,6 +140,7 @@ async function parseJsonGeneFile(filePath, mapping) {
         continue;
       }
 
+      /** @type {import('./dataTypes').GeneRecord} */
       const gene = {
         identifier: String(identifier),
         source: path.basename(filePath),
@@ -158,24 +161,28 @@ async function parseJsonGeneFile(filePath, mapping) {
     debug(`Parsed ${genes.length} genes from ${filePath}`);
     return genes;
   } catch (error) {
+    if (!(error instanceof Error)) throw error;
     if (error instanceof SyntaxError) {
       throw new Error(
-        `Error parsing JSON file ${filePath}: Invalid JSON format - ${error.message}`
+        `Error parsing JSON file ${filePath}: Invalid JSON format - ${error.message}`,
+        { cause: error }
       );
     }
-    throw new Error(`Error parsing JSON gene file ${filePath}: ${error.message}`);
+    throw new Error(`Error parsing JSON gene file ${filePath}: ${error.message}`, { cause: error });
   }
 }
 
 /**
  * Loads all features from file paths provided in params.
- * @param {Object} params - CLI/config parameters.
- * @returns {Promise<Object>} An object containing featuresByChrom and geneSets.
+ * @param {import('./dataTypes').FeatureParams} params - CLI/config parameters.
+ * @returns {Promise<import('./dataTypes').Features>} An object containing featuresByChrom and geneSets.
  */
 async function loadFeatures(params) {
   debug('Loading features from provided parameters');
 
+  /** @type {import('./dataTypes').Features['featuresByChrom']} */
   const featuresByChrom = {};
+  /** @type {import('./dataTypes').Features['geneSets']} */
   const geneSets = new Map();
 
   // Parse BED files
@@ -191,17 +198,20 @@ async function loadFeatures(params) {
 
           // Store region data with source information
           const regionData = {
+            low: region.start + 1,
+            high: region.end,
             name: region.name,
             source: file,
             score: region.score,
             strand: region.strand,
           };
 
-          featuresByChrom[region.chrom].insert(region.start, region.end, regionData);
+          featuresByChrom[region.chrom].insert(region.start + 1, region.end, regionData);
         }
 
         debug(`Loaded ${regions.length} regions from ${file}`);
       } catch (error) {
+        if (!(error instanceof Error)) throw error;
         debug(`Failed to load BED file ${file}: ${error.message}`);
         throw error;
       }
@@ -219,7 +229,7 @@ async function loadFeatures(params) {
             geneSets.set(gene.identifier, []);
           }
 
-          geneSets.get(gene.identifier).push({
+          geneSets.get(gene.identifier)?.push({
             source: file,
             type: 'gene_list',
           });
@@ -227,6 +237,7 @@ async function loadFeatures(params) {
 
         debug(`Loaded ${genes.length} genes from ${file}`);
       } catch (error) {
+        if (!(error instanceof Error)) throw error;
         debug(`Failed to load gene list file ${file}: ${error.message}`);
         throw error;
       }
@@ -243,7 +254,8 @@ async function loadFeatures(params) {
     try {
       mapping = JSON.parse(params.jsonGeneMapping);
     } catch (error) {
-      throw new Error(`Invalid JSON gene mapping: ${error.message}`);
+      if (!(error instanceof Error)) throw error;
+      throw new Error(`Invalid JSON gene mapping: ${error.message}`, { cause: error });
     }
 
     for (const file of params.jsonGenes) {
@@ -255,6 +267,7 @@ async function loadFeatures(params) {
             geneSets.set(gene.identifier, []);
           }
 
+          /** @type {import('./dataTypes').GeneSource} */
           const geneData = {
             source: file,
             type: 'json_genes',
@@ -267,11 +280,12 @@ async function loadFeatures(params) {
             }
           });
 
-          geneSets.get(gene.identifier).push(geneData);
+          geneSets.get(gene.identifier)?.push(geneData);
         }
 
         debug(`Loaded ${genes.length} genes from ${file}`);
       } catch (error) {
+        if (!(error instanceof Error)) throw error;
         debug(`Failed to load JSON gene file ${file}: ${error.message}`);
         throw error;
       }

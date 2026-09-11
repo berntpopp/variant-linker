@@ -20,7 +20,9 @@ describe('apiHelper', () => {
     // Mock successful response
     nock(apiBaseUrl).get(testEndpoint).reply(200, mockResponse);
 
-    const result = await apiHelper.fetchApi(testEndpoint);
+    const result = await apiHelper.fetchApi(testEndpoint, {}, false, 'GET', null, null, {
+      maxRetryDelayMs: 10,
+    });
     expect(result).to.deep.equal(mockResponse);
   });
 
@@ -32,7 +34,9 @@ describe('apiHelper', () => {
     nock(apiBaseUrl).get(testEndpoint).reply(500, { error: 'Internal Server Error' });
     nock(apiBaseUrl).get(testEndpoint).reply(200, mockResponse);
 
-    const result = await apiHelper.fetchApi(testEndpoint);
+    const result = await apiHelper.fetchApi(testEndpoint, {}, false, 'GET', null, null, {
+      maxRetryDelayMs: 10,
+    });
     expect(result).to.deep.equal(mockResponse);
   });
 
@@ -42,13 +46,15 @@ describe('apiHelper', () => {
     // First two requests fail with network errors, third succeeds
     nock(apiBaseUrl)
       .get(testEndpoint)
-      .replyWithError({ code: 'ECONNRESET', message: 'Connection reset' });
+      .replyWithError(Object.assign(new Error('Connection reset'), { code: 'ECONNRESET' }));
     nock(apiBaseUrl)
       .get(testEndpoint)
-      .replyWithError({ code: 'ETIMEDOUT', message: 'Connection timed out' });
+      .replyWithError(Object.assign(new Error('Connection timed out'), { code: 'ETIMEDOUT' }));
     nock(apiBaseUrl).get(testEndpoint).reply(200, mockResponse);
 
-    const result = await apiHelper.fetchApi(testEndpoint);
+    const result = await apiHelper.fetchApi(testEndpoint, {}, false, 'GET', null, null, {
+      maxRetryDelayMs: 10,
+    });
     expect(result).to.deep.equal(mockResponse);
   });
 
@@ -61,7 +67,9 @@ describe('apiHelper', () => {
       .reply(429, { error: 'Too Many Requests' }, { 'Retry-After': '1' });
     nock(apiBaseUrl).get(testEndpoint).reply(200, mockResponse);
 
-    const result = await apiHelper.fetchApi(testEndpoint);
+    const result = await apiHelper.fetchApi(testEndpoint, {}, false, 'GET', null, null, {
+      maxRetryDelayMs: 10,
+    });
     expect(result).to.deep.equal(mockResponse);
   });
 
@@ -70,7 +78,7 @@ describe('apiHelper', () => {
     nock(apiBaseUrl).get(testEndpoint).reply(400, { error: 'Bad Request' });
 
     try {
-      await apiHelper.fetchApi(testEndpoint);
+      await apiHelper.fetchApi(testEndpoint, {}, false, 'GET', null, null, { maxRetryDelayMs: 10 });
       throw new Error('Expected fetchApi to throw an error for 400 status code');
     } catch (error) {
       expect(error.response.status).to.equal(400);
@@ -91,7 +99,7 @@ describe('apiHelper', () => {
     // Make the request and expect it to fail
     let errorThrown = false;
     try {
-      await apiHelper.fetchApi(testEndpoint);
+      await apiHelper.fetchApi(testEndpoint, {}, false, 'GET', null, null, { maxRetryDelayMs: 10 });
     } catch (error) {
       errorThrown = true;
       // Verify it's the right kind of error
@@ -148,7 +156,8 @@ describe('apiHelper', () => {
     // Second attempt succeeds
     nock(apiBaseUrl).post(testEndpoint, requestBody).reply(200, mockResponse);
 
-    const result = await apiHelper.fetchApi(testEndpoint, {}, false, 'POST', requestBody);
+    const result = await apiHelper.fetchApi(testEndpoint, {}, false, 'POST', requestBody, null,
+      { maxRetryDelayMs: 10 });
 
     expect(result).to.deep.equal(mockResponse);
   });

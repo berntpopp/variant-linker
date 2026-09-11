@@ -13,7 +13,7 @@ const debug = require('debug')('variant-linker:ped-reader');
  * Reads and parses a standard 6-column PED file.
  *
  * @param {string} filePath - Path to the PED file
- * @returns {Promise<Map<string, Object>>} A Map with SampleID as key and parsed PED data as value
+ * @returns {Promise<import('./dataTypes').Pedigree>} A Map with SampleID as key and parsed PED data as value
  * @throws {Error} If the file doesn't exist, is not readable, or has parsing errors
  *
  * @example
@@ -88,12 +88,13 @@ async function readPedigree(filePath) {
     debug(`Successfully parsed ${pedigreeData.size} samples from PED file`);
     return pedigreeData;
   } catch (error) {
-    if (error.code === 'ENOENT') {
-      throw new Error(`PED file not found: ${filePath}`);
-    } else if (error.code === 'EACCES') {
-      throw new Error(`Cannot read PED file (permission denied): ${filePath}`);
+    if (!(error instanceof Error)) throw error;
+    if (('code' in error ? error.code : undefined) === 'ENOENT') {
+      throw new Error(`PED file not found: ${filePath}`, { cause: error });
+    } else if (('code' in error ? error.code : undefined) === 'EACCES') {
+      throw new Error(`Cannot read PED file (permission denied): ${filePath}`, { cause: error });
     } else {
-      throw new Error(`Error reading PED file: ${error.message}`);
+      throw new Error(`Error reading PED file: ${error.message}`, { cause: error });
     }
   }
 }

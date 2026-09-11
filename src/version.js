@@ -12,7 +12,7 @@ const packageJson = require('../package.json');
 /**
  * Returns the semantic version details for the current package.
  *
- * @returns {object} An object containing the version details:
+ * @returns {{version:string, major:number, minor:number, patch:number, prerelease: readonly (string|number)[], build:readonly string[]}} Version details:
  *   { version: string, major: number, minor: number, patch: number,
  *     prerelease: Array, build: Array }
  * @throws {Error} If the version in package.json is invalid.

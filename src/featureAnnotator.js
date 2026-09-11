@@ -12,9 +12,9 @@ const debug = require('debug')('variant-linker:feature-annotator');
 
 /**
  * Annotates variants with overlap information from user-provided features.
- * @param {Array<Object>} annotationData - Array of VEP annotations.
- * @param {Object} features - The loaded features from loadFeatures containing featuresByChrom and geneSets.
- * @returns {Array<Object>} The modified annotationData with a new `user_feature_overlap` field.
+ * @param {import('./dataTypes').Annotation[]} annotationData - Array of VEP annotations.
+ * @param {import('./dataTypes').Features} features - The loaded features from loadFeatures containing featuresByChrom and geneSets.
+ * @returns {import('./dataTypes').Annotation[]} The modified annotationData with a new `user_feature_overlap` field.
  */
 function annotateOverlaps(annotationData, features) {
   if (!features || !annotationData || !Array.isArray(annotationData)) {
@@ -36,14 +36,15 @@ function annotateOverlaps(annotationData, features) {
     // 1. Region Overlap Check
     if (featuresByChrom && annotation.seq_region_name && annotation.start && annotation.end) {
       const chrom = String(annotation.seq_region_name).replace(/^chr/i, ''); // Normalize chromosome name
-      const start = parseInt(annotation.start, 10);
-      const end = parseInt(annotation.end, 10);
+      const start = Number(annotation.start);
+      const end = Number(annotation.end);
 
       if (featuresByChrom[chrom]) {
         try {
           const overlappingRegions = featuresByChrom[chrom].search(start, end);
 
           for (const region of overlappingRegions) {
+            /** @type {import('./dataTypes').FeatureOverlap} */
             const overlapData = {
               type: 'region',
               name: region.name || 'unnamed',
@@ -69,6 +70,7 @@ function annotateOverlaps(annotationData, features) {
             `Found ${overlappingRegions.length} region overlaps for variant at ${chrom}:${start}-${end}`
           );
         } catch (error) {
+          if (!(error instanceof Error)) throw error;
           debug(`Error searching for region overlaps on ${chrom}: ${error.message}`);
         }
       }
@@ -95,9 +97,10 @@ function annotateOverlaps(annotationData, features) {
 
       for (const gene of variantGenes) {
         if (geneSets.has(gene)) {
-          const geneInfoList = geneSets.get(gene);
+          const geneInfoList = geneSets.get(gene) || [];
 
           for (const geneInfo of geneInfoList) {
+            /** @type {import('./dataTypes').FeatureOverlap} */
             const overlapData = {
               type: 'gene',
               identifier: gene,
@@ -143,7 +146,7 @@ function annotateOverlaps(annotationData, features) {
 /**
  * Checks if any annotation in the dataset has user feature overlaps.
  * This can be used to determine if the UserFeatureOverlap column should be included in output.
- * @param {Array<Object>} annotationData - Array of VEP annotations.
+ * @param {import('./dataTypes').Annotation[]} annotationData - Array of VEP annotations.
  * @returns {boolean} True if any annotation has user feature overlaps.
  */
 function hasUserFeatureOverlaps(annotationData) {
@@ -161,7 +164,7 @@ function hasUserFeatureOverlaps(annotationData) {
 
 /**
  * Formats user feature overlap data for display in tabular output.
- * @param {Array<Object>} overlaps - Array of overlap objects.
+ * @param {import('./dataTypes').FeatureOverlap[]} overlaps - Array of overlap objects.
  * @returns {string} Formatted string representation of overlaps.
  */
 function formatUserFeatureOverlaps(overlaps) {

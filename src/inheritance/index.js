@@ -15,14 +15,11 @@ const patternPrioritizer = require('./patternPrioritizer');
 // Primarily export the main analysis function
 const inheritance = {
   analyzeInheritanceForSample,
-};
-
-// Optionally, export utils and constants under a sub-namespace if they might be useful externally,
-// but keep the main focus on the analysis function. Direct imports are often cleaner.
-inheritance.utils = {
-  ...genotypeUtils,
-  ...pedigreeUtils,
-  DEFAULT_PRIORITY_ORDER: patternPrioritizer.DEFAULT_PRIORITY_ORDER,
+  utils: {
+    ...genotypeUtils,
+    ...pedigreeUtils,
+    DEFAULT_PRIORITY_ORDER: patternPrioritizer.DEFAULT_PRIORITY_ORDER,
+  },
 };
 
 module.exports = inheritance;

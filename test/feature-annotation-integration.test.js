@@ -15,8 +15,6 @@ describe('Feature Annotation Integration Tests', () => {
   let fsStub;
   let variantLinkerCore;
   let featureParser;
-  let IntervalTreeStub;
-  let intervalTreeInstance;
 
   beforeEach(() => {
     sandbox = sinon.createSandbox();
@@ -26,18 +24,9 @@ describe('Feature Annotation Integration Tests', () => {
       },
     };
 
-    // Mock IntervalTree
-    intervalTreeInstance = {
-      insert: sandbox.stub(),
-      search: sandbox.stub().returns([]),
-      count: 0,
-    };
-    IntervalTreeStub = sandbox.stub().returns(intervalTreeInstance);
-
     // Mock the featureParser module with fs stub and IntervalTree
     featureParser = proxyquire('../src/featureParser', {
       fs: fsStub,
-      'node-interval-tree': IntervalTreeStub,
     });
 
     // Mock variantLinkerCore with the stubbed featureParser
@@ -57,16 +46,6 @@ describe('Feature Annotation Integration Tests', () => {
     fsStub.promises.readFile.resolves(bedContent);
 
     // Configure interval tree mock to return overlapping regions
-    intervalTreeInstance.search.returns([
-      {
-        low: 65000,
-        high: 66000,
-        name: 'test_region',
-        score: 100,
-        strand: '+',
-        source: '/path/to/test.bed',
-      },
-    ]);
 
     // Mock VEP API response
     const vepResponse = [
@@ -368,16 +347,6 @@ describe('Feature Annotation Integration Tests', () => {
     fsStub.promises.readFile.onSecondCall().resolves(geneContent);
 
     // Configure interval tree mock to return overlapping regions
-    intervalTreeInstance.search.returns([
-      {
-        low: 65000,
-        high: 66000,
-        name: 'promoter_region',
-        score: 500,
-        strand: '+',
-        source: '/path/to/regions.bed',
-      },
-    ]);
 
     // Mock VEP API response
     const vepResponse = [

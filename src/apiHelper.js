@@ -1,102 +1,57 @@
 'use strict';
-// src/apiHelper.js
-
-/**
- * @fileoverview API Helper module to perform HTTP GET or POST requests with caching support.
- * It builds the full URL using the base API endpoint from the external configuration.
- * Implements exponential backoff retry for transient errors.
- */
-
-const axios = require('axios');
-const debugDetailed = require('debug')('variant-linker:detailed');
-const debugAll = require('debug')('variant-linker:all');
-// const cache = require('./cache'); // <-- Remove this line
-const { getCache, setCache } = require('./cache'); // <-- Import specific functions
+const axios = require('axios').default;
+const debug = require('debug')('variant-linker:detailed');
+const { getCacheAsync, setCache } = require('./cache');
 const apiConfig = require('../config/apiConfig.json');
+const { resolveRequestOptions, canonicalJson, abortable, delay } = require('./api/requestContext');
+/** @typedef {import('./api/requestContext').RequestOptions} RequestOptions */
+/** @typedef {Record<string, string | number | boolean | null | undefined>} QueryOptions */
+/** @typedef {import('axios').AxiosProxyConfig | false | null} ProxyConfig */
 
-// Retry configuration from apiConfig.json
-const MAX_RETRIES = apiConfig.requests?.retry?.maxRetries ?? 4; // Default: 4
-const BASE_DELAY_MS = apiConfig.requests?.retry?.baseDelayMs ?? 1000; // Default: 1000ms
-const RETRYABLE_STATUS_CODES = apiConfig.requests?.retry?.retryableStatusCodes ?? [
-  429, 500, 502, 503, 504,
-];
-// Max length for request body logging
-const MAX_BODY_LOG_LENGTH = 500;
-
-/**
- * Helper to truncate potentially large request bodies for logging.
- * @param {any} body - The request body.
- * @returns {string} - A string representation, possibly truncated.
- */
-function formatRequestBodyForLog(body) {
-  if (!body) {
-    return 'None';
-  }
-  try {
-    const bodyString = JSON.stringify(body);
-    if (bodyString.length > MAX_BODY_LOG_LENGTH) {
-      return `${bodyString.substring(0, MAX_BODY_LOG_LENGTH)}... (truncated)`;
-    }
-    return bodyString;
-  } catch (e) {
-    return '[Error formatting request body for log]';
-  }
-}
-
-/**
- * Parses a proxy URL into axios-compatible configuration.
- * @param {string} proxyUrl - Proxy URL (e.g., http://user:pass@proxy:8080)
- * @param {string} [proxyAuth] - Optional separate authentication (user:pass)
- * @returns {Object|boolean} Proxy configuration object or false to disable proxy
+/** Parse proxy credentials without including them in diagnostics.
+ * @param {string | null | undefined} proxyUrl
+ * @param {string | null} [proxyAuth]
+ * @returns {import('axios').AxiosProxyConfig | false}
  */
 function parseProxyConfig(proxyUrl, proxyAuth = null) {
-  if (!proxyUrl) {
-    return false; // No proxy configuration
-  }
-
+  if (!proxyUrl) return false;
   try {
     const url = new URL(proxyUrl);
+    if (!['http:', 'https:'].includes(url.protocol)) throw new Error('Unsupported protocol');
+    /** @type {import('axios').AxiosProxyConfig} */
     const config = {
-      protocol: url.protocol.slice(0, -1), // Remove trailing ':'
+      protocol: url.protocol.slice(0, -1),
       host: url.hostname,
-      port: parseInt(url.port) || (url.protocol === 'https:' ? 443 : 80),
+      port: Number(url.port) || (url.protocol === 'https:' ? 443 : 80),
     };
-
-    // Handle authentication from URL
     if (url.username && url.password) {
       config.auth = {
         username: decodeURIComponent(url.username),
         password: decodeURIComponent(url.password),
       };
     } else if (proxyAuth) {
-      // Handle separate authentication parameter
-      const [username, password] = proxyAuth.split(':', 2);
-      if (username && password) {
-        config.auth = { username, password };
+      const colon = proxyAuth.indexOf(':');
+      if (colon > 0 && colon < proxyAuth.length - 1) {
+        config.auth = { username: proxyAuth.slice(0, colon), password: proxyAuth.slice(colon + 1) };
       }
     }
-
-    debugDetailed(`Proxy configuration: ${config.protocol}://${config.host}:${config.port}`);
     return config;
-  } catch (error) {
-    throw new Error(
-      `Invalid proxy URL format: ${proxyUrl}. Expected format: http://[user:pass@]host:port`
-    );
+  } catch {
+    throw new Error('Invalid proxy URL format. Expected format: http://[user:pass@]host:port');
   }
 }
 
-/**
- * Fetch data from an API endpoint using axios with optional caching.
- * Implements exponential backoff retry for transient errors (5xx status codes, network errors).
- *
- * @param {string} endpointPath - The API endpoint path (e.g. "/vep/homo_sapiens/region").
- * @param {Object} [queryOptions={}] - Optional query parameters.
- * @param {boolean} [cacheEnabled=false] - If true, cache the response.
- * @param {string} [method='GET'] - HTTP method: 'GET' or 'POST'.
- * @param {Object|null} [requestBody=null] - For POST requests, the JSON body.
- * @param {Object} [proxyConfig=null] - Proxy configuration object.
- * @returns {Promise<Object>} The API response data.
- * @throws {Error} If the request fails after all retry attempts or for non-retryable errors.
+/** Fetch JSON with immutable identity, finite overall budget and cancellation.
+ * The generic describes the external API payload; wrappers validate their boundary.
+ * @template [T=unknown]
+ * @param {string} endpointPath
+ * @param {QueryOptions} [queryOptions]
+ * @param {boolean} [cacheEnabled]
+ * @param {string} [method]
+ * @param {unknown} [requestBody]
+ * @param {ProxyConfig} [proxyConfig]
+ * @param {RequestOptions} [requestOptions]
+ * @returns {Promise<T>}
  */
 async function fetchApi(
   endpointPath,
@@ -104,173 +59,87 @@ async function fetchApi(
   cacheEnabled = false,
   method = 'GET',
   requestBody = null,
-  proxyConfig = null
+  proxyConfig = null,
+  requestOptions = {}
 ) {
+  const context = resolveRequestOptions(requestOptions);
+  const controller = new AbortController();
+  const cancel = () => controller.abort(context.signal?.reason || new Error('Request cancelled'));
+  if (context.signal?.aborted) cancel();
+  context.signal?.addEventListener('abort', cancel, { once: true });
+  const timer = setTimeout(
+    () => controller.abort(new Error('Request deadline exceeded')),
+    context.deadlineMs
+  );
+  const signal = controller.signal;
   try {
-    // Remove any content-type header from queryOptions.
-    if (queryOptions['content-type']) {
-      delete queryOptions['content-type'];
+    signal.throwIfAborted();
+    const url = new URL(`${context.baseUrl.replace(/\/$/, '')}/${endpointPath.replace(/^\//, '')}`);
+    for (const [key, value] of Object.entries(queryOptions)) {
+      if (key.toLowerCase() !== 'content-type' && value !== null && value !== undefined)
+        url.searchParams.set(key, String(value));
     }
-    // Build the query string.
-    const params = new URLSearchParams(queryOptions).toString();
-    const baseUrl = process.env.ENSEMBL_BASE_URL || apiConfig.ensembl.baseUrl;
-    const url = params ? `${baseUrl}${endpointPath}?${params}` : `${baseUrl}${endpointPath}`;
-    // Don't log the full URL here yet, log it inside the loop for retries
-
+    url.searchParams.sort();
+    const verb = method.toUpperCase();
+    if (!['GET', 'POST'].includes(verb)) throw new Error(`Unsupported HTTP method: ${verb}`);
+    const body = JSON.parse(canonicalJson(requestBody));
+    const key = canonicalJson({
+      method: verb,
+      url: url.href,
+      assembly: context.assembly,
+      body: verb === 'POST' ? body : null,
+    });
     if (cacheEnabled) {
-      //   const cached = cache.getCache(url); // <-- Change this call
-      const cached = getCache(url); // <-- Use imported function directly
-      if (cached) {
-        debugDetailed(`Returning cached result for: ${url}`);
-        return cached;
+      const cached = await abortable(getCacheAsync(key), signal);
+      if (cached !== null && cached !== undefined) return /** @type {T} */ (cached);
+    }
+    const started = Date.now();
+    for (let attempt = 0; ; attempt++) {
+      signal.throwIfAborted();
+      try {
+        /** @type {import('axios').AxiosRequestConfig} */
+        const config = {
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          timeout: Math.min(
+            context.timeoutMs,
+            Math.max(1, context.deadlineMs - (Date.now() - started))
+          ),
+          signal,
+          maxContentLength: context.maxResponseBytes,
+          maxBodyLength: context.maxResponseBytes,
+        };
+        if (proxyConfig !== null) config.proxy = proxyConfig;
+        if (debug.enabled) debug('HTTP %s attempt %d (%s)', verb, attempt + 1, context.assembly);
+        const response = await abortable(
+          verb === 'POST' ? axios.post(url.href, body, config) : axios.get(url.href, config),
+          signal
+        );
+        if (cacheEnabled) await abortable(Promise.resolve(setCache(key, response.data)), signal);
+        return /** @type {T} */ (response.data);
+      } catch (error) {
+        signal.throwIfAborted();
+        const failure = /** @type {import('axios').AxiosError} */ (error);
+        const status = failure.response?.status;
+        const retryable = status
+          ? apiConfig.requests.retry.retryableStatusCodes.includes(status)
+          : ['ECONNRESET', 'ETIMEDOUT', 'ECONNABORTED', 'EAI_AGAIN', 'ERR_NETWORK'].includes(
+              failure.code || ''
+            );
+        if (!retryable || attempt >= context.maxRetries || axios.isCancel(error)) throw error;
+        const header = failure.response?.headers?.['retry-after'];
+        const retryAfter =
+          header === null || header === undefined
+            ? 0
+            : /^\d+(\.\d+)?$/.test(String(header))
+              ? Number(header) * 1000
+              : Math.max(0, Date.parse(String(header)) - Date.now());
+        const backoff = apiConfig.requests.retry.baseDelayMs * 2 ** attempt;
+        await delay(Math.min(context.maxRetryDelayMs, Math.max(backoff, retryAfter || 0)), signal);
       }
     }
-
-    // Implement retry logic with exponential backoff
-    let lastError = null;
-
-    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-      // Add delay before retries (not on first attempt)
-      if (attempt > 0) {
-        // Calculate delay with exponential backoff and jitter
-        // Incorporate Retry-After header value if present in lastError
-        let retryDelayMs = BASE_DELAY_MS * Math.pow(2, attempt - 1) * (1 + Math.random() * 0.2);
-        const retryAfterHeader = lastError?.response?.headers?.['retry-after'];
-
-        if (lastError?.response?.status === 429 && retryAfterHeader) {
-          const retryAfterSeconds = parseInt(retryAfterHeader, 10);
-          if (!isNaN(retryAfterSeconds)) {
-            const retryAfterMs = retryAfterSeconds * 1000;
-            // Use the larger of the calculated delay or the header value, add jitter
-            retryDelayMs = Math.max(retryDelayMs, retryAfterMs) + Math.random() * 100;
-            debugDetailed(
-              `Rate limited (429). Using Retry-After header: ${retryAfterSeconds}s. ` +
-                `Effective delay: ${retryDelayMs.toFixed(0)}ms`
-            );
-          } else {
-            // Handle date format for Retry-After (less common)
-            try {
-              const retryDate = new Date(retryAfterHeader).getTime();
-              const now = Date.now();
-              if (retryDate > now) {
-                const retryAfterMs = retryDate - now;
-                retryDelayMs = Math.max(retryDelayMs, retryAfterMs) + Math.random() * 100;
-                debugDetailed(
-                  `Rate limited (429). Using Retry-After header (date). ` +
-                    `Effective delay: ${retryDelayMs.toFixed(0)}ms`
-                );
-              }
-            } catch (dateParseError) {
-              debugDetailed(
-                `Could not parse Retry-After date: ${retryAfterHeader}. Using standard backoff.`
-              );
-            }
-          }
-        }
-
-        debugDetailed(
-          `Retry attempt ${attempt}/${MAX_RETRIES} after ${retryDelayMs.toFixed(0)}ms delay`
-        );
-        await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
-      }
-
-      // --- Enhanced Debug Logging for Request Details ---
-      const requestHeaders = { 'Content-Type': 'application/json', Accept: 'application/json' }; // Added Accept header
-      debugDetailed(
-        `Attempt ${attempt + 1}/${MAX_RETRIES + 1}: Sending API Request...` +
-          `\n  Method: ${method.toUpperCase()}` +
-          `\n  URL: ${url}` +
-          `\n  Headers: ${JSON.stringify(requestHeaders)}` +
-          (method.toUpperCase() === 'POST'
-            ? `\n  Body: ${formatRequestBodyForLog(requestBody)}`
-            : '')
-      );
-      // --- End Enhanced Debug Logging ---
-
-      try {
-        let response;
-        // Build axios config with headers and optional proxy
-        const axiosConfig = { headers: requestHeaders };
-        if (proxyConfig) {
-          axiosConfig.proxy = proxyConfig;
-        }
-
-        if (method.toUpperCase() === 'POST') {
-          response = await axios.post(url, requestBody, axiosConfig);
-        } else {
-          response = await axios.get(url, axiosConfig);
-        }
-
-        // If we get here, the request succeeded
-        debugDetailed(
-          `Attempt ${attempt + 1} Succeeded (Status: ${response.status}). ` +
-            `Response data length: ${JSON.stringify(response.data)?.length || 0}`
-        );
-        // Optionally log truncated response data for detailed debugging:
-        // debugDetailed(`Response Data (Truncated): ${formatRequestBodyForLog(response.data)}`);
-
-        if (cacheEnabled) {
-          //   cache.setCache(url, response.data); // <-- Change this call
-          setCache(url, response.data); // <-- Use imported function directly
-        }
-
-        return response.data;
-      } catch (error) {
-        lastError = error; // Store the error for potential Retry-After parsing
-        const statusCode = error.response?.status;
-        const isNetworkError = !statusCode && error.code; // e.g., ECONNRESET, ETIMEDOUT
-        const isRetryableStatusCode = statusCode && RETRYABLE_STATUS_CODES.includes(statusCode);
-
-        // Determine if error is retryable
-        const isRetryable = isRetryableStatusCode || isNetworkError;
-
-        if (isRetryable && attempt < MAX_RETRIES) {
-          debugDetailed(
-            `Attempt ${attempt + 1} Failed. Retryable error ` +
-              `(${statusCode || error.code}): ${error.message}. Retrying...`
-          );
-          // The delay calculation is now at the beginning of the loop
-          continue; // Go to the next attempt
-        }
-
-        // Non-retryable error or max retries reached
-        // Log more context about the failed request
-        debugAll(
-          `Failed request details:` +
-            `\n  Method: ${method.toUpperCase()}` +
-            `\n  URL: ${url}` +
-            (method.toUpperCase() === 'POST'
-              ? `\n  Body (Truncated): ${formatRequestBodyForLog(requestBody)}`
-              : '')
-        );
-        debugAll(
-          `Exhausted all ${attempt + 1} attempts or non-retryable error for URL: ${url}. ` +
-            `Last error (${statusCode || error.code}): ${error.message}`
-        );
-        if (error.response) {
-          // Log truncated response data on error
-          debugAll(
-            `Error Response Data (Truncated): ${formatRequestBodyForLog(error.response.data)}`
-          );
-          debugAll(`Error Response Headers: ${JSON.stringify(error.response.headers)}`);
-        } else if (error.request) {
-          debugAll('Error: No response received from server.');
-        } else {
-          debugAll(`Error Details: ${error.message}`);
-        }
-        throw error; // Throw the last encountered error
-      }
-    } // End of retry loop
-
-    // This point should technically not be reached due to throw/return within the loop
-    // Throw the last error if the loop finishes unexpectedly (e.g., MAX_RETRIES is -1)
-    debugAll(`Exiting fetchApi loop unexpectedly for ${url}. Throwing last error.`);
-    throw lastError;
-  } catch (error) {
-    // Catch any synchronous errors from initial setup (URL building, etc.)
-    debugAll(`Error in fetchApi setup or final throw: ${error.message}`);
-    throw error; // Re-throw the error
+  } finally {
+    clearTimeout(timer);
+    context.signal?.removeEventListener('abort', cancel);
   }
 }
-
-module.exports = { fetchApi, parseProxyConfig };
+module.exports = { fetchApi, parseProxyConfig, resolveRequestOptions };

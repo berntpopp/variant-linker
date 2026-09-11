@@ -18,7 +18,7 @@ const { isVariant, isRef, isMissing } = require('./genotypeUtils');
  * @param {string} pattern - The inheritance pattern being checked (e.g., 'autosomal_dominant').
  *                            Currently used mainly for logging context.
  * @param {Map<string, string>} genotypes - Map of sampleId to genotype string for the variant.
- * @param {Map<string, Object>} pedigreeData - Parsed pedigree data containing affected status.
+ * @param {import('../dataTypes').Pedigree} pedigreeData - Parsed pedigree data containing affected status.
  * @returns {string} Segregation status: 'segregates', 'does_not_segregate', or 'unknown_*'.
  */
 function checkSegregation(pattern, genotypes, pedigreeData) {

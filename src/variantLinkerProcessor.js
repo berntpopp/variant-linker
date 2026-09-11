@@ -11,6 +11,10 @@
  */
 
 // Use fs only if in a Node environment.
+/** @typedef {import('./dataTypes').Annotation} Annotation */
+/** @typedef {Record<string,Record<string,unknown>>} Criteria */
+/** @typedef {import('./analysisTypes').AnalysisResult} AnalysisResult */
+/** @typedef {Criteria|((result:AnalysisResult)=>AnalysisResult)|null|undefined} Filter */
 const fs = typeof window === 'undefined' ? require('fs') : null;
 const debug = require('debug')('variant-linker:processor');
 const {
@@ -22,10 +26,11 @@ const {
 const { hasUserFeatureOverlaps } = require('./featureAnnotator');
 const { getValueByPath } = require('./utils/pathUtils');
 const { formatAnnotationsToVcf } = require('./vcfFormatter');
+const { mapOutputToSchemaOrg, validateSchemaOrgOutput } = require('./schemaMapper');
 
 /**
  * Helper function to check if annotations contain CNV data.
- * @param {Array} annotationData - Array of annotation objects
+ * @param {Annotation[]} annotationData - Array of annotation objects
  * @returns {boolean} True if any annotation has CNV format or CNV-specific fields
  */
 function hasCnvAnnotations(annotationData) {
@@ -55,9 +60,9 @@ function hasCnvAnnotations(annotationData) {
 /**
  * Helper: Applies an operator to a value.
  *
- * @param {*} value - The value from the object.
+ * @param {unknown} value - The value from the object.
  * @param {string} operator - The operator (eq, ne, gt, gte, lt, lte, in, nin).
- * @param {*} target - The target value for the comparison.
+ * @param {unknown} target - The target value for the comparison.
  * @returns {boolean} True if the condition is satisfied, false otherwise.
  * @throws {Error} If the operator is not supported.
  */
@@ -68,25 +73,25 @@ function applyOperator(value, operator, target) {
     case 'ne':
       return value !== target;
     case 'gt':
-      if (typeof value !== 'number') {
+      if (typeof value !== 'number' || typeof target !== 'number') {
         console.warn(`Value is not numeric; cannot apply operator "gt".`);
         return false;
       }
       return value > target;
     case 'gte':
-      if (typeof value !== 'number') {
+      if (typeof value !== 'number' || typeof target !== 'number') {
         console.warn(`Value is not numeric; cannot apply operator "gte".`);
         return false;
       }
       return value >= target;
     case 'lt':
-      if (typeof value !== 'number') {
+      if (typeof value !== 'number' || typeof target !== 'number') {
         console.warn(`Value is not numeric; cannot apply operator "lt".`);
         return false;
       }
       return value < target;
     case 'lte':
-      if (typeof value !== 'number') {
+      if (typeof value !== 'number' || typeof target !== 'number') {
         console.warn(`Value is not numeric; cannot apply operator "lte".`);
         return false;
       }
@@ -117,9 +122,10 @@ function applyOperator(value, operator, target) {
  *     "transcript_consequences.*.impact": { eq: "MODERATE" }
  *   }
  *
- * @param {Array<Object>} data - The array of objects to filter.
- * @param {Object} criteria - The filtering criteria.
- * @returns {Array<Object>} The filtered array.
+ * @template {Record<string,unknown>} T
+ * @param {T[]} data - The array of objects to filter.
+ * @param {Criteria} criteria - The filtering criteria.
+ * @returns {T[]} The filtered array.
  * @throws {Error} If an unsupported operator is used.
  */
 function jsonApiFilter(data, criteria) {
@@ -129,12 +135,12 @@ function jsonApiFilter(data, criteria) {
 
   /**
    * Helper function to determine if an object matches all the specified filter criteria
-   * @param {Object} obj - The object to check against criteria
+   * @param {T} obj - The object to check against criteria
    * @returns {boolean} True if the object matches all criteria, false otherwise
    */
   function matchesCriteria(obj) {
     for (const field in criteria) {
-      if (!criteria.hasOwnProperty(field)) continue;
+      if (!Object.hasOwn(criteria, field)) continue;
       const conditions = criteria[field];
       // Use getValueByPath if the field contains a dot or wildcard.
       // Get field value with dot notation or wildcard support
@@ -143,7 +149,7 @@ function jsonApiFilter(data, criteria) {
       // Check if one element in array satisfies conditions
       // Check each operator in the conditions
       for (const operator in conditions) {
-        if (!conditions.hasOwnProperty(operator)) continue;
+        if (!Object.hasOwn(conditions, operator)) continue;
         const target = conditions[operator];
         if (Array.isArray(fieldValue)) {
           if (!fieldValue.some((val) => applyOperator(val, operator, target))) {
@@ -169,10 +175,10 @@ function jsonApiFilter(data, criteria) {
  * notation (assumed to be found in variantData[0].T.hgvsc[0]) and uses it for the VEP call.
  *
  * @param {string} variant - The genetic variant to be analyzed.
- * @param {function} variantRecoder - A function that recodes the variant.
- * @param {function} vepHgvsAnnotation - A function that retrieves VEP annotations for a given HGVS.
- * @param {Object} recoderOptions - Optional parameters for the Variant Recoder API.
- * @param {Object} vepOptions - Optional parameters for the VEP API.
+ * @param {(variant:string, options:Record<string,string>)=>Promise<Record<string,{hgvsc?:string[]}>[]>} variantRecoder - A function that recodes the variant.
+ * @param {(hgvs:string, transcript:string, options:Record<string,string>)=>Promise<Annotation[]>} vepHgvsAnnotation - A function that retrieves VEP annotations for a given HGVS.
+ * @param {Record<string,string>} recoderOptions - Optional parameters for the Variant Recoder API.
+ * @param {Record<string,string>} vepOptions - Optional parameters for the VEP API.
  * @returns {Promise<{variantData: Object, annotationData: Object}>} A promise that resolves
  * with an object containing variant recoder data and annotation data.
  * @throws {Error} If no data is returned from either API call.
@@ -187,7 +193,7 @@ async function processVariantLinking(
   try {
     debug('Starting variant linking process');
     const variantData = await variantRecoder(variant, recoderOptions);
-    debug(`Variant Recoder data received: ${JSON.stringify(variantData)}`);
+    debug('Variant Recoder data received: %O', variantData);
 
     if (!variantData || variantData.length === 0) {
       throw new Error('No data returned from Variant Recoder');
@@ -208,7 +214,7 @@ async function processVariantLinking(
     debug(`Selected HGVS: ${selectedHgvs}, Selected Transcript: ${selectedTranscript}`);
 
     const annotationData = await vepHgvsAnnotation(selectedHgvs, selectedTranscript, vepOptions);
-    debug(`VEP annotation data received: ${JSON.stringify(annotationData)}`);
+    debug('VEP annotation data received: %O', annotationData);
 
     if (!annotationData || annotationData.length === 0) {
       throw new Error('No annotation data returned from VEP');
@@ -217,7 +223,7 @@ async function processVariantLinking(
     debug('Variant linking process completed successfully');
     return { variantData, annotationData };
   } catch (error) {
-    debug(`Error in variant linking process: ${error.message}`);
+    debug('Error in variant linking process: %s', error);
     throw error;
   }
 }
@@ -227,8 +233,8 @@ async function processVariantLinking(
  * For each annotation, finds the transcript consequence with pick === 1
  * and creates a new annotation with only that consequence.
  *
- * @param {Array<Object>} annotationData - Array of annotation objects.
- * @returns {Array<Object>} Array of annotations with only picked consequences.
+ * @param {Annotation[]} annotationData - Array of annotation objects.
+ * @returns {Annotation[]} Array of annotations with only picked consequences.
  * @private
  */
 function _pickConsequences(annotationData) {
@@ -271,16 +277,26 @@ function _pickConsequences(annotationData) {
  * Additionally, statistics on the number of annotations (and transcript consequences)
  * before and after filtering are added to meta.stepsPerformed.
  *
- * @param {Object} results - The results object from variant processing.
- * @param {(function|Object)} [filterParam] - An optional filter function or filter criteria object.
+ * @param {AnalysisResult} results - The results object from variant processing.
+ * @param {Filter} filterParam - An optional filter function or filter criteria object.
  * @param {string} format - The desired output format (e.g., 'JSON').
- * @param {Object} [params] - Additional parameters including pickOutput flag.
- * @returns {string} The filtered and formatted results as a string.
+ * @param {import('./analysisTypes').AnalysisParams} [params] - Additional parameters including pickOutput flag.
+ * @returns {string|{header:string,data:string}} The serialized result or tabular stream chunk.
  * @throws {Error} If an unsupported format is specified or if filtering fails.
  */
 function filterAndFormatResults(results, filterParam, format, params = {}) {
   debug('Starting results filtering and formatting');
-  let filteredResults = { ...results };
+  /** @type {AnalysisResult} */
+  let filteredResults = {
+    ...results,
+    meta: { ...results.meta, stepsPerformed: [...(results.meta?.stepsPerformed || [])] },
+    annotationData: (results.annotationData || []).map((annotation) => ({
+      ...annotation,
+      ...(annotation.transcript_consequences && {
+        transcript_consequences: annotation.transcript_consequences.map((tc) => ({ ...tc })),
+      }),
+    })),
+  };
 
   // Apply --pick-output filtering FIRST, before any other filtering
   if (params.pickOutput === true) {
@@ -308,7 +324,7 @@ function filterAndFormatResults(results, filterParam, format, params = {}) {
 
   if (filterParam) {
     if (typeof filterParam === 'function') {
-      filteredResults = filterParam(results);
+      filteredResults = filterParam(filteredResults);
       // In this branch we only count the top-level annotationData.
       if (Array.isArray(results.annotationData)) {
         const originalCount = results.annotationData.length;
@@ -322,12 +338,14 @@ function filterAndFormatResults(results, filterParam, format, params = {}) {
       }
     } else if (typeof filterParam === 'object') {
       // Separate top-level criteria from transcript_consequences criteria.
+      /** @type {Criteria} */
       const topLevelCriteria = {};
+      /** @type {Criteria} */
       const transcriptCriteria = {};
       for (const key in filterParam) {
         if (Object.prototype.hasOwnProperty.call(filterParam, key)) {
           if (key.startsWith('transcript_consequences')) {
-            const newKey = key.replace(/^transcript_consequences\./, '');
+            const newKey = key.replace(/^transcript_consequences\.(?:\*\.)?/, '');
             transcriptCriteria[newKey] = filterParam[key];
           } else {
             topLevelCriteria[key] = filterParam[key];
@@ -335,9 +353,9 @@ function filterAndFormatResults(results, filterParam, format, params = {}) {
         }
       }
       const topLevelOriginalCount = results.annotationData.length;
-      let topLevelFiltered = results.annotationData;
+      let topLevelFiltered = filteredResults.annotationData;
       if (Object.keys(topLevelCriteria).length > 0) {
-        topLevelFiltered = jsonApiFilter(results.annotationData, topLevelCriteria);
+        topLevelFiltered = jsonApiFilter(filteredResults.annotationData, topLevelCriteria);
         filteredResults.meta.stepsPerformed.push(
           `Top-level filter applied: ${topLevelOriginalCount} before,` +
             ` ${topLevelFiltered.length} after filtering.`
@@ -368,12 +386,15 @@ function filterAndFormatResults(results, filterParam, format, params = {}) {
             ` before filtering, ${totalTCAfter} after filtering.`
         );
       }
-      filteredResults.annotationData = topLevelFiltered;
+      filteredResults.annotationData =
+        Object.keys(transcriptCriteria).length > 0
+          ? topLevelFiltered.filter((annotation) => annotation.transcript_consequences?.length)
+          : topLevelFiltered;
     } else {
       throw new Error('Filter parameter must be a function or a filter criteria object.');
     }
     // Log filtered results with detailed information
-    debug(`Filtered results: ${JSON.stringify(filteredResults)}`);
+    debug('Filtered results: %O', filteredResults);
   }
 
   let formattedResults;
@@ -382,7 +403,7 @@ function filterAndFormatResults(results, filterParam, format, params = {}) {
       formattedResults = JSON.stringify(filteredResults, null, 2);
       break;
     case 'CSV':
-    case 'TSV':
+    case 'TSV': {
       const delimiter = format.toUpperCase() === 'CSV' ? ',' : '\t';
 
       // Ensure we're working with clean filtered data before flattening
@@ -412,24 +433,26 @@ function filterAndFormatResults(results, filterParam, format, params = {}) {
         `Detected scoring fields in ${format.toUpperCase()}: ${scoringFields.join(', ') || 'none'}`
       );
 
-      const columnConfig = getDefaultColumnConfig({
-        includeInheritance: includeInheritanceCols,
-        includeUserFeatures: includeUserFeatureCols,
-        includeCnv: includeCnvCols,
-        scoringFields: scoringFields,
-      });
+      const columnConfig =
+        params.columnConfig ||
+        getDefaultColumnConfig({
+          includeInheritance: includeInheritanceCols,
+          includeUserFeatures: includeUserFeatureCols,
+          includeCnv: includeCnvCols,
+          scoringFields: scoringFields,
+        });
 
       const flatRows = flattenAnnotationData(annotationToUse, columnConfig);
 
       // Check if this is called from streaming mode
       if (params.isStreaming) {
         // Return structured object for streaming
-        const header = formatToTabular([], columnConfig, delimiter, true); // Get only the header
-        const data = formatToTabular(flatRows, columnConfig, delimiter, false); // Get only the data rows
+        const header = formatToTabular([], columnConfig, delimiter, true, params); // Get only the header
+        const data = formatToTabular(flatRows, columnConfig, delimiter, false, params); // Get only the data rows
         formattedResults = { header, data };
       } else {
         // Format the flattened data as CSV/TSV
-        formattedResults = formatToTabular(flatRows, columnConfig, delimiter, true);
+        formattedResults = formatToTabular(flatRows, columnConfig, delimiter, true, params);
       }
 
       // Update meta message
@@ -439,29 +462,12 @@ function filterAndFormatResults(results, filterParam, format, params = {}) {
           ` with ${flatRows.length} rows`
       );
       break;
-    case 'VCF':
+    }
+    case 'VCF': {
       debug(
         `Processing VCF output format. Has vcfRecordMap: ${Boolean(results.vcfRecordMap)},
         Has vcfHeaderLines: ${Boolean(results.vcfHeaderLines)}`
       );
-      debug(`Input variant type: ${results.meta?.variantType || 'unknown'}`);
-      debug(`Number of results to format as VCF: ${filteredResults.results?.length || 0}`);
-
-      // Dump first result structure for debugging
-      if (filteredResults.results && filteredResults.results.length > 0) {
-        const firstResult = filteredResults.results[0];
-        debug(`First result variantInfo: ${JSON.stringify(firstResult.variantInfo || {})}`);
-        if (firstResult.colocated_variants && firstResult.colocated_variants.length > 0) {
-          debug(`First result has ${firstResult.colocated_variants.length} colocated variants`);
-        }
-        if (firstResult.most_severe_consequence) {
-          debug(
-            `First result has most_severe_consequence:
-              ${JSON.stringify(firstResult.most_severe_consequence)}`
-          );
-        }
-      }
-
       // Define VL_CSQ format following VEP's convention
       const vlCsqFormat = [
         'Allele', // Derived ALT
@@ -484,9 +490,18 @@ function filterAndFormatResults(results, filterParam, format, params = {}) {
 
       // Format results as VCF using the dedicated formatter module
       // Pass the annotation data, VCF record map, and header lines from filtered results
+      let selectedRecords = filteredResults.vcfRecordMap;
+      if (filterParam && selectedRecords) {
+        const keys = new Set(
+          filteredResults.annotationData.map(
+            (annotation) => annotation.originalVariantKey || annotation.variantKey
+          )
+        );
+        selectedRecords = new Map([...selectedRecords].filter(([key]) => keys.has(key)));
+      }
       formattedResults = formatAnnotationsToVcf(
         filteredResults.annotationData,
-        filteredResults.vcfRecordMap,
+        selectedRecords,
         filteredResults.vcfHeaderLines,
         vlCsqFormat
       );
@@ -495,8 +510,10 @@ function filterAndFormatResults(results, filterParam, format, params = {}) {
         `Formatted output as VCF with annotations added as VL_CSQ INFO field`
       );
       break;
+    }
     case 'SCHEMA':
-      // Existing SCHEMA support will be added later
+      filteredResults = mapOutputToSchemaOrg(filteredResults);
+      validateSchemaOrgOutput(filteredResults);
       formattedResults = JSON.stringify(filteredResults, null, 2);
       break;
     default:

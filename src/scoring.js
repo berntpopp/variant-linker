@@ -23,15 +23,13 @@ const { getValueByPath } = require('./utils/pathUtils');
  * - variableAssignmentJson: parsed content of variable_assignment_config.json,
  * - formulaJson: parsed content of formula_config.json.
  *
- * @param {Object} variableAssignmentJson - Parsed JSON containing a "variables" object.
- * @param {Object} formulaJson - Parsed JSON containing scoring formulas.
- * @returns {{
- *   variables: Object,
- *   formulas: { annotationLevel: Array, transcriptLevel: Array }
- * }} A structured configuration object with variables and formulas for scoring
+ * @param {{variables: import('./analysisTypes').ScoringConfig['variables']}} variableAssignmentJson - Parsed JSON containing a "variables" object.
+ * @param {{formulas?: Record<string,string>[] | Partial<import('./analysisTypes').ScoringConfig['formulas']>, annotationLevel?:Record<string,string>[],transcriptLevel?:Record<string,string>[]}} formulaJson - Parsed JSON containing scoring formulas.
+ * @returns {import('./analysisTypes').ScoringConfig} A structured configuration object with variables and formulas for scoring
  */
 function parseScoringConfig(variableAssignmentJson, formulaJson) {
   const variables = variableAssignmentJson.variables;
+  /** @type {import('./analysisTypes').ScoringConfig['formulas']} */
   let formulas = { annotationLevel: [], transcriptLevel: [] };
 
   if (formulaJson.formulas) {
@@ -69,10 +67,7 @@ function parseScoringConfig(variableAssignmentJson, formulaJson) {
  * This function is intended for use in Node environments.
  *
  * @param {string} configPath - The path to the scoring configuration directory.
- * @returns {{
- *   variables: Object,
- *   formulas: { annotationLevel: Array, transcriptLevel: Array }
- * }} A structured configuration object containing the parsed scoring variables and formulas
+ * @returns {import('./analysisTypes').ScoringConfig} A structured configuration object containing the parsed scoring variables and formulas
  * @throws {Error} If there is an error reading or parsing the configuration files.
  */
 function readScoringConfigFromFiles(configPath) {
@@ -93,11 +88,13 @@ function readScoringConfigFromFiles(configPath) {
     const variableAssignmentJson = JSON.parse(variableAssignmentRaw);
     const formulaJson = JSON.parse(formulaRaw);
 
-    debugDetailed(`Variable Assignment JSON: ${JSON.stringify(variableAssignmentJson)}`);
-    debugDetailed(`Formula JSON: ${JSON.stringify(formulaJson)}`);
+    if (debugDetailed.enabled)
+      debugDetailed(`Variable Assignment JSON: ${JSON.stringify(variableAssignmentJson)}`);
+    if (debugDetailed.enabled) debugDetailed(`Formula JSON: ${JSON.stringify(formulaJson)}`);
 
     return parseScoringConfig(variableAssignmentJson, formulaJson);
   } catch (error) {
+    if (!(error instanceof Error)) throw error;
     debugAll(`Error reading scoring configuration files: ${error.message}`);
     throw error;
   }
@@ -145,17 +142,18 @@ function parseMappingString(mappingStr) {
 /**
  * Evaluates an optional condition on the raw value.
  *
- * @param {*} rawValue - The raw value extracted.
+ * @param {unknown} rawValue - The raw value extracted.
  * @param {string} condition - A JavaScript expression where "value" is the raw value.
- * @param {*} defaultValue - The default value to use if evaluation fails.
- * @returns {*} The result of the condition, or defaultValue if evaluation fails.
+ * @param {unknown} defaultValue - The default value to use if evaluation fails.
+ * @returns {unknown} The result of the condition, or defaultValue if evaluation fails.
  */
 function evaluateCondition(rawValue, condition, defaultValue) {
   try {
     // For safety, ensure that condition expressions are from trusted sources.
-    const conditionFunc = new Function('value', `return ${condition};`);
+    const conditionFunc = compileExpression(condition, ['value']);
     return conditionFunc(rawValue);
   } catch (e) {
+    if (!(e instanceof Error)) throw e;
     console.warn(`Error evaluating condition "${condition}": ${e.message}`);
     return defaultValue;
   }
@@ -174,19 +172,21 @@ function evaluateCondition(rawValue, condition, defaultValue) {
  *     set to the raw value.
  *   - default: (optional) the default value if the raw value is missing.
  *
- * @param {Object} obj - The object to extract variables from.
- * @param {Object} variablesConfig - The configuration mapping.
- * @param {Object} [context] - Optional additional context for extraction.
- * @returns {Object} An object mapping variable names to their computed values.
+ * @param {Record<string,unknown>} obj - The object to extract variables from.
+ * @param {import('./analysisTypes').VariableMappings} variablesConfig - The configuration mapping.
+ * @param {Record<string,unknown>} [context] - Optional additional context for extraction.
+ * @returns {Record<string,unknown>} An object mapping variable names to their computed values.
  */
 function extractVariables(obj, variablesConfig, context) {
+  /** @type {Record<string,unknown>} */
   const variables = {};
 
   for (const [path, mapping] of Object.entries(variablesConfig)) {
+    /** @type {{target:string,aggregator:string|null,condition?:string|null,defaultValue:unknown}} */
     let config;
     if (typeof mapping === 'string') {
       config = parseMappingString(mapping);
-    } else if (typeof mapping === 'object') {
+    } else if (mapping && typeof mapping === 'object') {
       config = {
         target: mapping.target || '',
         aggregator: mapping.aggregator || null,
@@ -202,13 +202,15 @@ function extractVariables(obj, variablesConfig, context) {
     // Wrap scalar values in array if using an aggregator to avoid substitution with default value
     if (config.aggregator && rawValue !== undefined && !Array.isArray(rawValue)) {
       rawValue = [rawValue];
-      debugDetailed(`Wrapped scalar value in array for aggregation: ${JSON.stringify(rawValue)}`);
+      if (debugDetailed.enabled)
+        debugDetailed(`Wrapped scalar value in array for aggregation: ${JSON.stringify(rawValue)}`);
     }
 
-    debugDetailed(
-      `Raw value for mapping "${mapping}" (target: ${config.target})` +
-        ` from path "${path}": ${JSON.stringify(rawValue)}`
-    );
+    if (debugDetailed.enabled)
+      debugDetailed(
+        `Raw value for mapping "${mapping}" (target: ${config.target})` +
+          ` from path "${path}": ${JSON.stringify(rawValue)}`
+      );
 
     // Normalize [] to undefined
     if (Array.isArray(rawValue) && rawValue.length === 0) {
@@ -218,13 +220,18 @@ function extractVariables(obj, variablesConfig, context) {
 
     if (Array.isArray(rawValue) && rawValue.some((item) => Array.isArray(item))) {
       rawValue = rawValue.flat(Infinity);
-      debugDetailed(`Flattened raw value: ${JSON.stringify(rawValue)}`);
+      if (debugDetailed.enabled) debugDetailed(`Flattened raw value: ${JSON.stringify(rawValue)}`);
     }
 
     let finalValue;
     if (config.aggregator) {
       if (!Array.isArray(rawValue) || rawValue.length === 0) {
-        finalValue = config.defaultValue;
+        finalValue =
+          config.aggregator === 'unique'
+            ? Array.isArray(config.defaultValue)
+              ? config.defaultValue
+              : [config.defaultValue]
+            : config.defaultValue;
         debugDetailed(
           `Using default value for aggregator "${config.aggregator}"` +
             ` for target "${config.target}": ${finalValue}`
@@ -232,14 +239,14 @@ function extractVariables(obj, variablesConfig, context) {
       } else {
         switch (config.aggregator.toLowerCase()) {
           case 'max':
-            finalValue = Math.max(...rawValue);
+            finalValue = Math.max(...rawValue.map(Number));
             break;
           case 'min':
-            finalValue = Math.min(...rawValue);
+            finalValue = Math.min(...rawValue.map(Number));
             break;
           case 'avg':
           case 'average':
-            finalValue = rawValue.reduce((a, b) => a + b, 0) / rawValue.length;
+            finalValue = rawValue.map(Number).reduce((a, b) => a + b, 0) / rawValue.length;
             break;
           case 'unique':
             finalValue = Array.from(new Set(rawValue)).sort();
@@ -251,10 +258,11 @@ function extractVariables(obj, variablesConfig, context) {
             );
             finalValue = rawValue;
         }
-        debugDetailed(
-          `Applied aggregator "${config.aggregator}"` +
-            ` on value: ${JSON.stringify(rawValue)} -> ${finalValue}`
-        );
+        if (debugDetailed.enabled)
+          debugDetailed(
+            `Applied aggregator "${config.aggregator}"` +
+              ` on value: ${JSON.stringify(rawValue)} -> ${finalValue}`
+          );
       }
     } else {
       finalValue = rawValue !== undefined ? rawValue : config.defaultValue;
@@ -269,45 +277,50 @@ function extractVariables(obj, variablesConfig, context) {
     variables[config.target] = finalValue;
   }
 
-  debugDetailed(`Extracted variables: ${JSON.stringify(variables)}`);
+  if (debugDetailed.enabled) debugDetailed(`Extracted variables: ${JSON.stringify(variables)}`);
   return variables;
 }
 
-/**
- * Retrieves the value from an object using a dot-separated path.
- * This function supports wildcards (*) in the path to traverse arrays.
- *
- * @param {Object} obj - The object to retrieve the value from.
- * @param {string} path - The dot-separated path (e.g., "a.b.*.c").
- * @param {Object} [context] - Optional context object for relative lookups.
- * @returns {*} The value at the specified path, or undefined if not found.
- */
+/** @type {Map<string,(...values:unknown[]) => unknown>} */
+const compiledFormulas = new Map();
 
-/**
- * Calculates a score based on a formula string and a set of variables.
- *
- * NOTE: This function uses the Function constructor to evaluate the formula.
- * Ensure that formulas are from trusted sources to avoid potential code injection risks.
- *
- * @param {string} formulaStr - The scoring formula as a string
- * (e.g., "cadd_phred_variant * 2 + gnomade_variant").
- * @param {Object} variables - An object mapping variable names to numeric values.
- * @returns {number} The calculated score.
+/** Compile explicitly trusted executable scoring configuration, with a bounded cache.
+ * @param {string} expression
+ * @param {string[]} names
+ * @returns {(...values:unknown[]) => unknown}
  */
+function compileExpression(expression, names) {
+  const key = JSON.stringify([expression, names]);
+  let compiled = compiledFormulas.get(key);
+  if (!compiled) {
+    compiled = /** @type {(...values:unknown[]) => unknown} */ (
+      new Function(...names, `return ${expression};`)
+    );
+    if (compiledFormulas.size >= 256) compiledFormulas.clear();
+    compiledFormulas.set(key, compiled);
+  }
+  return compiled;
+}
+
+/** @param {string} formulaStr @param {Record<string,unknown>} variables @returns {unknown} */
 function calculateScore(formulaStr, variables) {
   debugDetailed(`Evaluating formula: ${formulaStr}`);
-  debugDetailed(`Variables for formula: ${JSON.stringify(variables)}`);
+  if (debugDetailed.enabled) debugDetailed(`Variables for formula: ${JSON.stringify(variables)}`);
 
   // Build a substituted formula string for debugging.
-  let substitutedFormula = formulaStr;
-  for (const [key, value] of Object.entries(variables)) {
-    const pattern = new RegExp(`\\b${key}\\b`, 'g');
-    substitutedFormula = substitutedFormula.replace(pattern, JSON.stringify(value));
+  if (debugDetailed.enabled) {
+    let substitutedFormula = formulaStr;
+    for (const [key, value] of Object.entries(variables)) {
+      const pattern = new RegExp(`\\b${key}\\b`, 'g');
+      substitutedFormula = substitutedFormula.replace(
+        pattern,
+        JSON.stringify(value) ?? String(value)
+      );
+    }
+    debugDetailed(`Substituted formula: ${substitutedFormula}`);
   }
-  debugDetailed(`Substituted formula: ${substitutedFormula}`);
 
-  // eslint-disable-next-line no-new-func
-  const formula = new Function(...Object.keys(variables), `return ${formulaStr}`);
+  const formula = compileExpression(formulaStr, Object.keys(variables));
   const result = formula(...Object.values(variables));
   debugDetailed(`Result of formula: ${result}`);
   return result;
@@ -317,8 +330,8 @@ function calculateScore(formulaStr, variables) {
  * Finds the prioritized transcript from annotation based on biological relevance.
  * Priority order: pick=1 > mane=1 > canonical=1 > first transcript
  *
- * @param {Object} annotation - The VEP annotation data.
- * @returns {Object|null} The prioritized transcript consequence or null if none found.
+ * @param {import('./dataTypes').Annotation} annotation - The VEP annotation data.
+ * @returns {import('./dataTypes').Transcript|null} The prioritized transcript consequence or null if none found.
  */
 function _findPrioritizedTranscript(annotation) {
   if (
@@ -338,7 +351,9 @@ function _findPrioritizedTranscript(annotation) {
   }
 
   // 2. Find first transcript with mane === 1
-  prioritized = transcripts.find((tc) => tc.mane === 1);
+  prioritized =
+    transcripts.find((tc) => tc.mane_select || tc.mane === 1) ||
+    transcripts.find((tc) => tc.mane_plus_clinical);
   if (prioritized) {
     debugDetailed(`Found prioritized transcript with mane=1: ${prioritized.transcript_id}`);
     return prioritized;
@@ -356,21 +371,29 @@ function _findPrioritizedTranscript(annotation) {
   return transcripts[0];
 }
 
+/** @param {import('./analysisTypes').ScoringConfig['variables']} config
+ * @returns {config is import('./analysisTypes').ScopedVariables}
+ */
+function isScopedVariables(config) {
+  return 'aggregates' in config || 'transcriptFields' in config;
+}
+
 /**
  * Extracts variables for annotation-level scoring using scoped variable extraction.
  * Uses globally aggregated variables for variant-level fields and prioritized transcript
  * data for transcript-specific fields.
  *
- * @param {Object} annotation - The VEP annotation data.
- * @param {Object} variablesConfig - The variables configuration.
- * @returns {Object} An object mapping variable names to their computed values.
+ * @param {import('./dataTypes').Annotation} annotation - The VEP annotation data.
+ * @param {import('./analysisTypes').ScoringConfig['variables']} variablesConfig - The variables configuration.
+ * @returns {Record<string,unknown>} An object mapping variable names to their computed values.
  */
 function _extractAnnotationVariables(annotation, variablesConfig) {
+  /** @type {Record<string,unknown>} */
   const variables = {};
   const prioritizedTranscript = _findPrioritizedTranscript(annotation);
 
   // Handle new scoped configuration format
-  if (variablesConfig.aggregates || variablesConfig.transcriptFields) {
+  if (isScopedVariables(variablesConfig)) {
     // Extract globally aggregated variables (variant-level)
     if (variablesConfig.aggregates) {
       const aggregateVars = extractVariables(annotation, variablesConfig.aggregates);
@@ -378,9 +401,9 @@ function _extractAnnotationVariables(annotation, variablesConfig) {
     }
 
     // Extract transcript-specific fields from prioritized transcript
-    if (variablesConfig.transcriptFields && prioritizedTranscript) {
+    if (variablesConfig.transcriptFields) {
       const transcriptVars = extractVariables(
-        prioritizedTranscript,
+        prioritizedTranscript || {},
         variablesConfig.transcriptFields
       );
       Object.assign(variables, transcriptVars);
@@ -391,7 +414,7 @@ function _extractAnnotationVariables(annotation, variablesConfig) {
     Object.assign(variables, legacyVars);
   }
 
-  debugDetailed(`Annotation variables: ${JSON.stringify(variables)}`);
+  if (debugDetailed.enabled) debugDetailed(`Annotation variables: ${JSON.stringify(variables)}`);
   return variables;
 }
 
@@ -400,16 +423,17 @@ function _extractAnnotationVariables(annotation, variablesConfig) {
  * Uses globally aggregated variables for variant-level fields and individual transcript
  * data for transcript-specific fields.
  *
- * @param {Object} transcript - The transcript consequence data.
- * @param {Object} annotation - The full VEP annotation data for context.
- * @param {Object} variablesConfig - The variables configuration.
- * @returns {Object} An object mapping variable names to their computed values.
+ * @param {import('./dataTypes').Transcript} transcript - The transcript consequence data.
+ * @param {import('./dataTypes').Annotation} annotation - The full VEP annotation data for context.
+ * @param {import('./analysisTypes').ScoringConfig['variables']} variablesConfig - The variables configuration.
+ * @returns {Record<string,unknown>} An object mapping variable names to their computed values.
  */
 function _extractTranscriptVariables(transcript, annotation, variablesConfig) {
+  /** @type {Record<string,unknown>} */
   const variables = {};
 
   // Handle new scoped configuration format
-  if (variablesConfig.aggregates || variablesConfig.transcriptFields) {
+  if (isScopedVariables(variablesConfig)) {
     // Extract globally aggregated variables (variant-level) from annotation
     if (variablesConfig.aggregates) {
       const aggregateVars = extractVariables(annotation, variablesConfig.aggregates);
@@ -427,7 +451,7 @@ function _extractTranscriptVariables(transcript, annotation, variablesConfig) {
     Object.assign(variables, legacyVars);
   }
 
-  debugDetailed(`Transcript variables: ${JSON.stringify(variables)}`);
+  if (debugDetailed.enabled) debugDetailed(`Transcript variables: ${JSON.stringify(variables)}`);
   return variables;
 }
 
@@ -438,15 +462,15 @@ function _extractTranscriptVariables(transcript, annotation, variablesConfig) {
  * using a prioritized transcript approach. Transcript-level formulas use individual
  * transcript data for context-specific scoring.
  *
- * @param {Array} annotationData - The VEP annotation data.
- * @param {{ variables: Object, formulas: Object }} scoringConfig
+ * @param {import('./dataTypes').Annotation[]} annotationData - The VEP annotation data.
+ * @param {import('./analysisTypes').ScoringConfig} scoringConfig
  *        The scoring configuration containing variables and formulas.
- * @returns {Array} The original annotation data enhanced with calculated score fields at both
+ * @returns {import('./dataTypes').Annotation[]} The original annotation data enhanced with calculated score fields at both
  *          annotation and transcript levels based on the provided scoring configuration
  */
 function applyScoring(annotationData, scoringConfig) {
   // Log scoring configuration in debug mode
-  debug(`Applying scoring: ${JSON.stringify(scoringConfig)}`);
+  if (debug.enabled) debug(`Applying scoring: ${JSON.stringify(scoringConfig)}`);
   const variablesConfig = scoringConfig.variables;
   const formulasConfig = scoringConfig.formulas;
   const { annotationLevel, transcriptLevel } = formulasConfig;

@@ -43,6 +43,11 @@ describe('configHelper', () => {
       expect(result).to.equal('https://rest.ensembl.org');
     });
 
+    it('uses the same legacy endpoint for GRCh37 and hg19 aliases', () => {
+      expect(getBaseUrl('GRCh37')).to.equal(apiConfig.ensembl.legacyBaseUrl);
+      expect(getBaseUrl('grch37')).to.equal(getBaseUrl('hg19'));
+    });
+
     it('should return the standard base URL if assembly is null', () => {
       const expectedUrl = apiConfig.ensembl.baseUrl;
       const result = getBaseUrl(null);
@@ -68,7 +73,6 @@ describe('configHelper', () => {
       const expectedUrl = apiConfig.ensembl.baseUrl;
 
       expect(getBaseUrl('hg18')).to.equal(expectedUrl);
-      expect(getBaseUrl('GRCh37')).to.equal(expectedUrl);
       expect(getBaseUrl('mm10')).to.equal(expectedUrl);
       expect(getBaseUrl('invalid')).to.equal(expectedUrl);
       expect(getBaseUrl('123')).to.equal(expectedUrl);

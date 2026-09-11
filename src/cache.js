@@ -21,21 +21,21 @@ const cacheManager = new CacheManager(cacheConfig);
 /**
  * Stores data in the cache for a given key with an optional TTL.
  * @param {string} key - The key to store the data under (typically the request URL).
- * @param {*} data - The data to cache.
+ * @param {unknown} data - The data to cache.
  * @param {number} [ttl] - Time-to-live in milliseconds (uses default if not provided).
  */
 function setCache(key, data, ttl) {
-  debug(`Setting cache for key: ${key}${ttl ? `, TTL: ${ttl}ms` : ''}`);
-  // Use async operation but don't wait for it to maintain backward compatibility
-  cacheManager.set(key, data, ttl).catch((error) => {
-    debug(`Failed to set cache for key ${key}: ${error.message}`);
+  debug('Setting cache entry');
+  // Returning the promise is additive; synchronous callers may continue to ignore it.
+  return cacheManager.set(key, data, ttl).catch((error) => {
+    debug(`Failed to set cache: ${error.message}`);
   });
 }
 
 /**
  * Retrieves cached data for the given key if it has not expired.
  * @param {string} key - The cache key.
- * @returns {*} The cached data or null if not present or expired.
+ * @returns {unknown} The cached data or null if not present or expired.
  */
 function getCache(key) {
   // For backward compatibility, we need to return synchronously
@@ -44,18 +44,18 @@ function getCache(key) {
   const data = memoryCache.get(key);
 
   if (data !== undefined) {
-    debug(`Cache hit (memory) for key: ${key}`);
+    debug('Cache hit (memory)');
     return data;
   }
 
-  debug(`Cache miss (memory) for key: ${key}`);
+  debug('Cache miss (memory)');
   return null;
 }
 
 /**
  * Async version of getCache that checks both memory and persistent caches.
  * @param {string} key - The cache key.
- * @returns {Promise<*>} The cached data or null if not present or expired.
+ * @returns {Promise<unknown>} The cached data or null if not present or expired.
  */
 async function getCacheAsync(key) {
   return await cacheManager.get(key);
