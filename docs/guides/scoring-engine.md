@@ -11,9 +11,18 @@ expression semantics. Supported array callbacks and Math functions are explicitl
 allowed, with shared evaluation and collection limits. Formula programs can use
 initialized `const` declarations followed by `return`.
 
+Arrow functions are accepted only as expression-bodied callbacks to `map`,
+`filter`, `some`, `every` and `reduce`; they cannot be returned as score values.
+Spread accepts arrays. Computed lookup keys accept primitive values without
+invoking object conversion hooks. Library inputs must be JSON-style data;
+executable objects and JavaScript Proxies are outside this data-only contract.
+The interpreter bounds source length, syntax depth, variable count, collection
+size and total operations, including copying callback scopes.
+
 Models that previously used arbitrary JavaScript must migrate to this subset.
 Condition errors use the mapping default; formula errors stop scoring with an
-explicit error. Cached parsing never shares variable values between records.
+explicit error. Valid and invalid parsed expressions are cached without sharing
+variable values between records, and repeated condition diagnostics are deduplicated.
 Review biological assumptions separately from expression safety.
 
 ## Overview

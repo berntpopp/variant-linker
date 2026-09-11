@@ -110,22 +110,22 @@ function readScoringConfigFromFiles(configPath) {
  * @returns {{
  *   target: string,
  *   aggregator: (string|null),
- *   defaultValue: number
+ *   defaultValue: number|string
  * }} An object containing the parsed target field, optional aggregator function, and default value
  */
 function parseMappingString(mappingStr) {
   let aggregator = null;
   let variableName = mappingStr;
+  /** @type {number|string} */
   let defaultValue = 0;
   if (mappingStr.includes('|')) {
     const parts = mappingStr.split('|');
     const leftPart = parts[0].trim();
     const rightPart = parts[1].trim();
     if (rightPart.toLowerCase().startsWith('default:')) {
-      defaultValue = Number(rightPart.split(':')[1]);
-      if (isNaN(defaultValue)) {
-        defaultValue = 0;
-      }
+      const configuredDefault = rightPart.slice(rightPart.indexOf(':') + 1).trim();
+      defaultValue = Number(configuredDefault);
+      if (isNaN(defaultValue)) defaultValue = configuredDefault;
     }
     variableName = leftPart;
   }
@@ -141,6 +141,8 @@ function parseMappingString(mappingStr) {
   };
 }
 
+/** @type {Set<string>} */
+const conditionWarnings = new Set();
 /**
  * Evaluates an optional condition on the raw value.
  *
@@ -154,7 +156,12 @@ function evaluateCondition(rawValue, condition, defaultValue) {
     return evaluateExpression(condition, { value: rawValue });
   } catch (e) {
     if (!(e instanceof Error)) throw e;
-    console.warn(`Error evaluating condition "${condition}": ${e.message}`);
+    const diagnostic = JSON.stringify([condition, e.message]);
+    if (!conditionWarnings.has(diagnostic)) {
+      if (conditionWarnings.size >= 256) conditionWarnings.clear();
+      conditionWarnings.add(diagnostic);
+      console.warn(`Error evaluating condition "${condition}": ${e.message}`);
+    }
     return defaultValue;
   }
 }
@@ -286,19 +293,6 @@ function extractVariables(obj, variablesConfig, context) {
 function calculateScore(formulaStr, variables) {
   debugDetailed(`Evaluating formula: ${formulaStr}`);
   if (debugDetailed.enabled) debugDetailed(`Variables for formula: ${JSON.stringify(variables)}`);
-
-  // Build a substituted formula string for debugging.
-  if (debugDetailed.enabled) {
-    let substitutedFormula = formulaStr;
-    for (const [key, value] of Object.entries(variables)) {
-      const pattern = new RegExp(`\\b${key}\\b`, 'g');
-      substitutedFormula = substitutedFormula.replace(
-        pattern,
-        JSON.stringify(value) ?? String(value)
-      );
-    }
-    debugDetailed(`Substituted formula: ${substitutedFormula}`);
-  }
 
   const result = evaluateExpression(formulaStr, variables);
   debugDetailed(`Result of formula has type: ${typeof result}`);
@@ -460,12 +454,12 @@ function applyScoring(annotationData, scoringConfig) {
     const annotationVariables = _extractAnnotationVariables(annotation, variablesConfig);
 
     annotationLevel.forEach((formula) => {
-      const scoreName = Object.keys(formula)[0];
-      checkName(scoreName);
-      const formulaStr = formula[scoreName];
-      const scoreValue = calculateScore(formulaStr, annotationVariables);
-      annotation[scoreName] = scoreValue;
-      debugDetailed(`Calculated ${scoreName} for annotation (${typeof scoreValue})`);
+      for (const [scoreName, formulaStr] of Object.entries(formula)) {
+        checkName(scoreName);
+        const scoreValue = calculateScore(formulaStr, annotationVariables);
+        annotation[scoreName] = scoreValue;
+        debugDetailed(`Calculated ${scoreName} for annotation (${typeof scoreValue})`);
+      }
     });
 
     // Transcript-level formulas with individual transcript context
@@ -477,12 +471,12 @@ function applyScoring(annotationData, scoringConfig) {
           variablesConfig
         );
         transcriptLevel.forEach((formula) => {
-          const scoreName = Object.keys(formula)[0];
-          checkName(scoreName);
-          const formulaStr = formula[scoreName];
-          const scoreValue = calculateScore(formulaStr, transcriptVariables);
-          transcript[scoreName] = scoreValue;
-          debugDetailed(`Calculated ${scoreName} for transcript (${typeof scoreValue})`);
+          for (const [scoreName, formulaStr] of Object.entries(formula)) {
+            checkName(scoreName);
+            const scoreValue = calculateScore(formulaStr, transcriptVariables);
+            transcript[scoreName] = scoreValue;
+            debugDetailed(`Calculated ${scoreName} for transcript (${typeof scoreValue})`);
+          }
         });
       });
     }

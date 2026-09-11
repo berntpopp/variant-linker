@@ -4,7 +4,7 @@ const { spend, keyOf, read, array, primitive, binary } = require('./expressionVa
 /** @typedef {import('acorn').AnyNode} Node */
 /** @typedef {Map<string,unknown>} Scope */
 /** @typedef {{node:import('acorn').ArrowFunctionExpression,scope:Scope}} Closure */
-/** @type {Map<string, import('acorn').Program>} */
+/** @type {Map<string, import('acorn').Program|Error>} */
 const cache = new Map();
 /** @type {Record<string,(...args:number[])=>number>} */
 const math = {
@@ -31,15 +31,25 @@ const constants = { PI: Math.PI, E: Math.E, LN2: Math.LN2, LN10: Math.LN10, SQRT
  */
 function evaluateExpression(source, variables) {
   const names = Object.keys(variables);
+  if (source.length > 16384) throw new Error('Scoring source length limit exceeded');
+  if (names.length > 2048 || names.join('').length > 16384)
+    throw new Error('Scoring variable size limit exceeded');
   const key = JSON.stringify([source, names]);
   let program = cache.get(key);
   if (!program) {
-    program = parseExpression(source, names);
+    try {
+      program = parseExpression(source, names);
+    } catch (error) {
+      if (!(error instanceof Error)) throw error;
+      program = error;
+    }
     if (cache.size >= 256) cache.clear();
     cache.set(key, program);
   }
-  const scope = new Map(names.map((name) => [name, read(variables, name)]));
+  if (program instanceof Error) throw program;
   const budget = { remaining: 100000, depth: 0 };
+  spend(budget, names.length);
+  const scope = new Map(names.map((name) => [name, read(variables, name)]));
   /** @type {WeakMap<object,Closure>} */
   const closures = new WeakMap();
   /** @param {unknown} value @returns {number} */
@@ -52,6 +62,7 @@ function evaluateExpression(source, variables) {
     spend(budget);
     const closure = callback && typeof callback === 'object' ? closures.get(callback) : undefined;
     if (!closure) throw new Error('Scoring callback must be an expression arrow');
+    spend(budget, closure.scope.size);
     const local = new Map(closure.scope);
     closure.node.params.forEach((parameter, index) => {
       if (parameter.type === 'Identifier') local.set(parameter.name, args[index]);
@@ -256,6 +267,7 @@ function evaluateExpression(source, variables) {
             local
           );
         case 'ArrowFunctionExpression': {
+          spend(budget, local.size);
           const token = Object.create(null);
           closures.set(token, { node, scope: new Map(local) });
           return token;

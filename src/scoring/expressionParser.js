@@ -43,6 +43,7 @@ const METHODS = new Set([
   'startsWith',
   'endsWith',
 ]);
+const CALLBACKS = new Set(['map', 'filter', 'some', 'every', 'reduce']);
 const BINARY = new Set([
   '+',
   '-',
@@ -91,8 +92,8 @@ function parseExpression(source, names) {
     program = acorn.parse(source, { ecmaVersion: 2022, allowReturnOutsideFunction: true });
   }
   let count = 0;
-  /** @param {Node} node @param {Set<string>} bound @param {number} depth @returns {void} */
-  function validate(node, bound, depth) {
+  /** @param {Node} node @param {Set<string>} bound @param {number} depth @param {boolean} [callback] @returns {void} */
+  function validate(node, bound, depth, callback = false) {
     if (++count > 2048 || depth > 64) throw new Error('Scoring syntax complexity limit exceeded');
     /** @param {Node} child @returns {void} */
     const next = (child) => validate(child, bound, depth + 1);
@@ -179,6 +180,7 @@ function parseExpression(source, names) {
         else checkName(propertyName(node.property));
         return;
       case 'ArrowFunctionExpression': {
+        if (!callback) throw new Error('Scoring arrows are supported only as method callbacks');
         if (node.async || node.body.type === 'BlockStatement')
           throw new Error('Only expression arrow callbacks are supported');
         const inner = new Set(bound);
@@ -208,7 +210,14 @@ function parseExpression(source, names) {
           if (!allowed.has(method)) throw new Error(`Unsupported scoring method: ${method}`);
           next(callee.object);
         } else throw new Error('Only explicit scoring builtin calls are supported');
-        for (const argument of node.arguments) next(argument);
+        for (const [index, argument] of node.arguments.entries()) {
+          const allowsCallback =
+            index === 0 &&
+            callee.type === 'MemberExpression' &&
+            callee.property.type === 'Identifier' &&
+            CALLBACKS.has(callee.property.name);
+          validate(argument, bound, depth + 1, allowsCallback);
+        }
         return;
       }
       default:

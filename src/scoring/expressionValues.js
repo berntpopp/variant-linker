@@ -8,8 +8,8 @@ function spend(budget, amount = 1) {
 }
 /** @param {unknown} value @returns {string} */
 function keyOf(value) {
-  if (typeof value !== 'string' && typeof value !== 'number')
-    throw new Error('Scoring property must be a string or number');
+  if (value !== null && !['string', 'number', 'boolean', 'undefined'].includes(typeof value))
+    throw new Error('Scoring property must be primitive data');
   const key = String(value);
   checkName(key);
   return key;
