@@ -67,4 +67,5 @@ local_data/
 coverage/
 .nyc_output/
 coverage-data/
+coverage-*/
 temp/

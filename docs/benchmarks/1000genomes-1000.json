@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "project": "1000 Genomes Project, phase 3",
+    "release": "20130502, integrated v5b chromosome 22",
+    "assembly": "GRCh37",
+    "url": "https://ftp.1000genomes.ebi.ac.uk/vol1/ftp/release/20130502/ALL.chr22.phase3_shapeit2_mvncall_integrated_v5b.20130502.genotypes.vcf.gz",
+    "accessedAt": "2026-09-11T01:00:10.619Z",
+    "lastModified": "Tue, 16 Mar 2021 15:50:17 GMT",
+    "etag": "\"c416541-5bda952a1a040\"",
+    "sourceHeaderSampleCount": 2504,
+    "headerSha256": "75fed26ead47181553f0cfe54b09c712240ad65cfb339a2066727f30a8d45e95",
+    "decompressedPrefixSha256": "95da72cb12fd27fdb2c3f053f389229803a1191fa9f1d11d7d873e62cd76dee0",
+    "decompressedPrefixBytes": 10591676,
+    "hashNormalization": "UTF-8 lines with LF terminators; prefix ends after the last selected original record, including its source genotype columns"
+  },
+  "selection": {
+    "algorithm": "Scan source file order from byte zero; select first N chromosome 22 records with FILTER=PASS and different single A/C/G/T REF and ALT bases",
+    "requestedCount": 1000,
+    "recordsExamined": 1039,
+    "samplePolicy": "Sites only: preserve original CHROM, POS, ID, REF, ALT, QUAL, FILTER and INFO verbatim; remove FORMAT and every genotype/sample column; retain source metadata and add one subset metadata line",
+    "firstVariant": {
+      "chromosome": "22",
+      "position": 16050075,
+      "id": ".",
+      "ref": "A",
+      "alt": "G"
+    },
+    "lastVariant": {
+      "chromosome": "22",
+      "position": 16141716,
+      "id": ".",
+      "ref": "T",
+      "alt": "G"
+    },
+    "limitation": "Deterministic regional SNV workload; not a random or genome-wide representative sample and not an inheritance benchmark"
+  },
+  "dataset": {
+    "path": "local_data/benchmarks/1000genomes-chr22-grch37-1000.vcf",
+    "variantCount": 1000,
+    "bytes": 155515,
+    "sha256": "8e439d73dd7aad3da6d6a5f48ba3b7e0fa70d86069d793b2d1f622d4e1c55bec"
+  },
+  "transfer": {
+    "method": "HTTPS byte-range prefix request, streaming gzip/BGZF decompression; cancel after N eligible records",
+    "requestedRange": "bytes=0-8388607",
+    "responseStatus": 206,
+    "contentRange": "bytes 0-8388607/205612353",
+    "compressedBytesReceived": 199637,
+    "bytesDefinition": "Compressed HTTP entity bytes delivered to the counting stream before cancellation; excludes HTTP/TLS overhead and unconsumed socket buffers",
+    "completeSourceDownloaded": false,
+    "integrityScope": "Derived dataset and consumed decompressed prefix are hashed; the full upstream gzip object was not downloaded or hashed"
+  },
+  "reuse": {
+    "policy": "1000 Genomes Project data are available without embargo after final publication; cite the project and follow IGSR/EMBL-EBI terms. No software or publication license is assigned to the dataset here.",
+    "policyUrl": "https://www.internationalgenome.org/IGSR_disclaimer/",
+    "citationUrl": "https://www.internationalgenome.org/faq/how-do-I-cite-IGSR/",
+    "publication": "The 1000 Genomes Project Consortium. A global reference for human genetic variation. Nature 526, 68–74 (2015). doi:10.1038/nature15393",
+    "releaseReadmeUrl": "https://ftp.1000genomes.ebi.ac.uk/vol1/ftp/release/20130502/README_phase3_callset_20150220",
+    "sourceIndexUrl": "https://ftp.1000genomes.ebi.ac.uk/vol1/ftp/release/20130502/"
+  },
+  "reproduction": {
+    "command": "node scripts/benchmark/fetch-dataset.cjs --count 1000",
+    "node": "v22.14.0"
+  }
+}
