@@ -15,6 +15,8 @@ const debug = require('debug')('variant-linker:main');
 const debugDetailed = require('debug')('variant-linker:detailed');
 const debugAll = require('debug')('variant-linker:all');
 const { getValueByPath } = require('./utils/pathUtils');
+const { evaluateExpression } = require('./scoring/expressionEvaluator');
+const { checkName } = require('./scoring/expressionParser');
 
 /**
  * Parses scoring configuration from the provided JSON objects.
@@ -149,9 +151,7 @@ function parseMappingString(mappingStr) {
  */
 function evaluateCondition(rawValue, condition, defaultValue) {
   try {
-    // For safety, ensure that condition expressions are from trusted sources.
-    const conditionFunc = compileExpression(condition, ['value']);
-    return conditionFunc(rawValue);
+    return evaluateExpression(condition, { value: rawValue });
   } catch (e) {
     if (!(e instanceof Error)) throw e;
     console.warn(`Error evaluating condition "${condition}": ${e.message}`);
@@ -189,7 +189,7 @@ function extractVariables(obj, variablesConfig, context) {
     } else if (mapping && typeof mapping === 'object') {
       config = {
         target: mapping.target || '',
-        aggregator: mapping.aggregator || null,
+        aggregator: mapping.aggregator?.toLowerCase() || null,
         condition: mapping.condition || null,
         defaultValue: mapping.default !== undefined ? mapping.default : 0,
       };
@@ -197,6 +197,7 @@ function extractVariables(obj, variablesConfig, context) {
       continue;
     }
 
+    checkName(config.target);
     let rawValue = getValueByPath(obj, path, context);
 
     // Wrap scalar values in array if using an aggregator to avoid substitution with default value
@@ -234,7 +235,7 @@ function extractVariables(obj, variablesConfig, context) {
             : config.defaultValue;
         debugDetailed(
           `Using default value for aggregator "${config.aggregator}"` +
-            ` for target "${config.target}": ${finalValue}`
+            ` for target "${config.target}" (${typeof finalValue})`
         );
       } else {
         switch (config.aggregator.toLowerCase()) {
@@ -261,7 +262,7 @@ function extractVariables(obj, variablesConfig, context) {
         if (debugDetailed.enabled)
           debugDetailed(
             `Applied aggregator "${config.aggregator}"` +
-              ` on value: ${JSON.stringify(rawValue)} -> ${finalValue}`
+              ` on value: ${JSON.stringify(rawValue)} -> ${typeof finalValue}`
           );
       }
     } else {
@@ -271,7 +272,7 @@ function extractVariables(obj, variablesConfig, context) {
     if (config.condition) {
       finalValue = evaluateCondition(rawValue, config.condition, config.defaultValue);
       debugDetailed(
-        `Condition "${config.condition}" applied for target "${config.target}": ${finalValue}`
+        `Condition "${config.condition}" applied for target "${config.target}" (${typeof finalValue})`
       );
     }
     variables[config.target] = finalValue;
@@ -279,27 +280,6 @@ function extractVariables(obj, variablesConfig, context) {
 
   if (debugDetailed.enabled) debugDetailed(`Extracted variables: ${JSON.stringify(variables)}`);
   return variables;
-}
-
-/** @type {Map<string,(...values:unknown[]) => unknown>} */
-const compiledFormulas = new Map();
-
-/** Compile explicitly trusted executable scoring configuration, with a bounded cache.
- * @param {string} expression
- * @param {string[]} names
- * @returns {(...values:unknown[]) => unknown}
- */
-function compileExpression(expression, names) {
-  const key = JSON.stringify([expression, names]);
-  let compiled = compiledFormulas.get(key);
-  if (!compiled) {
-    compiled = /** @type {(...values:unknown[]) => unknown} */ (
-      new Function(...names, `return ${expression};`)
-    );
-    if (compiledFormulas.size >= 256) compiledFormulas.clear();
-    compiledFormulas.set(key, compiled);
-  }
-  return compiled;
 }
 
 /** @param {string} formulaStr @param {Record<string,unknown>} variables @returns {unknown} */
@@ -320,9 +300,8 @@ function calculateScore(formulaStr, variables) {
     debugDetailed(`Substituted formula: ${substitutedFormula}`);
   }
 
-  const formula = compileExpression(formulaStr, Object.keys(variables));
-  const result = formula(...Object.values(variables));
-  debugDetailed(`Result of formula: ${result}`);
+  const result = evaluateExpression(formulaStr, variables);
+  debugDetailed(`Result of formula has type: ${typeof result}`);
   return result;
 }
 
@@ -482,10 +461,11 @@ function applyScoring(annotationData, scoringConfig) {
 
     annotationLevel.forEach((formula) => {
       const scoreName = Object.keys(formula)[0];
+      checkName(scoreName);
       const formulaStr = formula[scoreName];
       const scoreValue = calculateScore(formulaStr, annotationVariables);
       annotation[scoreName] = scoreValue;
-      debugDetailed(`Calculated ${scoreName} for annotation: ${scoreValue}`);
+      debugDetailed(`Calculated ${scoreName} for annotation (${typeof scoreValue})`);
     });
 
     // Transcript-level formulas with individual transcript context
@@ -498,10 +478,11 @@ function applyScoring(annotationData, scoringConfig) {
         );
         transcriptLevel.forEach((formula) => {
           const scoreName = Object.keys(formula)[0];
+          checkName(scoreName);
           const formulaStr = formula[scoreName];
           const scoreValue = calculateScore(formulaStr, transcriptVariables);
           transcript[scoreName] = scoreValue;
-          debugDetailed(`Calculated ${scoreName} for transcript: ${scoreValue}`);
+          debugDetailed(`Calculated ${scoreName} for transcript (${typeof scoreValue})`);
         });
       });
     }

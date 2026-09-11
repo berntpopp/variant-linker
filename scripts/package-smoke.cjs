@@ -48,6 +48,18 @@ async function smoke() {
   assert.equal(requests.length, 1);
   assert.match(requests[0], /^https:\/\/rest\.ensembl\.org\/audit-smoke/);
 
+  context.Function = function blockedDynamicCode() {
+    throw new Error('Scoring must not construct executable JavaScript');
+  };
+  const scored = context.VariantLinker.scoring.applyScoring([{ values: [2, 3] }], {
+    variables: { values: 'values' },
+    formulas: {
+      annotationLevel: [{ score: 'Math.max(...values.map(value => value * 2))' }],
+      transcriptLevel: [],
+    },
+  });
+  assert.equal(scored[0].score, 6);
+
   const npmCli = process.env.npm_execpath;
   if (!npmCli) throw new Error('Run this smoke through npm run test:package');
   const pack = spawnSync(process.execPath, [npmCli, 'pack', '--dry-run', '--json'], {

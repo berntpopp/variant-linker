@@ -7,5 +7,5 @@ Use focused behavior regressions during development, then `npm run verify` befor
 claiming completion. Report actual command outcomes. Never weaken type, coverage,
 formatting or file-size gates to hide unfinished work.
 
-Scoring formulas execute trusted JavaScript. Do not introduce untrusted formula
-uploads or print proxy credentials/genomic payloads in routine diagnostics.
+Scoring uses restricted expressions and bounded evaluation. Do not introduce dynamic
+code execution or print credentials/genomic payloads in routine diagnostics.

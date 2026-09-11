@@ -9,7 +9,7 @@ Use Node >=22.14. Install committed dependency trees with `npm ci` and
 - Core modules: normalize requests, acquire annotations, enrich, then serialize.
 - API/cache modules: immutable transport contexts, bounded retries, canonical cache keys.
 - VCF/inheritance modules: preserve original records, target ALT, phase and uncertainty.
-- Scoring configuration is trusted executable code; never accept untrusted formulas.
+- Scoring uses a bounded expression interpreter; never reintroduce eval or Function.
 - Serializers own schema and escaping. Keep browser and Node capabilities explicit.
 
 ## Required local checks

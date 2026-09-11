@@ -62,7 +62,7 @@ describe('Scoring and path integrity', () => {
       },
       { formulas: [{ score: 'cachedInput + 9.321' }] }
     );
-    const compiler = sinon.spy(global, 'Function');
+    const compiler = sinon.spy(require('acorn'), 'parse');
     try {
       const output = applyScoring([{ raw: 1 }, { raw: 2 }, { raw: 3 }], config);
       assert.deepEqual(
@@ -76,6 +76,11 @@ describe('Scoring and path integrity', () => {
   });
 
   it('applies numeric aggregators and preserves array-valued unique defaults', () => {
+    const uppercase = parseScoringConfig(
+      { variables: { missing: { target: 'items', aggregator: 'UNIQUE', default: 5 } } },
+      { formulas: [{ score: 'items.map(x=>x).length' }] }
+    );
+    assert.equal(applyScoring([{}], uppercase)[0].score, 1);
     const config = parseScoringConfig(
       {
         variables: {

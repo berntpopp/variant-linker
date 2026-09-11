@@ -75,3 +75,12 @@ records the final whole-repository verification result separately.
 
 The streaming, liftover, scoring and cache limitations are documented in the
 [reliable-processing guide](../guide/reliable-processing.md).
+
+## Security follow-up
+
+The earlier trusted-JavaScript scoring limitation above is superseded by a bounded
+Acorn-based expression interpreter. It rejects dynamic code execution, globals,
+prototype traversal and accessors, while preserving bundled scoring models.
+Arbitrary JavaScript custom models must migrate to the documented expression subset.
+The focused security/compatibility suite passes 52 tests; independent Opus review
+and final whole-repository verification are recorded separately.

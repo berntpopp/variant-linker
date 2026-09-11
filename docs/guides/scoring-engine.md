@@ -2,6 +2,20 @@
 
 Variant-Linker includes a powerful, configurable scoring system that allows users to create custom scoring formulas for variant prioritization. The scoring engine supports both annotation-level and transcript-level scoring with flexible variable assignment.
 
+## Expression safety and compatibility
+
+Formulas and conditions are parsed and evaluated by a restricted interpreter;
+`eval`, `Function`, host globals, prototype access, assignments and loops are not
+supported. Arithmetic, comparisons, boolean operators and ternaries retain their
+expression semantics. Supported array callbacks and Math functions are explicitly
+allowed, with shared evaluation and collection limits. Formula programs can use
+initialized `const` declarations followed by `return`.
+
+Models that previously used arbitrary JavaScript must migrate to this subset.
+Condition errors use the mapping default; formula errors stop scoring with an
+explicit error. Cached parsing never shares variable values between records.
+Review biological assumptions separately from expression safety.
+
 ## Overview
 
 The scoring system consists of two main components:
@@ -67,8 +81,12 @@ The `variable_assignment_config.json` file maps annotation data to variables:
   "@context": "https://schema.org/",
   "@type": "Configuration",
   "variables": {
-    "annotation.field.path": "variable_name|operation:modifier|default:value",
-    "transcript_consequences.*.consequence_terms": "unique:consequence_terms|default:[]"
+    "annotation.field.path": "max:variable_name|default:0",
+    "transcript_consequences.*.consequence_terms": {
+      "target": "consequence_terms",
+      "aggregator": "unique",
+      "default": []
+    }
   }
 }
 ```
@@ -100,7 +118,6 @@ Applied to individual transcript consequences:
 | `max`     | Maximum value from array  | `max:cadd_scores`          |
 | `min`     | Minimum value from array  | `min:conservation_scores`  |
 | `unique`  | Unique values from array  | `unique:consequence_terms` |
-| `sum`     | Sum of numeric values     | `sum:allele_counts`        |
 | `avg`     | Average of numeric values | `avg:quality_scores`       |
 
 ### Default Values
@@ -274,7 +291,8 @@ Work with arrays of values:
 
 ### Mathematical Functions
 
-Use standard JavaScript Math functions:
+Use supported Math functions (for example `exp`, `max`, `min`, `abs`, `floor`,
+`ceil`, `round`, `sqrt`, `pow`, `log` and `log10`):
 
 ```javascript
 // Logarithmic scaling
@@ -406,16 +424,20 @@ The included `cnv_score_example` demonstrates pathogenicity scoring for structur
 
 ```json
 {
-  "aggregates": {
-    "consequence_terms": "transcript_consequences.*.consequence_terms:unique",
-    "bp_overlap": "transcript_consequences.*.bp_overlap:max",
-    "percentage_overlap": "transcript_consequences.*.percentage_overlap:max"
-  },
-  "transcriptFields": {
-    "dosage_gene": "dosage_sensitivity.gene_name",
-    "phaplo_score": "dosage_sensitivity.phaplo",
-    "ptriplo_score": "dosage_sensitivity.ptriplo",
-    "phenotypes": "phenotypes"
+  "variables": {
+    "aggregates": {
+      "transcript_consequences.*.consequence_terms": {
+        "target": "consequence_terms",
+        "aggregator": "unique",
+        "default": []
+      },
+      "transcript_consequences.*.bp_overlap": "max:bp_overlap|default:0",
+      "transcript_consequences.*.percentage_overlap": "max:percentage_overlap|default:0",
+      "dosage_sensitivity.gene_name": "dosage_gene",
+      "dosage_sensitivity.phaplo": "phaplo_score|default:0",
+      "dosage_sensitivity.ptriplo": "ptriplo_score|default:0",
+      "phenotypes": { "target": "phenotypes", "default": [] }
+    }
   }
 }
 ```

@@ -50,11 +50,15 @@ assembly. Use JSON when consuming detailed liftover provenance.
 
 ## Scoring and tabular text
 
-Scoring formulas **and conditions execute trusted JavaScript** through `Function`.
-Configuration files are executable code, not a sandbox. Only use models you trust;
-do not expose model upload or evaluation to untrusted users. Compiled expressions
-are cached without reusing values between variants. Transcript-free annotations
-use declared defaults; MANE Select and Plus Clinical metadata are recognized.
+Scoring formulas and conditions use a **restricted expression interpreter**, with
+parsed expressions cached without sharing values between variants. Arithmetic,
+comparisons, ternaries, object lookup, supported Math operations and bounded array
+callbacks are allowed. Formula programs may declare constants and return a value.
+Arbitrary JavaScript, host globals, assignments, loops, prototype traversal,
+getters and input-supplied callable values are rejected. Existing custom models
+that used unrestricted JavaScript must migrate to the documented expression subset.
+Transcript-free annotations use declared defaults; MANE Select and Plus Clinical
+metadata are recognized. Review models against known cases before relying on scores.
 
 TSV cells encode literal backslashes, tabs, carriage returns and newlines as `\\`,
 `\t`, `\r`, and `\n`, respectively. CSV uses quoted cells for delimiters, quotes and

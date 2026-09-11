@@ -125,8 +125,8 @@ lint/types/formatting, files below 650 lines, offline tests and >=81% coverage.
 
 For large VCFs, use `--stream --chunk-size 100`; inheritance requires full-file mode.
 JSON/SCHEMA streams emit one compact JSON document per chunk. `--spreadsheet-safe`
-protects CSV/TSV text cells for spreadsheet import. Scoring formulas and conditions
-are **trusted executable JavaScript**, not sandboxed configuration.
+protects CSV/TSV text cells for spreadsheet import. Scoring formulas and conditions use a **restricted expression language** with
+explicitly allowed operators and functions; arbitrary JavaScript is rejected.
 See [reliable processing](docs/guide/reliable-processing.md) for output, cache,
 liftover, benchmark and failure semantics.
 
