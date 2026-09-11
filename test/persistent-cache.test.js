@@ -252,6 +252,36 @@ describe('PersistentCache', () => {
   });
 
   describe('Error handling', () => {
+    for (const operation of ['delete', 'clear', '_cleanupExpired', 'getStats']) {
+      it(`contains lock permission errors from ${operation} and recovers afterward`, async () => {
+        await cache.set('retained', 'original-data');
+        const denied = Object.assign(
+          new Error('EACCES: permission denied while creating cache lock'),
+          {
+            code: 'EACCES',
+            syscall: 'mkdir',
+          }
+        );
+        const mkdir = sinon.stub(fs.promises, 'mkdir');
+        mkdir.callThrough();
+        mkdir.withArgs(path.join(cache.cacheDir, '.lock')).rejects(denied);
+        try {
+          const result = await cache[operation]('retained');
+          if (operation === 'delete') expect(result).to.equal(false);
+          if (operation === 'getStats') {
+            expect(result.error).to.include('EACCES');
+            expect(result.validEntries).to.equal(1);
+          }
+          expect(await cache.get('retained')).to.equal('original-data');
+        } finally {
+          mkdir.restore();
+        }
+        expect((await cache.getStats()).maintenanceErrors).to.equal(1);
+        expect(await cache.delete('retained')).to.equal(true);
+        expect(await cache.get('retained')).to.equal(null);
+      });
+    }
+
     it('should handle file system errors gracefully', async () => {
       const key = 'error-test';
       const data = 'test-data';

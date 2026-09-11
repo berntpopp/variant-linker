@@ -24,6 +24,7 @@ class PersistentCache {
     this.maxSize = this._parseSizeString(config.maxSize || '100MB');
     this.cacheDir = '';
     this.writeErrors = 0;
+    this.maintenanceErrors = 0;
     this.rejectedEntries = 0;
     /** @type {DirectoryState} */
     this.state = {
@@ -69,10 +70,27 @@ class PersistentCache {
   /** @param {string} filePath @returns {Promise<Entry | null>} */
   async _readCacheFile(filePath) {
     if (!OWNED.test(path.basename(filePath))) return null;
+    /** @type {import('fs/promises').FileHandle | undefined} */
+    let handle;
     try {
-      const info = await fs.promises.lstat(filePath);
-      if (!info.isFile() || info.isSymbolicLink()) return null;
-      const entry = JSON.parse(await fs.promises.readFile(filePath, 'utf8'));
+      const flags =
+        fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW ?? 0) | (fs.constants.O_NONBLOCK ?? 0);
+      handle = await fs.promises.open(filePath, flags);
+      const info = await handle.stat({ bigint: true });
+      if (!info.isFile()) return null;
+      // Windows lacks O_NOFOLLOW: reject symlinks and verify the pathname still names
+      // the opened descriptor. Subsequent reads use only that descriptor, never the path.
+      const pathname = await fs.promises.lstat(filePath, { bigint: true });
+      // Windows lstat reports device zero even when descriptor stat reports the volume ID.
+      if (
+        pathname.isSymbolicLink() ||
+        !pathname.isFile() ||
+        (pathname.dev !== 0n && info.dev !== pathname.dev) ||
+        info.ino !== pathname.ino ||
+        (!fs.constants.O_NOFOLLOW && info.ino === 0n)
+      )
+        return null;
+      const entry = JSON.parse(await handle.readFile('utf8'));
       if (
         entry?.owner !== OWNER ||
         typeof entry.key !== 'string' ||
@@ -85,6 +103,8 @@ class PersistentCache {
       return entry;
     } catch {
       return null;
+    } finally {
+      await handle?.close().catch(() => {});
     }
   }
 
@@ -233,19 +253,34 @@ class PersistentCache {
   async has(key) {
     return (await this.getEntry(key)) !== null;
   }
-  /** @param {string} key */
+  /** Keep optional cache maintenance failures observable without failing annotation work.
+   * @param {string} operation @param {unknown} error @returns {string}
+   */
+  _recordMaintenanceError(operation, error) {
+    this.maintenanceErrors++;
+    const message = error instanceof Error ? error.message : String(error);
+    debug('Persistent cache %s failed: %s', operation, message);
+    return message;
+  }
+  /** @param {string} key @returns {Promise<boolean>} False when absent or deletion fails. */
   async delete(key) {
     if (this.disabled) return false;
     return this._exclusive(async () => {
       if (!(await this._readCacheFile(this._getFilePath(key)))) return false;
       await this._removeOwned(this._getFilename(key));
       return true;
+    }).catch((error) => {
+      this._recordMaintenanceError('delete', error);
+      return false;
     });
   }
+  /** Best-effort clear; failures are counted in maintenanceErrors. */
   async clear() {
     if (this.disabled) return;
     await this._exclusive(async () => {
       for (const name of [...this.state.index.keys()]) await this._removeOwned(name);
+    }).catch((error) => {
+      this._recordMaintenanceError('clear', error);
     });
   }
   async _cleanupExpired() {
@@ -254,10 +289,19 @@ class PersistentCache {
       for (const [name, entry] of this.state.index) {
         if (entry.expiresAt <= Date.now()) await this._removeOwned(name);
       }
+    }).catch((error) => {
+      this._recordMaintenanceError('expiry cleanup', error);
     });
   }
+  /** Return the last indexed snapshot with an explicit error if refresh fails. */
   async getStats() {
-    if (!this.disabled) await this._exclusive(async () => {});
+    /** @type {string | undefined} */
+    let refreshError;
+    if (!this.disabled) {
+      await this._exclusive(async () => {}).catch((error) => {
+        refreshError = this._recordMaintenanceError('statistics refresh', error);
+      });
+    }
     let totalSize = 0,
       validEntries = 0,
       expiredEntries = 0;
@@ -275,8 +319,10 @@ class PersistentCache {
       maxSize: this.maxSize,
       defaultTTL: this.defaultTTL,
       writeErrors: this.writeErrors,
+      maintenanceErrors: this.maintenanceErrors,
       rejectedEntries: this.rejectedEntries,
       maintenanceScans: this.state.scans,
+      ...(refreshError ? { error: refreshError } : {}),
     };
   }
 }
