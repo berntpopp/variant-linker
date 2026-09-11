@@ -43,7 +43,7 @@ describe('Validated liftover contracts', () => {
     try {
       assert.equal(process.env.ENSEMBL_BASE_URL, original);
       const other = await fetchApi('/default');
-      assert.match(other.url, /https:\/\/rest.ensembl.org/);
+      assert.equal(new URL(other.url).origin, 'https://rest.ensembl.org');
     } finally {
       release();
       await pending;
