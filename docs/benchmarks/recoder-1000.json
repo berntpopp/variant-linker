@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "provenancePath": "docs/benchmarks/1000genomes-1000.json",
+    "vcfPath": "local_data/benchmarks/1000genomes-chr22-grch37-1000.vcf",
+    "sha256": "8e439d73dd7aad3da6d6a5f48ba3b7e0fa70d86069d793b2d1f622d4e1c55bec",
+    "assembly": "GRCh37",
+    "originalSourceUrl": "https://ftp.1000genomes.ebi.ac.uk/vol1/ftp/release/20130502/ALL.chr22.phase3_shapeit2_mvncall_integrated_v5b.20130502.genotypes.vcf.gz"
+  },
+  "transformation": {
+    "algorithm": "One-to-one VCF file-order conversion of biallelic SNVs to NC_000022.10:g.{POS}{REF}>{ALT}; retain original one-based coordinate and alleles",
+    "accession": "NC_000022.10",
+    "chromosome": "22",
+    "assembly": "GRCh37.p13 primary chromosome sequence (unchanged by assembly patches)",
+    "accessionEvidenceUrl": "https://www.ncbi.nlm.nih.gov/nuccore/NC_000022.10",
+    "assemblyEvidenceUrl": "https://www.ncbi.nlm.nih.gov/datasets/genome/GCF_000001405.25/",
+    "evidenceCheckedOn": "2026-09-11",
+    "referenceValidation": "Reference alleles are inherited from the SHA-verified public VCF. This derivation does not independently download or compare the reference sequence.",
+    "samplePolicy": "No sample genotype fields; identical sites and order to the VCF benchmark"
+  },
+  "dataset": {
+    "path": "local_data/benchmarks/1000genomes-chr22-grch37-1000.hgvs.txt",
+    "variantCount": 1000,
+    "bytes": 27000,
+    "sha256": "9bec9502fd24f919a2955b202f5ba5ae89c2b20228c30ee0931c80f0fcad8ae1",
+    "firstVariant": "NC_000022.10:g.16050075A>G",
+    "lastVariant": "NC_000022.10:g.16141716T>G"
+  },
+  "reuse": {
+    "policy": "1000 Genomes Project data are available without embargo after final publication; cite the project and follow IGSR/EMBL-EBI terms. No software or publication license is assigned to the dataset here.",
+    "policyUrl": "https://www.internationalgenome.org/IGSR_disclaimer/",
+    "citationUrl": "https://www.internationalgenome.org/faq/how-do-I-cite-IGSR/",
+    "publication": "The 1000 Genomes Project Consortium. A global reference for human genetic variation. Nature 526, 68–74 (2015). doi:10.1038/nature15393",
+    "releaseReadmeUrl": "https://ftp.1000genomes.ebi.ac.uk/vol1/ftp/release/20130502/README_phase3_callset_20150220",
+    "sourceIndexUrl": "https://ftp.1000genomes.ebi.ac.uk/vol1/ftp/release/20130502/"
+  },
+  "reproduction": {
+    "command": "node scripts/benchmark/derive-recoder-dataset.cjs",
+    "node": "v22.14.0"
+  }
+}

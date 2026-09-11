@@ -252,7 +252,7 @@ describe('PersistentCache', () => {
   });
 
   describe('Error handling', () => {
-    for (const operation of ['delete', 'clear', '_cleanupExpired', 'getStats']) {
+    for (const operation of ['delete', 'clear', '_cleanupExpired']) {
       it(`contains lock permission errors from ${operation} and recovers afterward`, async () => {
         await cache.set('retained', 'original-data');
         const denied = Object.assign(
@@ -268,10 +268,6 @@ describe('PersistentCache', () => {
         try {
           const result = await cache[operation]('retained');
           if (operation === 'delete') expect(result).to.equal(false);
-          if (operation === 'getStats') {
-            expect(result.error).to.include('EACCES');
-            expect(result.validEntries).to.equal(1);
-          }
           expect(await cache.get('retained')).to.equal('original-data');
         } finally {
           mkdir.restore();

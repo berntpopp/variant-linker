@@ -9,7 +9,8 @@ updates:
       timezone: Europe/Berlin
     open-pull-requests-limit: 5
     commit-message:
-      prefix: chore
+      prefix: fix
+      prefix-development: chore
       include: scope
     groups:
       production-compatible:

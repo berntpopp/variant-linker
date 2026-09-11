@@ -131,12 +131,7 @@ class PersistentCache {
         }
       }
       try {
-        let generation = '';
-        try {
-          generation = await fs.promises.readFile(path.join(this.cacheDir, '.generation'), 'utf8');
-        } catch {
-          /* First write. */
-        }
+        const generation = await this._readGeneration();
         if (!generation || generation !== this.state.generation) await this._scan();
         const result = await operation();
         const nextGeneration = crypto.randomUUID();
@@ -153,27 +148,76 @@ class PersistentCache {
     return run;
   }
 
-  async _scan() {
+  /** Collect a complete candidate before changing shared index state. */
+  async _collectIndex() {
     this.state.scans++;
-    this.state.index.clear();
-    this.state.totalBytes = 0;
+    /** @type {Map<string, IndexEntry>} */
+    const index = new Map();
+    let totalBytes = 0;
     for (const name of await fs.promises.readdir(this.cacheDir)) {
       if (!OWNED.test(name)) continue;
       const filePath = path.join(this.cacheDir, name);
       const entry = await this._readCacheFile(filePath);
       if (!entry) continue;
       const info = await fs.promises.stat(filePath);
-      this.state.index.set(name, {
+      index.set(name, {
         bytes: info.size,
         expiresAt: entry.expiresAt,
         createdAt: entry.createdAt,
       });
-      this.state.totalBytes += info.size;
+      totalBytes += info.size;
     }
     // Rebuild creation order once when another process changed the directory.
-    this.state.index = new Map(
-      [...this.state.index].sort((a, b) => a[1].createdAt - b[1].createdAt)
-    );
+    return {
+      index: new Map([...index].sort((a, b) => a[1].createdAt - b[1].createdAt)),
+      totalBytes,
+    };
+  }
+
+  async _scan() {
+    const snapshot = await this._collectIndex();
+    this.state.index = snapshot.index;
+    this.state.totalBytes = snapshot.totalBytes;
+  }
+
+  async _readGeneration() {
+    try {
+      return await fs.promises.readFile(path.join(this.cacheDir, '.generation'), 'utf8');
+    } catch (error) {
+      if (/** @type {NodeJS.ErrnoException} */ (error).code === 'ENOENT') return '';
+      throw error;
+    }
+  }
+
+  async _assertNoMutation() {
+    try {
+      await fs.promises.lstat(path.join(this.cacheDir, '.lock'));
+    } catch (error) {
+      if (/** @type {NodeJS.ErrnoException} */ (error).code === 'ENOENT') return;
+      throw error;
+    }
+    throw new Error('Cache mutation in progress; statistics snapshot was not refreshed');
+  }
+
+  /** Read-only refresh: never create a lock or publish a mutation generation.
+   * Bracket the scan with lock checks followed by generation reads. A writer
+   * overlapping the scan either retains its lock or changes that generation.
+   */
+  _refreshStatistics() {
+    const run = this.state.queue.then(async () => {
+      await this._assertNoMutation();
+      const generation = await this._readGeneration();
+      if (generation && generation === this.state.generation) return;
+      const snapshot = await this._collectIndex();
+      await this._assertNoMutation();
+      if (generation !== (await this._readGeneration()))
+        throw new Error('Cache changed during statistics refresh; retaining the last snapshot');
+      this.state.index = snapshot.index;
+      this.state.totalBytes = snapshot.totalBytes;
+      this.state.generation = generation;
+    });
+    this.state.queue = run.catch(() => {});
+    return run;
   }
 
   /** @param {string} filePath @param {Entry} entry */
@@ -298,7 +342,7 @@ class PersistentCache {
     /** @type {string | undefined} */
     let refreshError;
     if (!this.disabled) {
-      await this._exclusive(async () => {}).catch((error) => {
+      await this._refreshStatistics().catch((error) => {
         refreshError = this._recordMaintenanceError('statistics refresh', error);
       });
     }

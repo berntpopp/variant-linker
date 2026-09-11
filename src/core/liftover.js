@@ -25,12 +25,12 @@ async function performLiftover(variants, cacheEnabled = false, requestOptions = 
       const lifted = await liftOverVariant(originalVariant, cacheEnabled, requestOptions);
       if (
         originalToLiftedMap[lifted.liftedKey] &&
-        originalToLiftedMap[lifted.liftedKey] !== lifted.originalKey
+        originalToLiftedMap[lifted.liftedKey] !== lifted.originalVariant
       ) {
         throw new Error('Multiple original variants map to the same target identity');
       }
       liftedVariants.push(lifted.variant);
-      originalToLiftedMap[lifted.liftedKey] = lifted.originalKey;
+      originalToLiftedMap[lifted.liftedKey] = lifted.originalVariant;
       const target = parseVcfVariant(lifted.variant);
       liftoverMeta[originalVariant] = {
         ...lifted,

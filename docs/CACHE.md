@@ -287,6 +287,16 @@ const data = await getCacheAsync('key');
 
 ## Examples
 
+### Persistent cache layout and migration
+
+Current persistent entries live in `<configured location>/entries-v1/` and have names `vl-<sha256>.json`, an ownership marker, and a key whose hash matches the filename. The byte budget, expiration cleanup, and `clearCacheAsync()` apply only to verified entries in this namespace. Unrelated files and malformed JSON are preserved.
+
+Older releases wrote unprefixed `<sha256>.json` files directly into the configured location. These legacy files are not migrated, included in current statistics or the byte budget, or removed by current cleanup. They can continue to occupy disk space after an upgrade. A matching filename or JSON shape alone does not establish that the application owns a file, so there is no automatic legacy deletion.
+
+To reclaim that space, stop applications using the old cache, confirm the exact old cache directory from your previous configuration, and back it up. Inspect the candidate files and their provenance before removing anything. Remove only files you have independently confirmed were created by Variant-Linker; if the directory was dedicated exclusively to its cache, you may archive that confirmed directory and let the application create a fresh one. Preserve unrelated files and the active `entries-v1` directory. Legacy cache contents are disposable and can be reacquired from the annotation service.
+
+Statistics are read-only snapshots. They do not create mutation locks or change the generation marker, and repeated reads do not invalidate another process's index. A refresh is published only after its complete scan observes a stable generation without an active writer. If a writer is active or a refresh fails, statistics return the last complete snapshot with an `error` field and increment `maintenanceErrors`; they do not report a partly rebuilt index as current.
+
 ### Basic Usage
 
 ```javascript

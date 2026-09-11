@@ -7,6 +7,7 @@ const { loadFeatures } = require('../featureParser');
 const { parseOptionalParameters, readVariantsFromFile } = require('./helpers');
 const { writeOutput } = require('./write');
 const { filterAndFormatResults } = require('../variantLinkerProcessor');
+const { emptyVcfResult } = require('./emptyVcfResult');
 
 /** @param {string|undefined} value @returns {import('../dataTypes').SampleMap|null} */
 function parseSampleMap(value) {
@@ -48,23 +49,26 @@ async function processFileBased(params) {
     params.bedFile || params.geneList || params.jsonGenes ? await loadFeatures(params) : null;
   const calculateInheritance =
     params.calculateInheritance ?? Boolean(pedigreeData || (vcf && vcf.samples.length > 1));
-  const result = await analyzeVariant({
-    ...params,
-    variants,
-    recoderOptions,
-    vepOptions,
-    pedigreeData,
-    sampleMap,
-    features,
-    calculateInheritance,
-    vcfRecordMap: vcf?.vcfRecordMap,
-    vcfHeaderLines: vcf?.headerLines,
-    samples: vcf?.samples,
-    scoringConfigPath: params.scoring_config_path || params.scoringConfigPath,
-    output: 'JSON',
-    filter: undefined,
-    pickOutput: false,
-  });
+  const result =
+    vcf && !variants.length
+      ? emptyVcfResult({ vcfRecordMap: vcf.vcfRecordMap, vcfHeaderLines: vcf.headerLines })
+      : await analyzeVariant({
+          ...params,
+          variants,
+          recoderOptions,
+          vepOptions,
+          pedigreeData,
+          sampleMap,
+          features,
+          calculateInheritance,
+          vcfRecordMap: vcf?.vcfRecordMap,
+          vcfHeaderLines: vcf?.headerLines,
+          samples: vcf?.samples,
+          scoringConfigPath: params.scoring_config_path || params.scoringConfigPath,
+          output: 'JSON',
+          filter: undefined,
+          pickOutput: false,
+        });
   if (typeof result === 'string') throw new Error('Unexpected serialized analysis result');
   const content = filterAndFormatResults(
     result,
@@ -78,7 +82,7 @@ async function processFileBased(params) {
     await fs.promises.writeFile(savePath, content);
     console.error('Results saved to ' + savePath);
   } else {
-    await writeOutput(content + '\n');
+    await writeOutput(content.endsWith('\n') ? content : content + '\n');
   }
   if (
     result.annotationData.some((annotation) => annotation.error) ||

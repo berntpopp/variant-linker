@@ -6,6 +6,7 @@ const { prepareStream, processAndOutputChunk } = require('./stream');
 const { formatAnnotationsToVcf } = require('../vcfFormatter');
 const { formatToTabular } = require('../dataExtractor');
 const { writeOutput } = require('./write');
+const { vlCsqFormat } = require('../output/vcfFields');
 
 /** Retain complete original records within each chunk; release maps after writes.
  * @param {import('../analysisTypes').CliParams} params */
@@ -45,29 +46,21 @@ async function processVcfStream(params) {
           previous.records.push(entry);
         } else {
           common.vcfRecordMap.set(entry.key, entry);
-          chunk.push(entry.key);
+          if (!entry.passthrough) chunk.push(entry.key);
         }
       }
       if (retainedEntries >= (params.chunkSize || 100)) await flush();
     }
-    if (chunk.length) await flush();
+    if (retainedEntries) await flush();
     if (first && !common.streamState.failed) {
       const format = params.output.toUpperCase();
       const empty =
         format === 'VCF'
-          ? formatAnnotationsToVcf([], new Map(), common.vcfHeaderLines, [
-              'Allele',
-              'Consequence',
-              'IMPACT',
-              'SYMBOL',
-              'Gene',
-              'Feature_type',
-              'Feature',
-            ])
+          ? formatAnnotationsToVcf([], new Map(), common.vcfHeaderLines, vlCsqFormat)
           : ['CSV', 'TSV'].includes(format)
             ? formatToTabular([], common.columnConfig, format === 'CSV' ? ',' : '\t')
             : '';
-      if (empty) await writeOutput(empty + '\n', destination);
+      if (empty) await writeOutput(empty.endsWith('\n') ? empty : empty + '\n', destination);
     }
     if (savePath) {
       destination.end();

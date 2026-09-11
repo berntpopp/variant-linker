@@ -7,21 +7,25 @@ const { loadFeatures } = require('../featureParser');
 const { readScoringConfigFromFiles } = require('../scoring');
 const { parseOptionalParameters } = require('./helpers');
 const { writeOutput } = require('./write');
+const { emptyVcfResult } = require('./emptyVcfResult');
 
 /** @param {string[]} chunk @param {boolean} isFirstChunk
  * @param {import('../analysisTypes').StreamParams} params */
 async function processAndOutputChunk(chunk, isFirstChunk, params) {
+  let formatted;
   try {
-    const result = await analyzeVariant({
-      ...params,
-      variants: chunk,
-      isStreaming: true,
-      output: 'JSON',
-      filter: undefined,
-      pickOutput: false,
-    });
+    const result = chunk.length
+      ? await analyzeVariant({
+          ...params,
+          variants: chunk,
+          isStreaming: true,
+          output: 'JSON',
+          filter: undefined,
+          pickOutput: false,
+        })
+      : emptyVcfResult(params);
     if (typeof result === 'string') throw new Error('Unexpected serialized analysis result');
-    const formatted = filterAndFormatResults(
+    formatted = filterAndFormatResults(
       result,
       params.filter ? JSON.parse(params.filter) : null,
       params.output,
@@ -35,31 +39,31 @@ async function processAndOutputChunk(chunk, isFirstChunk, params) {
     params.streamState.failed += Object.values(result.meta.liftoverMeta || {}).filter(
       (entry) => entry.status !== 'success'
     ).length;
-    if (typeof formatted === 'object') {
-      if (isFirstChunk && formatted.header)
-        await writeOutput(formatted.header + '\n', params.destination);
-      if (formatted.data) await writeOutput(formatted.data + '\n', params.destination);
-    } else {
-      let text = formatted;
-      if (['JSON', 'SCHEMA'].includes(params.output.toUpperCase()))
-        text = JSON.stringify(JSON.parse(formatted));
-      if (params.output.toUpperCase() === 'VCF' && !isFirstChunk) {
-        text = text
-          .split('\n')
-          .filter((line) => !line.startsWith('#'))
-          .join('\n');
-      }
-      await writeOutput(text + '\n', params.destination);
-    }
-    return true;
   } catch (error) {
-    if (error && typeof error === 'object' && 'code' in error) throw error;
-    params.streamState.failed += chunk.length;
+    params.streamState.failed += chunk.length || params.vcfRecordMap?.size || 0;
     console.error(
       'Error processing chunk: ' + (error instanceof Error ? error.message : String(error))
     );
     return false;
   }
+  // Output errors are fatal; API and processing errors above are counted per chunk.
+  if (typeof formatted === 'object') {
+    if (isFirstChunk && formatted.header)
+      await writeOutput(formatted.header + '\n', params.destination);
+    if (formatted.data) await writeOutput(formatted.data + '\n', params.destination);
+  } else {
+    let text = formatted;
+    if (['JSON', 'SCHEMA'].includes(params.output.toUpperCase()))
+      text = JSON.stringify(JSON.parse(formatted));
+    if (params.output.toUpperCase() === 'VCF' && !isFirstChunk) {
+      text = text
+        .split('\n')
+        .filter((line) => !line.startsWith('#'))
+        .join('\n');
+    }
+    if (text) await writeOutput(text.endsWith('\n') ? text : text + '\n', params.destination);
+  }
+  return true;
 }
 
 /** @param {import('../analysisTypes').CliParams} params

@@ -20,6 +20,7 @@ const { projectGenotype } = require('./inheritance/genotypeUtils');
  * @property {Map<string,string>} genotypes Target ALT presence, preserving ploidy/phase/missingness.
  * @property {Map<string,string>} originalGenotypes Original unprojected GT.
  * @property {VcfEntry[]} [records] Additional occurrences including the first row.
+ * @property {boolean} [passthrough] Valid reference-only row with no ALT to annotate.
  */
 /** @typedef {{headerLines:string[], samples:string[], recordId:string, originalLine:string, entries:VcfEntry[]}} VcfRecord */
 
@@ -37,7 +38,8 @@ function samplesFromHeader(headerLines) {
  */
 function parseEntries(parser, line, recordId, samples) {
   const record = parser.parseLine(line);
-  if (!record?.CHROM || !record.POS || !record.REF || !Array.isArray(record.ALT)) return [];
+  if (!record?.CHROM || !record.POS || !record.REF)
+    throw new Error(`Invalid VCF record at ${recordId}`);
   const { CHROM: chrom, POS: pos, REF: ref } = record;
   const originalRecord = { ...record, CHROM: chrom, REF: ref };
   const columns = line.split('\t');
@@ -48,6 +50,29 @@ function parseEntries(parser, line, recordId, samples) {
       gtIndex < 0 ? './.' : (columns[index + 9] || '').split(':')[gtIndex] || './.',
     ])
   );
+  if (columns[4] === '.')
+    return [
+      {
+        key: `passthrough:${recordId}`,
+        chrom,
+        pos,
+        ref,
+        alt: '.',
+        altIndex: 0,
+        originalRecordId: recordId,
+        originalLine: line,
+        originalRecord,
+        originalGenotypes,
+        genotypes: new Map(originalGenotypes),
+        passthrough: true,
+      },
+    ];
+  if (
+    !Array.isArray(record.ALT) ||
+    !record.ALT.length ||
+    record.ALT.some((alt) => !alt || alt === '.')
+  )
+    throw new Error(`Invalid VCF ALT at ${recordId}`);
   return record.ALT.flatMap((alt, index) => {
     if (!alt || alt === '.') return [];
     const altIndex = index + 1;
@@ -145,7 +170,6 @@ async function readVariantsFromVcf(filePath) {
     for (const [index, line] of lines.entries()) {
       if (!line.trim() || line.startsWith('#')) continue;
       for (const entry of parseEntries(parser, line, `line:${index + 1}`, samples)) {
-        variantsToProcess.push(entry.key);
         const previous = vcfRecordMap.get(entry.key);
         if (previous) {
           previous.records ||= [{ ...previous, genotypes: new Map(previous.genotypes) }];
@@ -154,7 +178,10 @@ async function readVariantsFromVcf(filePath) {
           for (const [sample, gt] of previous.genotypes) {
             if (gt !== entry.genotypes.get(sample)) previous.genotypes.set(sample, './.');
           }
-        } else vcfRecordMap.set(entry.key, entry);
+        } else {
+          vcfRecordMap.set(entry.key, entry);
+          if (!entry.passthrough) variantsToProcess.push(entry.key);
+        }
       }
     }
     return { variantsToProcess, vcfRecordMap, headerText, headerLines, samples };

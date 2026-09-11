@@ -17,6 +17,7 @@
 /** @typedef {Criteria|((result:AnalysisResult)=>AnalysisResult)|null|undefined} Filter */
 const fs = typeof window === 'undefined' ? require('fs') : null;
 const debug = require('debug')('variant-linker:processor');
+const { vlCsqFormat } = require('./output/vcfFields');
 const {
   flattenAnnotationData,
   formatToTabular,
@@ -468,26 +469,6 @@ function filterAndFormatResults(results, filterParam, format, params = {}) {
         `Processing VCF output format. Has vcfRecordMap: ${Boolean(results.vcfRecordMap)},
         Has vcfHeaderLines: ${Boolean(results.vcfHeaderLines)}`
       );
-      // Define VL_CSQ format following VEP's convention
-      const vlCsqFormat = [
-        'Allele', // Derived ALT
-        'Consequence', // Most severe consequence
-        'IMPACT', // Impact of most severe consequence
-        'SYMBOL', // Gene symbol
-        'Gene', // Ensembl Gene ID
-        'Feature_type', // Type of feature (e.g., Transcript)
-        'Feature', // Ensembl Feature ID (e.g., ENST...)
-        'BIOTYPE', // Biotype of the feature (e.g., protein_coding)
-        'HGVSc', // HGVS coding sequence notation
-        'HGVSp', // HGVS protein sequence notation
-        'Protein_position', // Position in protein
-        'Amino_acids', // Amino acid change
-        'Codons', // Codon change
-        'Existing_variation', // dbSNP IDs etc.
-        'SIFT', // SIFT prediction/score
-        'PolyPhen', // PolyPhen prediction/score
-      ];
-
       // Format results as VCF using the dedicated formatter module
       // Pass the annotation data, VCF record map, and header lines from filtered results
       let selectedRecords = filteredResults.vcfRecordMap;
