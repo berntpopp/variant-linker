@@ -2,6 +2,29 @@
 
 Variant-Linker includes a powerful, configurable scoring system that allows users to create custom scoring formulas for variant prioritization. The scoring engine supports both annotation-level and transcript-level scoring with flexible variable assignment.
 
+## Expression safety and compatibility
+
+Formulas and conditions are parsed and evaluated by a restricted interpreter;
+`eval`, `Function`, host globals, prototype access, assignments and loops are not
+supported. Arithmetic, comparisons, boolean operators and ternaries retain their
+expression semantics. Supported array callbacks and Math functions are explicitly
+allowed, with shared evaluation and collection limits. Formula programs can use
+initialized `const` declarations followed by `return`.
+
+Arrow functions are accepted only as expression-bodied callbacks to `map`,
+`filter`, `some`, `every` and `reduce`; they cannot be returned as score values.
+Spread accepts arrays. Computed lookup keys accept primitive values without
+invoking object conversion hooks. Library inputs must be JSON-style data;
+executable objects and JavaScript Proxies are outside this data-only contract.
+The interpreter bounds source length, syntax depth, variable count, collection
+size and total operations, including copying callback scopes.
+
+Models that previously used arbitrary JavaScript must migrate to this subset.
+Condition errors use the mapping default; formula errors stop scoring with an
+explicit error. Valid and invalid parsed expressions are cached without sharing
+variable values between records, and repeated condition diagnostics are deduplicated.
+Review biological assumptions separately from expression safety.
+
 ## Overview
 
 The scoring system consists of two main components:
@@ -10,6 +33,7 @@ The scoring system consists of two main components:
 2. **Variable Assignment**: Maps annotation fields to variables used in formulas
 
 This modular approach allows researchers to:
+
 - Create domain-specific scoring models
 - Integrate multiple annotation sources
 - Apply complex mathematical transformations
@@ -66,8 +90,12 @@ The `variable_assignment_config.json` file maps annotation data to variables:
   "@context": "https://schema.org/",
   "@type": "Configuration",
   "variables": {
-    "annotation.field.path": "variable_name|operation:modifier|default:value",
-    "transcript_consequences.*.consequence_terms": "unique:consequence_terms|default:[]"
+    "annotation.field.path": "max:variable_name|default:0",
+    "transcript_consequences.*.consequence_terms": {
+      "target": "consequence_terms",
+      "aggregator": "unique",
+      "default": []
+    }
   }
 }
 ```
@@ -94,13 +122,12 @@ Applied to individual transcript consequences:
 
 ### Basic Operations
 
-| Operation | Description | Example |
-|-----------|-------------|---------|
-| `max` | Maximum value from array | `max:cadd_scores` |
-| `min` | Minimum value from array | `min:conservation_scores` |
-| `unique` | Unique values from array | `unique:consequence_terms` |
-| `sum` | Sum of numeric values | `sum:allele_counts` |
-| `avg` | Average of numeric values | `avg:quality_scores` |
+| Operation | Description               | Example                    |
+| --------- | ------------------------- | -------------------------- |
+| `max`     | Maximum value from array  | `max:cadd_scores`          |
+| `min`     | Minimum value from array  | `min:conservation_scores`  |
+| `unique`  | Unique values from array  | `unique:consequence_terms` |
+| `avg`     | Average of numeric values | `avg:quality_scores`       |
 
 ### Default Values
 
@@ -149,6 +176,7 @@ Use JSONPath-like expressions to access nested data:
 ```
 
 This example implements a logistic regression model incorporating:
+
 - Population frequencies (gnomAD exomes and genomes)
 - Consequence type indicators
 - CADD pathogenicity scores
@@ -272,7 +300,8 @@ Work with arrays of values:
 
 ### Mathematical Functions
 
-Use standard JavaScript Math functions:
+Use supported Math functions (for example `exp`, `max`, `min`, `abs`, `floor`,
+`ceil`, `round`, `sqrt`, `pow`, `log` and `log10`):
 
 ```javascript
 // Logarithmic scaling
@@ -345,16 +374,19 @@ VL_CSQ=T|missense_variant|MODERATE|F5|...|nephro_variant_score=0.89
 ### Common Issues
 
 **Formula Syntax Errors**
+
 - Check JavaScript syntax in formulas
 - Verify variable names match assignments
 - Test formulas with simple examples
 
 **Missing Variables**
+
 - Ensure variable paths exist in annotation data
 - Use appropriate default values
 - Check JSONPath expressions
 
 **Score Calculation Errors**
+
 - Validate mathematical operations
 - Handle division by zero cases
 - Check for null/undefined values
@@ -372,6 +404,7 @@ variant-linker \
 ```
 
 Debug output includes:
+
 - Variable assignment details
 - Formula evaluation steps
 - Error messages and stack traces
@@ -384,45 +417,55 @@ Variant-Linker includes specialized support for scoring Copy Number Variants (CN
 
 CNV scoring configurations can access additional variables not available for point mutations:
 
-| Variable | Description | Source |
-|----------|-------------|---------|
-| `bp_overlap` | Base pairs overlapping with gene features | VEP transcript consequences |
-| `percentage_overlap` | Percentage of feature overlap | VEP transcript consequences |
-| `phenotypes` | Associated disease phenotypes | VEP top-level annotation |
-| `phaplo_score` | Haploinsufficiency score | VEP dosage sensitivity |
-| `ptriplo_score` | Triplosensitivity score | VEP dosage sensitivity |
+| Variable             | Description                               | Source                      |
+| -------------------- | ----------------------------------------- | --------------------------- |
+| `bp_overlap`         | Base pairs overlapping with gene features | VEP transcript consequences |
+| `percentage_overlap` | Percentage of feature overlap             | VEP transcript consequences |
+| `phenotypes`         | Associated disease phenotypes             | VEP top-level annotation    |
+| `phaplo_score`       | Haploinsufficiency score                  | VEP dosage sensitivity      |
+| `ptriplo_score`      | Triplosensitivity score                   | VEP dosage sensitivity      |
 
 ### Example CNV Scoring Configuration
 
 The included `cnv_score_example` demonstrates pathogenicity scoring for structural variants:
 
 **Variable Assignment** (`scoring/cnv_score_example/variable_assignment_config.json`):
+
 ```json
 {
-  "aggregates": {
-    "consequence_terms": "transcript_consequences.*.consequence_terms:unique",
-    "bp_overlap": "transcript_consequences.*.bp_overlap:max",
-    "percentage_overlap": "transcript_consequences.*.percentage_overlap:max"
-  },
-  "transcriptFields": {
-    "dosage_gene": "dosage_sensitivity.gene_name",
-    "phaplo_score": "dosage_sensitivity.phaplo",
-    "ptriplo_score": "dosage_sensitivity.ptriplo",
-    "phenotypes": "phenotypes"
+  "variables": {
+    "aggregates": {
+      "transcript_consequences.*.consequence_terms": {
+        "target": "consequence_terms",
+        "aggregator": "unique",
+        "default": []
+      },
+      "transcript_consequences.*.bp_overlap": "max:bp_overlap|default:0",
+      "transcript_consequences.*.percentage_overlap": "max:percentage_overlap|default:0",
+      "dosage_sensitivity.gene_name": "dosage_gene",
+      "dosage_sensitivity.phaplo": "phaplo_score|default:0",
+      "dosage_sensitivity.ptriplo": "ptriplo_score|default:0",
+      "phenotypes": { "target": "phenotypes", "default": [] }
+    }
   }
 }
 ```
 
 **Scoring Formulas** (`scoring/cnv_score_example/formula_config.json`):
+
 ```json
 {
   "formulas": {
-    "annotationLevel": [{
-      "cnv_pathogenicity_score": "const baseScore = consequence_terms.includes('feature_truncation') ? 20 : (consequence_terms.includes('feature_elongation') ? 15 : 0); const overlapScore = Math.min(bp_overlap / 10000, 10); const dosageScore = (phaplo_score || 0) * 5 + (ptriplo_score || 0) * 3; const phenotypeScore = phenotypes && phenotypes.length > 0 ? 5 : 0; return baseScore + overlapScore + dosageScore + phenotypeScore;"
-    }],
-    "transcriptLevel": [{
-      "transcript_cnv_impact": "const hasFeatureTruncation = consequence_terms.includes('feature_truncation'); const hasHighOverlap = (bp_overlap || 0) > 50000; const isHighConfidenceGene = (phaplo_score || 0) >= 3 || (ptriplo_score || 0) >= 3; return hasFeatureTruncation && hasHighOverlap && isHighConfidenceGene ? 'HIGH_IMPACT' : (hasFeatureTruncation || (hasHighOverlap && isHighConfidenceGene) ? 'MODERATE_IMPACT' : 'LOW_IMPACT');"
-    }]
+    "annotationLevel": [
+      {
+        "cnv_pathogenicity_score": "const baseScore = consequence_terms.includes('feature_truncation') ? 20 : (consequence_terms.includes('feature_elongation') ? 15 : 0); const overlapScore = Math.min(bp_overlap / 10000, 10); const dosageScore = (phaplo_score || 0) * 5 + (ptriplo_score || 0) * 3; const phenotypeScore = phenotypes && phenotypes.length > 0 ? 5 : 0; return baseScore + overlapScore + dosageScore + phenotypeScore;"
+      }
+    ],
+    "transcriptLevel": [
+      {
+        "transcript_cnv_impact": "const hasFeatureTruncation = consequence_terms.includes('feature_truncation'); const hasHighOverlap = (bp_overlap || 0) > 50000; const isHighConfidenceGene = (phaplo_score || 0) >= 3 || (ptriplo_score || 0) >= 3; return hasFeatureTruncation && hasHighOverlap && isHighConfidenceGene ? 'HIGH_IMPACT' : (hasFeatureTruncation || (hasHighOverlap && isHighConfidenceGene) ? 'MODERATE_IMPACT' : 'LOW_IMPACT');"
+      }
+    ]
   }
 }
 ```
@@ -449,7 +492,7 @@ variant-linker \
 The example CNV scoring model considers:
 
 1. **Functional Impact**: Feature truncation/elongation consequences
-2. **Overlap Significance**: Base pairs and percentage overlap with gene features  
+2. **Overlap Significance**: Base pairs and percentage overlap with gene features
 3. **Dosage Sensitivity**: Haploinsufficiency and triplosensitivity scores
 4. **Clinical Relevance**: Associated disease phenotypes
 

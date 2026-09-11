@@ -265,19 +265,10 @@ describe('featureParser', () => {
   });
 
   describe('loadFeatures', () => {
-    let IntervalTreeStub;
-    let intervalTreeInstance;
-
+    let featureParser;
     beforeEach(() => {
-      intervalTreeInstance = {
-        insert: sandbox.stub(),
-        count: 5,
-      };
-      IntervalTreeStub = sandbox.stub().returns(intervalTreeInstance);
-
       featureParser = proxyquire('../src/featureParser', {
         fs: { promises: fsStub },
-        'node-interval-tree': IntervalTreeStub,
       });
 
       // Re-destructure the loadFeatures function for this test suite
@@ -296,8 +287,8 @@ describe('featureParser', () => {
 
       expect(result.featuresByChrom).to.have.property('1');
       expect(result.featuresByChrom).to.have.property('2');
-      expect(IntervalTreeStub).to.have.been.calledTwice;
-      expect(intervalTreeInstance.insert).to.have.been.calledTwice;
+      expect(result.featuresByChrom['1'].count).to.equal(1);
+      expect(result.featuresByChrom['2'].search(3001, 4000)).to.have.length(1);
       expect(result.geneSets.size).to.equal(0);
     });
 

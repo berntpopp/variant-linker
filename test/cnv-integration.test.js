@@ -355,6 +355,10 @@ describe('CNV Integration Tests', () => {
 
   describe('Error Handling', () => {
     it('should handle invalid CNV format gracefully', async () => {
+      nock('https://rest.ensembl.org')
+        .get('/variant_recoder/human/7%3A117559600-117559609%3AUNKNOWN')
+        .query(true)
+        .reply(400, { error: 'Unknown variant notation' });
       try {
         await analyzeVariant({
           variant: '7:117559600-117559609:UNKNOWN',

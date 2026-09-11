@@ -37,6 +37,7 @@ variant-linker --variants-file batch.txt \
 BED (Browser Extensible Data) files define genomic regions. Variant-Linker supports standard BED formats:
 
 #### 3-Column BED (Minimal)
+
 ```
 chr1	1000	2000
 chr1	5000	6000
@@ -44,6 +45,7 @@ chrX	10000	11000
 ```
 
 #### 4-Column BED (With Names)
+
 ```
 chr1	1000	2000	promoter_region_1
 chr1	5000	6000	enhancer_region_1
@@ -51,6 +53,7 @@ chrX	10000	11000	regulatory_element_1
 ```
 
 #### 6-Column BED (Full Format)
+
 ```
 chr1	1000	2000	promoter_BRCA1	800	+
 chr1	5000	6000	enhancer_TP53	600	-
@@ -58,14 +61,16 @@ chrX	10000	11000	regulatory_AR	900	+
 ```
 
 **Columns:**
+
 1. **Chromosome** (required): `chr1`, `1`, `chrX`, `X` (chr prefix optional)
 2. **Start** (required): 0-based start position
-3. **End** (required): 1-based end position  
+3. **End** (required): 1-based end position
 4. **Name** (optional): Region identifier/description
 5. **Score** (optional): Numeric score (0-1000)
 6. **Strand** (optional): `+`, `-`, or `.`
 
 **Features:**
+
 - Header lines (`#`, `track`, `browser`) are automatically skipped
 - Empty lines and comments are ignored
 - Invalid coordinates are skipped with warnings
@@ -88,10 +93,12 @@ MSH2
 ```
 
 **Supported Identifiers:**
+
 - Gene symbols: `BRCA1`, `TP53`, `MYC`
 - Ensembl gene IDs: `ENSG00000012048`, `ENSG00000141510`
 
 **Features:**
+
 - One gene per line
 - Comment lines starting with `#` are ignored
 - Empty lines are skipped
@@ -103,6 +110,7 @@ MSH2
 Structured JSON files containing gene information with flexible field mapping:
 
 #### Array Format
+
 ```json
 [
   {
@@ -113,7 +121,7 @@ Structured JSON files containing gene information with flexible field mapping:
     "diseases": ["Breast Cancer", "Ovarian Cancer"]
   },
   {
-    "gene_symbol": "BRCA2", 
+    "gene_symbol": "BRCA2",
     "panel": "Hereditary Cancer",
     "classification": "High Penetrance",
     "inheritance": "Autosomal Dominant",
@@ -123,6 +131,7 @@ Structured JSON files containing gene information with flexible field mapping:
 ```
 
 #### Object Format
+
 ```json
 {
   "BRCA1": {
@@ -133,7 +142,7 @@ Structured JSON files containing gene information with flexible field mapping:
   },
   "TP53": {
     "symbol": "TP53",
-    "panel_name": "Tumor_Suppressor_Panel", 
+    "panel_name": "Tumor_Suppressor_Panel",
     "pathogenicity_score": 0.98,
     "clinical_significance": "Pathogenic"
   }
@@ -153,6 +162,7 @@ The mapping parameter defines how to extract gene identifiers and additional dat
 ```
 
 **Mapping Fields:**
+
 - `identifier` (required): Field containing the gene identifier
 - `dataFields` (optional): Array of additional fields to include in output
 
@@ -160,12 +170,12 @@ The mapping parameter defines how to extract gene identifiers and additional dat
 
 ### Core Options
 
-| Option | Alias | Type | Description |
-|--------|-------|------|-------------|
-| `--bed-file` | `-bf` | Array | Path to BED file(s) with genomic regions |
-| `--gene-list` | `-gl` | Array | Path to gene list file(s) |
-| `--json-genes` | `-jg` | Array | Path to JSON gene file(s) |
-| `--json-gene-mapping` | | String | JSON mapping for JSON gene files |
+| Option                | Alias | Type   | Description                              |
+| --------------------- | ----- | ------ | ---------------------------------------- |
+| `--bed-file`          | `-bf` | Array  | Path to BED file(s) with genomic regions |
+| `--gene-list`         | `-gl` | Array  | Path to gene list file(s)                |
+| `--json-genes`        | `-jg` | Array  | Path to JSON gene file(s)                |
+| `--json-gene-mapping` |       | String | JSON mapping for JSON gene files         |
 
 ### Usage Notes
 
@@ -199,7 +209,7 @@ Custom annotations appear in the `user_feature_overlap` array:
           "strand": "+"
         },
         {
-          "type": "gene", 
+          "type": "gene",
           "identifier": "BRCA1",
           "source": "cancer_genes.txt",
           "gene_source_type": "gene_list"
@@ -220,8 +230,9 @@ rs80357906,17:43094692-43094692(1),BRCA1,"region:BRCA1_promoter(regulatory_regio
 ```
 
 **Format Specification:**
+
 - **Regions**: `region:name(filename)`
-- **Genes**: `gene:identifier(filename)` 
+- **Genes**: `gene:identifier(filename)`
 - **Multiple**: Separated by semicolons (`;`)
 - **Missing Names**: `unknown` placeholder used
 
@@ -258,7 +269,7 @@ variant-linker --variant "BRCA1:c.68_69delAG" \
     "identifier": "hgnc_symbol",
     "dataFields": [
       "disease_panel",
-      "inheritance_pattern", 
+      "inheritance_pattern",
       "clinical_actionability",
       "evidence_level",
       "last_reviewed"
@@ -302,32 +313,40 @@ variant-linker --vcf-input patient_variants.vcf \
 ### Common Issues and Solutions
 
 **File Not Found**
+
 ```bash
 Error: Error parsing BED file /path/to/missing.bed: ENOENT: no such file or directory
 ```
+
 - Verify file path is correct
 - Check file permissions
 - Use absolute paths if needed
 
 **Invalid BED Format**
+
 ```bash
 Warning: Skipping invalid BED line 5: insufficient columns (2)
 ```
+
 - Ensure minimum 3 columns (chr, start, end)
 - Verify tab-separated format
 - Check for header lines
 
 **JSON Mapping Error**
+
 ```bash
 Error: --json-gene-mapping is required when using --json-genes
 ```
+
 - Always provide mapping parameter with JSON files
 - Verify JSON syntax in mapping string
 
 **Invalid JSON Mapping**
+
 ```bash
 Error: Invalid JSON gene mapping: Unexpected token
 ```
+
 - Validate JSON syntax: `echo '{"identifier":"gene"}' | jq`
 - Escape quotes properly in shell
 
@@ -357,7 +376,7 @@ Error: Invalid JSON gene mapping: Unexpected token
 ### Scale Guidelines
 
 - **BED Regions**: Efficiently handles 100K+ regions
-- **Gene Lists**: Optimized for 10K+ genes  
+- **Gene Lists**: Optimized for 10K+ genes
 - **JSON Metadata**: Suitable for complex clinical databases
 - **Concurrent Files**: Multiple files processed in parallel
 
@@ -417,7 +436,7 @@ const features = await loadFeatures({
   bedFile: ['regulatory_regions.bed'],
   geneList: ['cancer_genes.txt'],
   jsonGenes: ['gene_panels.json'],
-  jsonGeneMapping: '{"identifier":"gene_symbol","dataFields":["panel","classification"]}'
+  jsonGeneMapping: '{"identifier":"gene_symbol","dataFields":["panel","classification"]}',
 });
 
 // Analyze variants with custom features
@@ -426,7 +445,7 @@ const result = await analyzeVariant({
   recoderOptions: { vcf_string: '1' },
   vepOptions: { CADD: '1', hgvs: '1' },
   output: 'JSON',
-  features: features
+  features: features,
 });
 
 console.log(result.annotationData[0].user_feature_overlap);
@@ -435,7 +454,7 @@ console.log(result.annotationData[0].user_feature_overlap);
 ## Related Documentation
 
 - [CLI Usage Guide](../getting-started/cli-usage.md) - Complete CLI reference
-- [VCF and PED Files](./vcf-and-ped-files.md) - Working with genomic file formats  
+- [VCF and PED Files](./vcf-and-ped-files.md) - Working with genomic file formats
 - [Inheritance Analysis](./inheritance-analysis.md) - Family-based variant analysis
 - [Scoring Engine](./scoring-engine.md) - Custom variant scoring
 - [API Usage](../getting-started/api-usage.md) - Programmatic interface

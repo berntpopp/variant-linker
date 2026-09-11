@@ -99,17 +99,9 @@
 
 :root {
   --vp-home-hero-name-color: transparent;
-  --vp-home-hero-name-background: -webkit-linear-gradient(
-    120deg,
-    #2e8555 30%,
-    #25c2a0
-  );
+  --vp-home-hero-name-background: -webkit-linear-gradient(120deg, #2e8555 30%, #25c2a0);
 
-  --vp-home-hero-image-background-image: linear-gradient(
-    -45deg,
-    #2e8555 50%,
-    #25c2a0 50%
-  );
+  --vp-home-hero-image-background-image: linear-gradient(-45deg, #2e8555 50%, #25c2a0 50%);
   --vp-home-hero-image-filter: blur(44px);
 }
 
@@ -168,7 +160,7 @@
   .vp-doc h1 {
     font-size: 2rem;
   }
-  
+
   .vp-doc h2 {
     font-size: 1.5rem;
   }

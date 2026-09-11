@@ -20,7 +20,6 @@ const vepEndpoint = apiConfig.ensembl.endpoints.vepRegions;
 // --- Test Suite ---
 describe('Inheritance Analysis Integration Tests', function () {
   // Increase timeout for tests involving multiple steps + potential API mocks
-  // eslint-disable-next-line no-invalid-this
   this.timeout(15000); // 15 seconds timeout per test
 
   let sandbox;
@@ -52,12 +51,11 @@ describe('Inheritance Analysis Integration Tests', function () {
             else if (chrom === 'X' && pos === 300000) geneSymbol = 'COL4A5';
             else if (chrom === '1' && pos === 1002000) geneSymbol = 'ABCA4';
             else if (chrom === '1' && pos === 1003000) geneSymbol = 'BRCA1';
-            else if (chrom === '2' && pos === 2000000) geneSymbol = 'BRCA2';
             // ** FIX: Ensure variantKey generated here matches the hyphenated format if used **
             // Although analyzeVariant should handle key assignment primarily.
             return {
               input: variantInput,
-              id: `${chrom}_${pos}_${ref}_${alt}` || 'variant_id', // Generate a mock ID
+              id: `${chrom}_${pos}_${ref}_${alt}`, // Generate a mock ID
               most_severe_consequence: 'mock_consequence',
               // Need seq_region_name, start, end, allele_string for variantKey generation later
               seq_region_name: chrom,
@@ -226,7 +224,7 @@ describe('Inheritance Analysis Integration Tests', function () {
           const alt = parts[4];
           return {
             input: variantInput,
-            id: `${chrom}_${pos}_${ref}_${alt}` || 'variant_id',
+            id: `${chrom}_${pos}_${ref}_${alt}`,
             most_severe_consequence: 'mock',
             seq_region_name: chrom,
             start: pos,
@@ -319,7 +317,7 @@ describe('Inheritance Analysis Integration Tests', function () {
           const alt = parts[4];
           return {
             input: variantInput,
-            id: `${chrom}_${pos}_${ref}_${alt}` || 'variant_id',
+            id: `${chrom}_${pos}_${ref}_${alt}`,
             most_severe_consequence: 'mock',
             seq_region_name: chrom,
             start: pos,

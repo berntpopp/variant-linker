@@ -5,13 +5,17 @@ const { expect } = require('chai');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const sinon = require('sinon');
 const PersistentCache = require('../src/cache/PersistentCache');
 
 describe('PersistentCache', () => {
   let cache;
   let tempDir;
+  let clock;
 
   beforeEach(() => {
+    // Freeze only the wall clock; real filesystem I/O and lock timers continue normally.
+    clock = sinon.useFakeTimers({ toFake: ['Date'] });
     // Create a temporary directory for each test
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'variant-linker-test-'));
 
@@ -23,13 +27,10 @@ describe('PersistentCache', () => {
   });
 
   afterEach(() => {
+    clock.restore();
     // Clean up temporary directory
     if (fs.existsSync(tempDir)) {
-      const files = fs.readdirSync(tempDir);
-      for (const file of files) {
-        fs.unlinkSync(path.join(tempDir, file));
-      }
-      fs.rmdirSync(tempDir);
+      fs.rmSync(tempDir, { recursive: true, force: true });
     }
   });
 
@@ -112,8 +113,9 @@ describe('PersistentCache', () => {
       // Should be available immediately
       expect(await cache.get(key)).to.equal(data);
 
-      // Wait for expiration
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      clock.tick(49);
+      expect(await cache.get(key)).to.equal(data);
+      clock.tick(1);
 
       // Should be expired
       expect(await cache.get(key)).to.be.null;
@@ -140,8 +142,7 @@ describe('PersistentCache', () => {
 
       expect(await cache.has(key)).to.be.true;
 
-      // Wait for expiration
-      await new Promise((resolve) => setTimeout(resolve, 150));
+      clock.tick(150);
 
       expect(await cache.has(key)).to.be.false;
     });
@@ -161,12 +162,12 @@ describe('PersistentCache', () => {
       expect(fs.existsSync(newTempDir)).to.be.true;
 
       // Clean up
-      fs.rmdirSync(newTempDir);
+      fs.rmSync(newTempDir, { recursive: true, force: true });
     });
 
     it('should handle corrupted cache files gracefully', async () => {
       const key = 'corrupted-test';
-      const filePath = path.join(tempDir, cache._getFilename(key));
+      const filePath = cache._getFilePath(key);
 
       // Write corrupted JSON
       fs.writeFileSync(filePath, '{ invalid json }');
@@ -191,7 +192,7 @@ describe('PersistentCache', () => {
       await cache.set(key, data);
 
       // Check that no temporary files are left behind
-      const files = fs.readdirSync(tempDir);
+      const files = fs.readdirSync(cache.cacheDir);
       const tempFiles = files.filter((f) => f.endsWith('.tmp'));
 
       expect(tempFiles).to.have.length(0);
@@ -202,7 +203,7 @@ describe('PersistentCache', () => {
     it('should return accurate cache statistics', async () => {
       const stats1 = await cache.getStats();
       expect(stats1.validEntries).to.equal(0);
-      expect(stats1.location).to.equal(tempDir);
+      expect(stats1.location).to.equal(cache.cacheDir);
 
       await cache.set('key1', 'data1');
       await cache.set('key2', 'data2');
@@ -217,8 +218,7 @@ describe('PersistentCache', () => {
       // Add entry with short TTL
       await cache.set('expired-key', 'data', 50); // 50ms TTL
 
-      // Wait for expiration
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      clock.tick(100);
 
       const stats = await cache.getStats();
       expect(stats.expiredEntries).to.be.greaterThan(0);
@@ -252,6 +252,32 @@ describe('PersistentCache', () => {
   });
 
   describe('Error handling', () => {
+    for (const operation of ['delete', 'clear', '_cleanupExpired']) {
+      it(`contains lock permission errors from ${operation} and recovers afterward`, async () => {
+        await cache.set('retained', 'original-data');
+        const denied = Object.assign(
+          new Error('EACCES: permission denied while creating cache lock'),
+          {
+            code: 'EACCES',
+            syscall: 'mkdir',
+          }
+        );
+        const mkdir = sinon.stub(fs.promises, 'mkdir');
+        mkdir.callThrough();
+        mkdir.withArgs(path.join(cache.cacheDir, '.lock')).rejects(denied);
+        try {
+          const result = await cache[operation]('retained');
+          if (operation === 'delete') expect(result).to.equal(false);
+          expect(await cache.get('retained')).to.equal('original-data');
+        } finally {
+          mkdir.restore();
+        }
+        expect((await cache.getStats()).maintenanceErrors).to.equal(1);
+        expect(await cache.delete('retained')).to.equal(true);
+        expect(await cache.get('retained')).to.equal(null);
+      });
+    }
+
     it('should handle file system errors gracefully', async () => {
       const key = 'error-test';
       const data = 'test-data';

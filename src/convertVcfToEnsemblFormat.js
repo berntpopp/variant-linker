@@ -142,7 +142,7 @@ function convertVcfToEnsemblFormat(vcf) {
     debugDetailed(`Converted to Ensembl format: region=${region}, allele=${allele}`);
     return { region, allele };
   } catch (error) {
-    debugAll(`Error in convertVcfToEnsemblFormat: ${error.message}`);
+    debugAll('Error in convertVcfToEnsemblFormat: %s', error);
     throw error;
   }
 }
@@ -158,6 +158,7 @@ function convertVcfToEnsemblFormat(vcf) {
  * @throws {Error} Always throws an error indicating that conversion to VCF is not supported.
  */
 function convertEnsemblToVcfFormat(ensemblInput) {
+  void ensemblInput;
   throw new Error(
     'Conversion from Ensembl format to VCF format is not supported without reference sequence information.'
   );

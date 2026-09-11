@@ -1,0 +1,12 @@
+node_modules/
+dist/
+coverage/
+coverage-*/
+temp/
+docs/.vitepress/dist/
+docs/.vitepress/cache/
+local_data/
+package-lock.json
+docs/package-lock.json
+test/fixtures/
+examples/benchmark_data/

@@ -26,8 +26,8 @@ const compoundHetAnalyzer = require('./compoundHetAnalyzer');
  * 3. Fallback to the first sample ID found in the first variant's genotype map.
  *
  * @param {Map<string, Map<string, string>>} genotypesMap - Map of variant keys to genotype maps.
- * @param {Map<string, Object>|null} pedigreeData - Optional pedigree data.
- * @param {Object|null} sampleMap - Optional sample role mapping.
+ * @param {import('../dataTypes').Pedigree|null} pedigreeData - Optional pedigree data.
+ * @param {import('../dataTypes').SampleMap|null} sampleMap - Optional sample role mapping.
  * @returns {string | null} The determined index sample ID or null if none could be found.
  * @private
  */
@@ -65,9 +65,9 @@ function _determineIndexSampleId(genotypesMap, pedigreeData, sampleMap) {
   // 3. Fallback to first sample in genotype data if still not found
   if (!indexSampleId && genotypesMap && genotypesMap.size > 0) {
     const firstVariantKey = genotypesMap.keys().next().value;
-    const firstGenotypes = genotypesMap.get(firstVariantKey);
+    const firstGenotypes = firstVariantKey ? genotypesMap.get(firstVariantKey) : undefined;
     if (firstGenotypes && firstGenotypes.size > 0) {
-      indexSampleId = firstGenotypes.keys().next().value;
+      indexSampleId = firstGenotypes.keys().next().value || null;
       debugDetailed(`  Using fallback index (first sample from first variant): ${indexSampleId}`);
     }
   }
@@ -85,12 +85,13 @@ function _determineIndexSampleId(genotypesMap, pedigreeData, sampleMap) {
  * with fallback to top-level gene_symbol if available.
  * Assigns a placeholder if no gene symbol can be determined.
  *
- * @param {Array<Object>} annotations - Variant annotation objects with `variantKey`.
- * @returns {Map<string, Array<Object>>} Map of gene symbols to their variant annotations.
+ * @param {import('../dataTypes').Annotation[]} annotations - Variant annotation objects with `variantKey`.
+ * @returns {Map<string, import('../dataTypes').Annotation[]>} Map of gene symbols to their variant annotations.
  * @private
  */
 function _groupAnnotationsByGene(annotations) {
   debugDetailed(`--- Grouping ${annotations?.length || 0} annotations by gene ---`);
+  /** @type {Map<string,import('../dataTypes').Annotation[]>} */
   const geneVariantsMap = new Map();
 
   if (!annotations || !Array.isArray(annotations)) {
@@ -104,39 +105,18 @@ function _groupAnnotationsByGene(annotations) {
       continue;
     }
 
-    let geneSymbol = null;
-    // Find the first gene symbol in the transcript consequences
-    if (Array.isArray(annotation.transcript_consequences)) {
-      for (const cons of annotation.transcript_consequences) {
-        if (cons?.gene_symbol) {
-          geneSymbol = cons.gene_symbol;
-          break; // Use the first one found
-        }
-      }
+    const genes = new Set(
+      (annotation.transcript_consequences || [])
+        .map((cons) => cons.gene_symbol || cons.gene_id)
+        .filter(Boolean)
+    );
+    if (annotation.gene_symbol) genes.add(annotation.gene_symbol);
+    for (const geneSymbol of genes) {
+      if (!geneSymbol) continue;
+      if (!geneVariantsMap.has(geneSymbol)) geneVariantsMap.set(geneSymbol, []);
+      const group = geneVariantsMap.get(geneSymbol) || [];
+      if (!group.some((item) => item.variantKey === annotation.variantKey)) group.push(annotation);
     }
-
-    // Fallback: If no gene symbol in consequences, try top-level annotation
-    if (!geneSymbol && annotation.gene_symbol) {
-      geneSymbol = annotation.gene_symbol;
-      debugDetailed(` Using top-level gene symbol for ${annotation.variantKey}: ${geneSymbol}`);
-    }
-
-    if (!geneSymbol) {
-      // Use a default placeholder if still no gene symbol
-      geneSymbol = `NO_GENE_${annotation.seq_region_name || 'UNK'}`;
-      debugDetailed(
-        `  Variant ${annotation.variantKey} - no gene symbol found. ` +
-          `Using placeholder: ${geneSymbol}`
-      );
-      // Do not skip, group under placeholder
-    }
-
-    // Add to the map
-    if (!geneVariantsMap.has(geneSymbol)) {
-      geneVariantsMap.set(geneSymbol, []);
-    }
-    geneVariantsMap.get(geneSymbol).push(annotation); // Push the full annotation object
-    debugDetailed(`  Added variant ${annotation.variantKey} to gene group ${geneSymbol}`);
   }
 
   debugDetailed(`--- Finished grouping. Found ${geneVariantsMap.size} gene groups. ---`);
@@ -147,9 +127,9 @@ function _groupAnnotationsByGene(annotations) {
  * Merges compound heterozygous results back into the main inheritance results map.
  * Updates the prioritized pattern and adds compHet details.
  *
- * @param {Map<string, Object>} inheritanceResults - Main results map (variantKey -> result).
+ * @param {Map<string, import('../dataTypes').InheritanceResult>} inheritanceResults - Main results map (variantKey -> result).
  * @param {string} geneSymbol - The gene being processed.
- * @param {Object} compHetResult - The result from analyzeCompoundHeterozygous.
+ * @param {import('../dataTypes').CompoundHetResult} compHetResult - The result from analyzeCompoundHeterozygous.
  * @private
  */
 function _mergeCompHetResults(inheritanceResults, geneSymbol, compHetResult) {
@@ -167,6 +147,15 @@ function _mergeCompHetResults(inheritanceResults, geneSymbol, compHetResult) {
   for (const variantKey of compHetResult.variantKeys) {
     if (inheritanceResults.has(variantKey)) {
       const currentResult = inheritanceResults.get(variantKey);
+      if (!currentResult) continue;
+      const confirmedForVariant =
+        compHetResult.isCompHet && !compHetResult.ambiguousVariantKeys.includes(variantKey);
+      const compHetPattern = confirmedForVariant
+        ? compHetResult.pattern
+        : compHetResult.pattern.replace(
+            /^compound_heterozygous$/,
+            'compound_heterozygous_possible'
+          );
       debugDetailed(
         `    Variant ${variantKey}: Current Pattern='${currentResult.prioritizedPattern}'`
       );
@@ -211,7 +200,7 @@ function _mergeCompHetResults(inheritanceResults, geneSymbol, compHetResult) {
          isCurrentWeak=${isCurrentWeak}, isCurrentStrong=${isCurrentStrong}`
       );
 
-      if (compHetResult.isCompHet) {
+      if (confirmedForVariant) {
         // Confirmed CompHet overrides weak patterns and autosomal_dominant, but not other strong patterns
         if (isCurrentWeak || currentResult.prioritizedPattern === 'autosomal_dominant') {
           debugDetailed(
@@ -229,10 +218,10 @@ function _mergeCompHetResults(inheritanceResults, geneSymbol, compHetResult) {
         if (isCurrentWeak) {
           debugDetailed(
             `    -> Overriding weak pattern '${newPrioritizedPattern}' with possible CompHet ` +
-              `'${compHetResult.pattern}'`
+              `'${compHetPattern}'`
           );
           // Use the specific 'possible' pattern from the compHetResult
-          newPrioritizedPattern = compHetResult.pattern;
+          newPrioritizedPattern = compHetPattern;
         } else {
           debugDetailed(
             `    -> Keeping non-weak pattern '${newPrioritizedPattern}' despite possible CompHet`
@@ -242,7 +231,7 @@ function _mergeCompHetResults(inheritanceResults, geneSymbol, compHetResult) {
 
       // Add CompHet details
       const compHetDetails = {
-        isCandidate: compHetResult.isCompHet, // isCandidate true only if confirmed
+        isCandidate: confirmedForVariant, // isCandidate true only if confirmed
         isPossible: compHetResult.isPossible,
         geneSymbol,
         // List partners involved in this specific CompHet finding
@@ -257,17 +246,18 @@ function _mergeCompHetResults(inheritanceResults, geneSymbol, compHetResult) {
       const enhancedResult = {
         ...currentResult,
         prioritizedPattern: newPrioritizedPattern, // Use the potentially updated pattern
-        possiblePatterns: [
-          ...new Set([...(currentResult.possiblePatterns || []), compHetResult.pattern]),
-        ],
+        possiblePatterns: [...new Set([...(currentResult.possiblePatterns || []), compHetPattern])],
         // Add/overwrite segregation status for comphet patterns
         segregationStatus: {
           ...currentResult.segregationStatus,
-          ...(compHetResult.isCompHet && { compound_heterozygous: 'segregates' }), // Assume segregates if confirmed
-          ...(compHetResult.isPossible &&
-            !compHetResult.isCompHet && { [compHetResult.pattern]: 'unknown' }), // Status for possible is unknown
+          ...(confirmedForVariant && { compound_heterozygous: 'segregates' }), // Assume segregates if confirmed
+          ...(compHetResult.isPossible && !confirmedForVariant && { [compHetPattern]: 'unknown' }), // Status for possible is unknown
         },
-        compHetDetails: compHetDetails,
+        compHetDetails:
+          currentResult.compHetDetails?.isCandidate && !confirmedForVariant
+            ? currentResult.compHetDetails
+            : compHetDetails,
+        compHetByGene: { ...currentResult.compHetByGene, [geneSymbol]: compHetDetails },
       };
 
       inheritanceResults.set(variantKey, enhancedResult);
@@ -287,12 +277,12 @@ function _mergeCompHetResults(inheritanceResults, geneSymbol, compHetResult) {
  * Analyzes inheritance patterns for a list of variant annotations.
  * This is the main entry point for the inheritance analysis workflow.
  *
- * @param {Array<Object>} annotations - Variant objects with required properties.
+ * @param {import('../dataTypes').Annotation[]} annotations - Variant objects with required properties.
  *                                      Each must have a 'variantKey' property in CHR-POS-REF-ALT format.
  * @param {Map<string, Map<string, string>>} genotypesMap - Variant genotype maps, keyed by CHR-POS-REF-ALT.
- * @param {Map<string, Object>|null} pedigreeData - Optional parsed pedigree data.
- * @param {Object|null} sampleMap - Optional role to sample ID mapping.
- * @returns {Map<string, Object>} Map of variantKeys (CHR-POS-REF-ALT) to inheritance results.
+ * @param {import('../dataTypes').Pedigree|null} pedigreeData - Optional parsed pedigree data.
+ * @param {import('../dataTypes').SampleMap|null} sampleMap - Optional role to sample ID mapping.
+ * @returns {Map<string, import('../dataTypes').InheritanceResult>} Map of variantKeys (CHR-POS-REF-ALT) to inheritance results.
  */
 function analyzeInheritanceForSample(annotations, genotypesMap, pedigreeData, sampleMap) {
   debugDetailed(`--- Entering analyzeInheritanceForSample ---`);
@@ -301,6 +291,7 @@ function analyzeInheritanceForSample(annotations, genotypesMap, pedigreeData, sa
   );
 
   // Map: variantKey -> { prioritizedPattern, possiblePatterns, segregationStatus, compHetDetails }
+  /** @type {Map<string,import('../dataTypes').InheritanceResult>} */
   const results = new Map();
 
   if (!Array.isArray(annotations) || !annotations.length) {
@@ -369,7 +360,7 @@ function analyzeInheritanceForSample(annotations, genotypesMap, pedigreeData, sa
     );
 
     // *** FIX: Use the correct variantKey (CHR-POS-REF-ALT) for genotype lookup ***
-    const genotypes = genotypesMap.get(variantKey);
+    const genotypes = genotypesMap.get(annotation.originalVariantKey || variantKey);
 
     if (!genotypes) {
       // This log message is now more accurate if genotypesMap is correct but key is wrong
@@ -440,6 +431,7 @@ function analyzeInheritanceForSample(annotations, genotypesMap, pedigreeData, sa
             segregationResults.set(pattern, status);
             debugDetailed(`    <--- checkSegregation result: ${status}`);
           } catch (segError) {
+            if (!(segError instanceof Error)) throw segError;
             debugDetailed(`    !!! ERROR checking segregation for ${pattern}: ${segError.message}`);
             segregationResults.set(pattern, 'error_checking_segregation');
           }
@@ -468,6 +460,7 @@ function analyzeInheritanceForSample(annotations, genotypesMap, pedigreeData, sa
       });
       debugDetailed(`  Stored initial inheritance result for key ${variantKey}.`);
     } catch (error) {
+      if (!(error instanceof Error)) throw error;
       debug(`!!! ERROR analyzing inheritance for variant ${variantKey}: ${error.message} !!!`);
       debugDetailed(`Stack trace: ${error.stack}`);
       // Store error using the correct variantKey
@@ -536,13 +529,15 @@ function analyzeInheritanceForSample(annotations, genotypesMap, pedigreeData, sa
           debugDetailed(`  No applicable CompHet pattern found for ${geneSymbol}.`);
         }
       } catch (compHetError) {
+        if (!(compHetError instanceof Error)) throw compHetError;
         debug(`!!! CompHet error for ${geneSymbol}: ${compHetError.message} !!!`);
         debugDetailed(`Stack trace: ${compHetError.stack}`);
         // Optionally mark involved variants with an error status
         for (const variant of geneVariants) {
           // Use the correct key to update the results map
-          if (results.has(variant.variantKey)) {
+          if (variant.variantKey && results.has(variant.variantKey)) {
             const currentResult = results.get(variant.variantKey);
+            if (!currentResult) continue;
             results.set(variant.variantKey, {
               ...currentResult,
               compHetDetails: { error: `CompHet analysis failed: ${compHetError.message}` },

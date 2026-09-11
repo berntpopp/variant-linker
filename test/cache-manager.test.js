@@ -19,11 +19,7 @@ describe('CacheManager', () => {
   afterEach(() => {
     // Clean up temporary directory
     if (tempDir && fs.existsSync(tempDir)) {
-      const files = fs.readdirSync(tempDir);
-      for (const file of files) {
-        fs.unlinkSync(path.join(tempDir, file));
-      }
-      fs.rmdirSync(tempDir);
+      fs.rmSync(tempDir, { recursive: true, force: true });
     }
   });
 
@@ -276,7 +272,7 @@ describe('CacheManager', () => {
 
       expect(stats.persistent.enabled).to.be.true;
       expect(stats.persistent.validEntries).to.equal(2);
-      expect(stats.persistent.location).to.equal(tempDir);
+      expect(stats.persistent.location).to.equal(cacheManager.persistentCache.cacheDir);
     });
 
     it('should handle statistics when persistent cache is disabled', async () => {

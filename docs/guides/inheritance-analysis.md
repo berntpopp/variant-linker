@@ -14,37 +14,49 @@ The inheritance analysis module automatically examines genotype data and family 
 ## Supported Inheritance Patterns
 
 ### De Novo Variants
+
 Variants present in the child but absent in both parents:
+
 - Indicates potential new mutations
 - High priority for disease causation studies
 - Requires trio or extended family data
 
 ### Autosomal Dominant (AD)
+
 Heterozygous variants that segregate with affected status:
+
 - One copy of variant causes phenotype
 - Affected individuals typically have one affected parent
 - 50% transmission rate to offspring
 
 ### Autosomal Recessive (AR)
+
 Homozygous variants in affected individuals with carrier parents:
+
 - Two copies required for phenotype
 - Parents typically unaffected carriers
 - 25% transmission rate for affected offspring from carrier parents
 
 ### X-linked Dominant (XLD)
+
 Variants on X chromosome following dominant inheritance:
+
 - Affects both males and females
 - Affected males pass trait to all daughters
 - Affected females have 50% transmission rate
 
 ### X-linked Recessive (XLR)
+
 Variants on X chromosome following recessive inheritance:
+
 - Primarily affects males
 - Carrier mothers transmit to 50% of sons
 - Affected fathers pass carrier status to all daughters
 
 ### Compound Heterozygous
+
 Two different variants in the same gene that together cause recessive phenotype:
+
 - Each variant inherited from different parents
 - Gene-level analysis required
 - Both variants must affect gene function
@@ -52,13 +64,17 @@ Two different variants in the same gene that together cause recessive phenotype:
 ## Analysis Modes
 
 ### Single Sample Mode
+
 When only one sample is present in the VCF file:
+
 - Limited inheritance pattern analysis
 - Focuses on variant annotation and basic pattern possibilities
 - Cannot determine de novo status or segregation
 
 ### Trio Mode
+
 When parent-child trio is available:
+
 - Full de novo analysis
 - Basic dominant/recessive pattern assessment
 - Optimal for most clinical applications
@@ -74,7 +90,9 @@ variant-linker --vcf-input trio.vcf --sample-map "PROBAND,MOTHER,FATHER" --calcu
 ```
 
 ### Extended Family Mode
+
 When comprehensive family structure is provided via PED file:
+
 - Multi-generational inheritance analysis
 - Complex pattern recognition
 - Compound heterozygous detection
@@ -160,16 +178,19 @@ When inheritance analysis is enabled, each variant annotation includes a `deduce
 ### Confidence Levels
 
 **High Confidence**
+
 - Clear segregation pattern
 - Sufficient family members
 - Consistent with single inheritance mode
 
 **Medium Confidence**
+
 - Some evidence for pattern
 - Limited family size or incomplete data
 - Multiple possible patterns
 
 **Low Confidence**
+
 - Insufficient data for pattern determination
 - Conflicting evidence
 - Complex inheritance not clearly resolved
@@ -189,13 +210,17 @@ When inheritance analysis is enabled, each variant annotation includes a `deduce
 The inheritance analysis engine uses a multi-step calculation process:
 
 #### 1. Index Sample Determination
+
 The system identifies the proband/index sample using this priority:
+
 - Explicit `sampleMap` with 'index' or 'proband' designation
 - First affected individual (phenotype = '2') in PED file
 - First sample ID in the VCF genotype data
 
 #### 2. Genotype Classification
+
 Each genotype is classified based on allele counts:
+
 - **0/0 or 0|0**: Homozygous reference (isRef)
 - **0/1 or 1/0 or 0|1 or 1|0**: Heterozygous (isHet)
 - **1/1 or 1|1**: Homozygous alternate (isHomAlt)
@@ -205,6 +230,7 @@ Each genotype is classified based on allele counts:
 #### 3. Pattern-Specific Rules
 
 **De Novo Detection**:
+
 ```
 IF index has variant (Het or HomAlt) AND
    mother is HomRef (0/0) AND
@@ -213,6 +239,7 @@ THEN pattern = de_novo
 ```
 
 **Autosomal Dominant (AD)**:
+
 ```
 IF index is Het AND
    (mother is Het OR father is Het) AND
@@ -221,6 +248,7 @@ THEN pattern = autosomal_dominant
 ```
 
 **Autosomal Recessive (AR)**:
+
 ```
 IF index is HomAlt AND
    mother is Het AND
@@ -229,6 +257,7 @@ THEN pattern = autosomal_recessive
 ```
 
 **X-linked Patterns** (requires chromosome information):
+
 - **X-linked Dominant (XLD)**:
   - Affected males: Must have affected mother
   - Affected females: One affected parent sufficient
@@ -245,11 +274,13 @@ segregation_score = (carriers_affected + non_carriers_unaffected) / total_inform
 ```
 
 Where:
+
 - **carriers_affected**: Variant carriers who are affected
 - **non_carriers_unaffected**: Non-carriers who are unaffected
 - **total_informative_members**: All family members with both genotype and phenotype data
 
 Segregation categories:
+
 - **Perfect** (score = 1.0): Complete segregation with phenotype
 - **High** (score ≥ 0.8): Strong segregation evidence
 - **Moderate** (score ≥ 0.6): Some segregation support
@@ -265,11 +296,12 @@ confidence = calculateConfidence({
   familySize,
   missingDataCount,
   mendelianErrors,
-  patternConsistency
-})
+  patternConsistency,
+});
 ```
 
 Confidence modifiers:
+
 - **High**: Large families (≥5), perfect segregation, no missing data
 - **Medium**: Small families (3-4), good segregation (≥0.8), minimal missing data
 - **Low**: Duo analysis, poor segregation (<0.8), significant missing data
@@ -277,12 +309,14 @@ Confidence modifiers:
 ### De Novo Detection
 
 De novo variants are identified when:
+
 - Child has variant (heterozygous or homozygous)
 - Both parents lack the variant (homozygous reference)
 - High-quality genotype calls for all family members
 - No evidence of sample mix-up or technical errors
 
 Additional checks for de novo calls:
+
 - **Allele balance**: Het calls should have ~50% alternate allele frequency
 - **Read depth**: Sufficient coverage in all trio members
 - **Quality scores**: High genotype quality (GQ) values
@@ -290,12 +324,14 @@ Additional checks for de novo calls:
 ### Compound Heterozygous Detection
 
 Compound heterozygous variants are identified by:
+
 1. **Gene-level Analysis**: Group variants by affected gene
 2. **Phase Analysis**: Determine if variants are on different chromosomes
 3. **Parent-of-Origin**: Verify variants inherited from different parents
 4. **Functional Impact**: Both variants must potentially affect gene function
 
 Algorithm for compound het detection:
+
 ```
 FOR each gene with multiple Het variants in index:
   IF variant1 from mother (mother Het, father HomRef) AND
@@ -307,12 +343,14 @@ FOR each gene with multiple Het variants in index:
 ### Multi-Allelic Variant Handling
 
 For variants with multiple alternate alleles:
+
 1. Split multi-allelic sites into biallelic representations
 2. Analyze each alternate allele independently
 3. Preserve allele-specific genotype information
 4. Report inheritance patterns per alternate allele
 
 Example:
+
 ```
 Original: 1:12345 A T,G (GT: 1/2)
 Split to:
@@ -323,28 +361,33 @@ Split to:
 ### Special Cases and Edge Conditions
 
 #### Hemizygous Calls (Male X Chromosome)
+
 - Males have single X chromosome
 - Genotypes reported as "1" (not "1/1")
 - Special handling for X-linked inheritance calculations
 
 #### Missing Genotypes
+
 - Pattern reported as "unknown_missing_genotype"
 - Segregation analysis excludes missing samples
 - Confidence automatically reduced
 
 #### Technical Replicates
+
 - If duplicate samples detected, use highest quality call
 - Flag inconsistent genotypes between replicates
 
 ### Quality Control
 
 The analysis includes several quality control measures:
+
 - **Genotype Quality Filtering**: Remove low-quality genotype calls
 - **Mendelian Error Detection**: Identify inconsistent inheritance
 - **Sample Relationship Validation**: Verify expected family relationships
 - **Technical Artifact Filtering**: Remove likely technical errors
 
 Quality metrics tracked:
+
 - **Mendelian error rate**: Percentage of impossible inheritance patterns
 - **Missing data rate**: Proportion of missing genotypes
 - **Hardy-Weinberg equilibrium**: For population-level checks
@@ -380,6 +423,7 @@ Quality metrics tracked:
 The inheritance analysis system is composed of specialized modules:
 
 #### Core Modules
+
 - **`inheritanceAnalyzer.js`**: Main orchestrator that coordinates all analysis
 - **`patternDeducer.js`**: Deduces potential inheritance patterns from genotypes
 - **`segregationChecker.js`**: Validates pattern consistency across families
@@ -387,6 +431,7 @@ The inheritance analysis system is composed of specialized modules:
 - **`compoundHetAnalyzer.js`**: Detects compound heterozygous variants
 
 #### Utility Modules
+
 - **`genotypeUtils.js`**: Genotype parsing and classification functions
 - **`pedigreeUtils.js`**: Family relationship and sex determination utilities
 
@@ -422,6 +467,7 @@ The inheritance analysis system is composed of specialized modules:
 ### Key Data Structures
 
 #### Genotype Map
+
 ```javascript
 Map<variantKey, Map<sampleId, genotype>>
 // Example:
@@ -429,6 +475,7 @@ Map<variantKey, Map<sampleId, genotype>>
 ```
 
 #### Pedigree Data
+
 ```javascript
 Map<sampleId, {
   familyId: string,
@@ -440,6 +487,7 @@ Map<sampleId, {
 ```
 
 #### Pattern Result
+
 ```javascript
 {
   patterns: ["autosomal_recessive", "compound_heterozygous"],
@@ -458,6 +506,7 @@ Map<sampleId, {
 ### Custom Pattern Definitions
 
 Future versions will support custom inheritance pattern definitions for:
+
 - Disease-specific inheritance models
 - Population-specific patterns
 - Complex multi-gene interactions
@@ -465,6 +514,7 @@ Future versions will support custom inheritance pattern definitions for:
 ### Integration with Functional Annotation
 
 Inheritance analysis integrates with functional annotation to prioritize variants:
+
 - **Functional Impact**: Consider variant consequence severity
 - **Gene Constraint**: Integrate gene constraint metrics
 - **Pathogenicity Scores**: Weight by computational pathogenicity predictions
@@ -472,6 +522,7 @@ Inheritance analysis integrates with functional annotation to prioritize variant
 ### Performance Optimization
 
 For large-scale analysis:
+
 - **Parallel Processing**: Variants analyzed concurrently
 - **Memory Efficiency**: Streaming VCF processing
 - **Caching**: Pedigree relationships cached for reuse
@@ -482,16 +533,19 @@ For large-scale analysis:
 ### Common Issues
 
 **No Inheritance Patterns Detected**
+
 - Check sample naming consistency between VCF and PED files
 - Verify family relationships in PED file
 - Ensure genotype quality is sufficient
 
 **Inconsistent Patterns**
+
 - Review phenotype assignments in PED file
 - Check for sample mix-ups or labeling errors
 - Consider incomplete penetrance or variable expressivity
 
 **Low Confidence Results**
+
 - Increase family size if possible
 - Improve genotype quality through better sequencing
 - Validate relationships with independent methods
@@ -510,6 +564,7 @@ variant-linker \
 ```
 
 Debug output includes:
+
 - Genotype extraction details
 - Family relationship parsing
 - Pattern matching logic

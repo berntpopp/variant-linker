@@ -1,13 +1,17 @@
 {
-  "aggregates": {
-    "consequence_terms": "transcript_consequences.*.consequence_terms:unique",
-    "bp_overlap": "transcript_consequences.*.bp_overlap:max",
-    "percentage_overlap": "transcript_consequences.*.percentage_overlap:max"
-  },
-  "transcriptFields": {
-    "dosage_gene": "dosage_sensitivity.gene_name",
-    "phaplo_score": "dosage_sensitivity.phaplo",
-    "ptriplo_score": "dosage_sensitivity.ptriplo",
-    "phenotypes": "phenotypes"
+  "variables": {
+    "aggregates": {
+      "transcript_consequences.*.consequence_terms": {
+        "target": "consequence_terms",
+        "aggregator": "unique",
+        "default": []
+      },
+      "transcript_consequences.*.bp_overlap": "max:bp_overlap|default:0",
+      "transcript_consequences.*.percentage_overlap": "max:percentage_overlap|default:0",
+      "dosage_sensitivity.gene_name": "dosage_gene",
+      "dosage_sensitivity.phaplo": "phaplo_score|default:0",
+      "dosage_sensitivity.ptriplo": "ptriplo_score|default:0",
+      "phenotypes": { "target": "phenotypes", "default": [] }
+    }
   }
 }

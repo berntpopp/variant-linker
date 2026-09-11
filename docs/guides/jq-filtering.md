@@ -24,13 +24,14 @@ Get HGVS coding/protein annotations and VCF coordinates for MANE_Select RefSeq t
 ```bash
 # Single command pipeline
 variant-linker --variant "ENST00000366667:c.803C>T" --output JSON | \
-jq -r '.annotationData[] as $anno | 
-       $anno.transcript_consequences[] | 
-       select(has("mane") and (.mane | contains(["MANE_Select"])) and (.transcript_id | startswith("NM_"))) | 
+jq -r '.annotationData[] as $anno |
+       $anno.transcript_consequences[] |
+       select(has("mane") and (.mane | contains(["MANE_Select"])) and (.transcript_id | startswith("NM_"))) |
        [$anno.originalInput, .hgvsc, (.hgvsp // "N/A"), $anno.variantKey] | @tsv'
 ```
 
 **Output:**
+
 ```
 ENST00000366667:c.803C>T	NM_001384479.1:c.803C>T	NP_001371408.1:p.Ala268Val	1-230710021-G-A
 ```
@@ -42,9 +43,9 @@ ENST00000366667:c.803C>T	NM_001384479.1:c.803C>T	NP_001371408.1:p.Ala268Val	1-23
 variant-linker --variant "ENST00000366667:c.803C>T" --output JSON > variant_output.json
 
 # Then apply jq filter
-jq -r '.annotationData[] as $anno | 
-       $anno.transcript_consequences[] | 
-       select(has("mane") and (.mane | contains(["MANE_Select"])) and (.transcript_id | startswith("NM_"))) | 
+jq -r '.annotationData[] as $anno |
+       $anno.transcript_consequences[] |
+       select(has("mane") and (.mane | contains(["MANE_Select"])) and (.transcript_id | startswith("NM_"))) |
        [$anno.originalInput, .hgvsc, (.hgvsp // "N/A"), $anno.variantKey] | @tsv' variant_output.json
 ```
 
@@ -58,11 +59,11 @@ echo -e "rs123\nENST00000366667:c.803C>T\n1-100000-A-G" > variants.txt
 
 # Process with batch mode and filter
 variant-linker --variants-file variants.txt --output JSON | \
-jq -r '.[] | 
-       select(.annotationData) | 
-       .annotationData[] as $anno | 
-       $anno.transcript_consequences[] | 
-       select(has("mane") and (.transcript_id | startswith("NM_"))) | 
+jq -r '.[] |
+       select(.annotationData) |
+       .annotationData[] as $anno |
+       $anno.transcript_consequences[] |
+       select(has("mane") and (.transcript_id | startswith("NM_"))) |
        "\($anno.originalInput) -> \(.hgvsc)"'
 ```
 
@@ -72,9 +73,9 @@ jq -r '.[] |
 
 ```bash
 variant-linker --variant "rs123" --output JSON | \
-jq -r '.annotationData[] as $anno | 
-       $anno.transcript_consequences[] | 
-       select(has("mane") and (.transcript_id | startswith("NM_"))) | 
+jq -r '.annotationData[] as $anno |
+       $anno.transcript_consequences[] |
+       select(has("mane") and (.transcript_id | startswith("NM_"))) |
        [.transcript_id, .hgvsc, (.hgvsp // "N/A"), $anno.variantKey] | @tsv'
 ```
 
@@ -82,10 +83,10 @@ jq -r '.annotationData[] as $anno |
 
 ```bash
 variant-linker --variant "rs123" --output JSON | \
-jq -r '["Transcript", "HGVS_c", "HGVS_p", "VCF"], 
-       (.annotationData[] as $anno | 
-        $anno.transcript_consequences[] | 
-        select(has("mane") and (.transcript_id | startswith("NM_"))) | 
+jq -r '["Transcript", "HGVS_c", "HGVS_p", "VCF"],
+       (.annotationData[] as $anno |
+        $anno.transcript_consequences[] |
+        select(has("mane") and (.transcript_id | startswith("NM_"))) |
         [.transcript_id, .hgvsc, (.hgvsp // "N/A"), $anno.variantKey]) | @csv'
 ```
 
@@ -93,9 +94,9 @@ jq -r '["Transcript", "HGVS_c", "HGVS_p", "VCF"],
 
 ```bash
 variant-linker --variant "rs123" --output JSON | \
-jq '[.annotationData[] as $anno | 
-     $anno.transcript_consequences[] | 
-     select(has("mane") and (.transcript_id | startswith("NM_"))) | 
+jq '[.annotationData[] as $anno |
+     $anno.transcript_consequences[] |
+     select(has("mane") and (.transcript_id | startswith("NM_"))) |
      {
        transcript: .transcript_id,
        hgvsc: .hgvsc,
@@ -112,9 +113,9 @@ jq '[.annotationData[] as $anno |
 
 ```bash
 variant-linker --variant "rs123" --output JSON | \
-jq -r '.annotationData[]? as $anno | 
-       $anno.transcript_consequences[]? | 
-       select(has("mane") and (.transcript_id | startswith("NM_"))) | 
+jq -r '.annotationData[]? as $anno |
+       $anno.transcript_consequences[]? |
+       select(has("mane") and (.transcript_id | startswith("NM_"))) |
        "\(.hgvsc // "N/A") | \(.hgvsp // "N/A") | \($anno.variantKey // "N/A")"'
 ```
 

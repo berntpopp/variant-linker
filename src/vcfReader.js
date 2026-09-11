@@ -1,300 +1,204 @@
-// src/vcfReader.js
-
-/**
- * @fileoverview VCF file parsing functionality for variant-linker.
- * Provides functions to read variants from standard VCF files, preserving header
- * information, sample genotypes, and properly handling multi-allelic sites.
- * @module vcfReader
- */
-
 'use strict';
 
 const fs = require('fs');
-
-const debug = require('debug')('variant-linker:vcf-reader');
-const debugDetailed = require('debug')('variant-linker:detailed');
-// Using direct require with eslint disable for @gmod/vcf package
-/* eslint-disable node/no-missing-require */
+const readline = require('readline');
 const VCF = require('@gmod/vcf').default;
-/* eslint-enable node/no-missing-require */
+const { projectGenotype } = require('./inheritance/genotypeUtils');
+
+/** @typedef {ReturnType<InstanceType<typeof VCF>['parseLine']>} ParsedRecord */
+/**
+ * @typedef {object} VcfEntry
+ * @property {string} key Canonical annotation identity (not original row identity).
+ * @property {string} chrom
+ * @property {number} pos
+ * @property {string} ref
+ * @property {string} alt
+ * @property {number} altIndex One-based ALT position; zero for reference-only passthrough records.
+ * @property {string} originalRecordId Stable source line identity.
+ * @property {string} originalLine Exact fields without line terminator.
+ * @property {ParsedRecord & {CHROM:string, REF:string}} originalRecord
+ * @property {Map<string,string>} genotypes Target ALT presence, preserving ploidy/phase/missingness.
+ * @property {Map<string,string>} originalGenotypes Original unprojected GT.
+ * @property {VcfEntry[]} [records] Additional occurrences including the first row.
+ * @property {boolean} [passthrough] Valid reference-only row with no ALT to annotate.
+ */
+/** @typedef {{headerLines:string[], samples:string[], recordId:string, originalLine:string, entries:VcfEntry[]}} VcfRecord */
+
+/** @param {string[]} headerLines @returns {string[]} */
+function samplesFromHeader(headerLines) {
+  return (headerLines.find((line) => line.startsWith('#CHROM')) || '').split('\t').slice(9);
+}
 
 /**
- * Reads variants from a VCF file and extracts them for processing.
- * Handles multi-allelic sites by splitting them into separate variants.
- * Extracts genotype information for each sample.
- * Preserves the original VCF header and records for later use in VCF output.
- *
- * @async
- * @param {string} filePath - Path to the VCF file to read
- * @returns {Promise<Object>} Object containing:
- *   - variantsToProcess {Array<string>}: Array of variant strings in the format "CHROM-POS-REF-ALT"
- *   - vcfRecordMap {Map}: Map of variant keys ("CHROM-POS-REF-ALT") to original VCF record data with genotypes
- *   - headerText {string}: The complete original VCF header text
- *   - headerLines {Array<string>}: Array of header lines
- *   - samples {Array<string>}: Array of sample IDs found in the VCF
- * @throws {Error} If there's an issue reading or parsing the VCF file
+ * @param {InstanceType<typeof VCF>} parser
+ * @param {string} line
+ * @param {string} recordId
+ * @param {string[]} samples
+ * @returns {VcfEntry[]}
  */
-async function readVariantsFromVcf(filePath) {
-  debug(`Reading VCF file: ${filePath}`);
+function parseEntries(parser, line, recordId, samples) {
+  const record = parser.parseLine(line);
+  if (!record?.CHROM || !record.POS || !record.REF)
+    throw new Error(`Invalid VCF record at ${recordId}`);
+  const { CHROM: chrom, POS: pos, REF: ref } = record;
+  const originalRecord = { ...record, CHROM: chrom, REF: ref };
+  const columns = line.split('\t');
+  const gtIndex = (columns[8] || '').split(':').indexOf('GT');
+  const originalGenotypes = new Map(
+    samples.map((sample, index) => [
+      sample,
+      gtIndex < 0 ? './.' : (columns[index + 9] || '').split(':')[gtIndex] || './.',
+    ])
+  );
+  if (columns[4] === '.')
+    return [
+      {
+        key: `passthrough:${recordId}`,
+        chrom,
+        pos,
+        ref,
+        alt: '.',
+        altIndex: 0,
+        originalRecordId: recordId,
+        originalLine: line,
+        originalRecord,
+        originalGenotypes,
+        genotypes: new Map(originalGenotypes),
+        passthrough: true,
+      },
+    ];
+  if (
+    !Array.isArray(record.ALT) ||
+    !record.ALT.length ||
+    record.ALT.some((alt) => !alt || alt === '.')
+  )
+    throw new Error(`Invalid VCF ALT at ${recordId}`);
+  return record.ALT.flatMap((alt, index) => {
+    if (!alt || alt === '.') return [];
+    const altIndex = index + 1;
+    const key = `${record.CHROM}-${record.POS}-${record.REF}-${alt}`;
+    return [
+      {
+        key,
+        chrom,
+        pos,
+        ref,
+        alt,
+        altIndex,
+        originalRecordId: recordId,
+        originalLine: line,
+        originalRecord,
+        originalGenotypes,
+        genotypes: new Map(
+          [...originalGenotypes].map(([sample, gt]) => [sample, projectGenotype(gt, altIndex)])
+        ),
+      },
+    ];
+  });
+}
 
-  if (!fs.existsSync(filePath)) {
-    throw new Error(`VCF file not found: ${filePath}`);
-  }
-
-  // Initialize return values
-  const variantsToProcess = [];
-  const vcfRecordMap = new Map();
-  let headerText = '';
-  let headerLines = [];
-
+/**
+ * Iterate input records with bounded memory. The caller owns analysis buffering.
+ * Header-only files yield a final empty record, so callers can preserve headers.
+ * @param {string} filePath
+ * @returns {AsyncGenerator<VcfRecord>}
+ */
+async function* iterateVcfRecords(filePath) {
+  if (!fs.existsSync(filePath)) throw new Error(`VCF file not found: ${filePath}`);
+  const stream = fs.createReadStream(filePath, { encoding: 'utf8' });
+  const lines = readline.createInterface({ input: stream, crlfDelay: Infinity });
+  /** @type {string[]} */
+  const headerLines = [];
+  /** @type {InstanceType<typeof VCF>|undefined} */
+  let parser;
+  let lineNumber = 0;
+  let records = 0;
   try {
-    // Read the file line by line to extract the header correctly
-    const fileContent = fs.readFileSync(filePath, 'utf8');
-    const lines = fileContent.split('\n');
-
-    // Collect header lines
-    headerLines = lines.filter((line) => line.startsWith('#'));
-    headerText = headerLines.join('\n');
-
-    if (headerLines.length === 0) {
-      throw new Error('No header lines found in VCF file');
-    }
-
-    debug(`Found ${headerLines.length} header lines`);
-
-    // Create VCF parser with the header
-    const parser = new VCF({ header: headerText });
-
-    // Log a warning if essential headers are missing
-    if (!headerLines.some((line) => line.startsWith('##fileformat='))) {
-      debug('Warning: Missing ##fileformat in VCF header');
-    }
-
-    // Get sample IDs from the header
-    const samples = [];
-    const headerFieldLine = headerLines.find((line) => line.startsWith('#CHROM'));
-    if (headerFieldLine) {
-      const headerFields = headerFieldLine.split('\t');
-      // VCF format: The first 9 columns are fixed, samples start at index 9
-      if (headerFields.length > 9) {
-        // Trim sample IDs to remove any carriage return or other whitespace characters
-        const trimmedSamples = headerFields.slice(9).map((id) => id.trim());
-        samples.push(...trimmedSamples);
-        debug(`Found ${samples.length} samples in VCF file: ${samples.join(', ')}`);
-      } else {
-        debug('No samples found in VCF file (single-sample or no genotypes)');
-      }
-    } else {
-      debug('Warning: Missing #CHROM header line in VCF file');
-    }
-
-    // Process each data line
-    const dataLines = lines.filter((line) => !line.startsWith('#') && line.trim() !== '');
-
-    for (const line of dataLines) {
-      // Try to parse the line, but handle any parsing errors
-      let record;
-      try {
-        record = parser.parseLine(line);
-        // *** DEBUG POINT: Log the raw parsed record ***
-        debugDetailed(`VCF Record Parsed: ${JSON.stringify(record)}`);
-        debugDetailed(
-          `VCF Record (${record?.CHROM}:${record?.POS}): Has samples = ${Boolean(record?.SAMPLES)}`
-        );
-      } catch (parseError) {
-        debug(
-          `Warning: Failed to parse VCF line: ${line.substring(0, 100)}... ` +
-            `(Error: ${parseError.message})`
-        );
-        continue; // Skip this line and continue with the next one
-      }
-
-      // Verify we have required fields
-      if (!record || !record.CHROM || !record.POS || !record.REF) {
-        debug(
-          `Warning: Missing required fields in VCF record, skipping line: ` +
-            `${line.substring(0, 100)}...`
-        );
+    for await (const line of lines) {
+      lineNumber++;
+      if (!line.trim()) continue;
+      if (line.startsWith('#')) {
+        headerLines.push(line);
         continue;
       }
-
-      const chrom = record.CHROM;
-      const pos = record.POS;
-      const ref = record.REF;
-      const altAlleles = record.ALT;
-
-      // Validate altAlleles is iterable before processing
-      if (!altAlleles || !Array.isArray(altAlleles)) {
-        debug(
-          `Warning: Invalid ALT field in record at ${chrom}:${pos}, ` +
-            `skipping: ${JSON.stringify(record)}`
-        );
-        continue; // Skip this record and continue with the next one
-      }
-
-      // Skip records with empty ALT arrays
-      if (altAlleles.length === 0) {
-        debug(`Warning: Empty ALT field in record at ${chrom}:${pos}, skipping`);
-        continue;
-      }
-
-      // Check for missing alternative alleles (represented as periods in VCF)
-      if (altAlleles.length === 1 && altAlleles[0] === '.') {
-        debug(
-          `Warning: Missing alternative allele (ALT=.) in record at ${chrom}:${pos}, ` +
-            `skipping: This is a valid VCF format for reference-only variants, ` +
-            `but requires an alternative allele for annotation.`
-        );
-        continue;
-      }
-
-      // Handle each alternative allele as a separate variant
-      for (const alt of altAlleles) {
-        // Skip invalid alt values
-        if (alt === null || alt === undefined || alt === '') {
-          debug(
-            `Warning: Invalid ALT value in record at ${chrom}:${pos}, ` + `skipping this alt allele`
-          );
-          continue;
-        }
-
-        // *** Key Generation FIX ***
-        // Use the CHR-POS-REF-ALT format consistently
-        const key = `${chrom}-${pos}-${ref}-${alt}`; // Use hyphenated key
-        const formattedVariant = key; // variantsToProcess uses this format
-
-        // *** DEBUG POINT 1: Key Generation ***
-        debugDetailed(
-          `vcfReader: Generated Key='${key}' (hyphenated) and FormattedVariant='${formattedVariant}' for ALT='${alt}'`
-        );
-        variantsToProcess.push(formattedVariant); // Add to variants to process
-
-        // Store genotypes for this variant (CHROM/POS/REF/ALT)
-        const genotypes = new Map();
-
-        // Check if the parser actually returned a GENOTYPES function and if samples exist
-        if (typeof record.GENOTYPES === 'function' && samples.length > 0) {
-          let parsedGenotypes = null;
-          try {
-            // Call the function to parse genotypes lazily
-            // eslint-disable-next-line new-cap
-            parsedGenotypes = record.GENOTYPES();
-            // Use more careful logging for potentially large objects
-            if (parsedGenotypes && debugDetailed.enabled) {
-              debugDetailed(`Parsed Genotypes object for ${key}: [Object]`);
-              // Log genotypes individually if debugging detailed is enabled
-              Object.keys(parsedGenotypes).forEach((sampleId) => {
-                debugDetailed(`  Sample ${sampleId} (raw): ${parsedGenotypes[sampleId]}`);
-              });
-            } else if (!parsedGenotypes) {
-              debugDetailed(`Parsed Genotypes object for ${key}: null`);
-            }
-          } catch (e) {
-            // Log the specific error when calling GENOTYPES()
-            debugDetailed(`Error calling record.GENOTYPES() for ${key}: ${e.message}`);
-            // Continue without genotypes if parsing fails for this record
-          }
-
-          if (parsedGenotypes) {
-            // Check if parsing succeeded
-            for (const sampleId of samples) {
-              // Access the genotype string using the sampleId as the key
-              // The value might be an array (e.g., ['0/1']), handle this
-              const gtValue = parsedGenotypes[sampleId];
-              let gtString = './.'; // Default to missing
-
-              // ** Refined genotype string extraction **
-              if (Array.isArray(gtValue) && gtValue.length > 0) {
-                gtString = String(gtValue[0]); // Take the first element if it's an array
-              } else if (gtValue !== undefined && gtValue !== null) {
-                gtString = String(gtValue); // Use it directly if not an array
-              }
-
-              debugDetailed(
-                `Processing sample ${sampleId}: Extracted GT string = ${JSON.stringify(gtString)}`
-              );
-
-              // Check for undefined, null, or empty string representations AFTER potential array access
-              if (
-                gtString !== undefined &&
-                gtString !== null &&
-                gtString.trim() !== '' &&
-                gtString !== '.'
-              ) {
-                // Store the extracted genotype string (e.g., "0/1", "0|0")
-                // Ensure it's stored as a string and trim any whitespace/carriage returns
-                const trimmedGT = gtString.trim();
-                genotypes.set(sampleId, trimmedGT);
-                debugDetailed(` -> Storing GT '${trimmedGT}' for sample ${sampleId}`);
-              } else {
-                // Use './.' if GT is missing, null, empty, or explicitly '.'
-                genotypes.set(sampleId, './.');
-                debugDetailed(
-                  ` -> Sample ${sampleId}: GT missing/empty/invalid ('${gtString}'), storing './.'`
-                );
-              }
-            }
-          } else {
-            // If parsedGenotypes is null/undefined (e.g., due to error or no samples in record)
-            // Fill with missing for all expected samples
-            debugDetailed(
-              `No parsed genotype object available for ${key}. Storing './.' for all samples.`
-            );
-            for (const sampleId of samples) {
-              genotypes.set(sampleId, './.');
-            }
-          }
-        } else {
-          // If no GENOTYPES function or no samples defined in header, store missing
-          debugDetailed(
-            `No GENOTYPES function or no samples found for ${key}. ` +
-              `Using './.' for all samples.`
-          );
-          for (const sampleId of samples) {
-            genotypes.set(sampleId, './.');
-          }
-        }
-
-        // *** DEBUG POINT 2: Genotype Map Content ***
-        debugDetailed(
-          `vcfReader: Final genotypes Map for Key='${key}': ${JSON.stringify(Array.from(genotypes.entries()))}`
-        );
-
-        // *** Storing in vcfRecordMap FIX ***
-        // Store original record info with genotypes using the NEW key
-        vcfRecordMap.set(key, {
-          // Use the new hyphenated key format
-          chrom,
-          pos,
-          ref,
-          alt, // Store the specific ALT allele this entry corresponds to
-          genotypes, // Store the populated or default genotypes map
-          originalRecord: record, // Keep original record if needed elsewhere
-        });
-        // *** DEBUG POINT 3: Storing in vcfRecordMap ***
-        debugDetailed(`vcfReader: Stored record in vcfRecordMap for Key='${key}'`);
-      }
+      if (!headerLines.length) throw new Error('No header lines found in VCF file');
+      parser ||= new VCF({ header: headerLines.join('\n') });
+      const samples = samplesFromHeader(headerLines);
+      const recordId = `line:${lineNumber}`;
+      const entries = parseEntries(parser, line, recordId, samples);
+      records++;
+      yield { headerLines, samples, recordId, originalLine: line, entries };
     }
-
-    debug(`Processed ${variantsToProcess.length} variants from VCF file`);
-    // *** DEBUG POINT 4: Final Map Size ***
-    debugDetailed(`vcfReader: Final vcfRecordMap size: ${vcfRecordMap.size}`);
-
-    return {
-      variantsToProcess,
-      vcfRecordMap,
-      headerText,
-      headerLines,
-      samples,
-    };
+    if (!headerLines.length) throw new Error('No header lines found in VCF file');
+    if (!records)
+      yield {
+        headerLines,
+        samples: samplesFromHeader(headerLines),
+        recordId: '',
+        originalLine: '',
+        entries: [],
+      };
   } catch (error) {
-    // Provide more detailed error message for debugging
-    const errorDetails = error.stack ? `\n${error.stack}` : '';
-    debug(`VCF parsing error: ${error.message}${errorDetails}`);
-    throw new Error(`Error parsing VCF file: ${error.message}`);
+    throw new Error(
+      `Error parsing VCF file: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error }
+    );
+  } finally {
+    lines.close();
+    stream.destroy();
   }
 }
 
-module.exports = {
-  readVariantsFromVcf,
-};
+/**
+ * Compatibility materializer. Use iterateVcfRecords for bounded processing.
+ * Duplicate canonical keys share an annotation lookup, but retain all original rows.
+ * @param {string} filePath
+ * @returns {Promise<{variantsToProcess:string[],vcfRecordMap:Map<string,VcfEntry>,headerText:string,headerLines:string[],samples:string[]}>}
+ */
+async function readVariantsFromVcf(filePath) {
+  if (!fs.existsSync(filePath)) throw new Error(`VCF file not found: ${filePath}`);
+  try {
+    return parseVcfText(fs.readFileSync(filePath, 'utf8'));
+  } catch (error) {
+    throw new Error(
+      `Error parsing VCF file: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error }
+    );
+  }
+}
+
+/** Parse complete VCF text with the same original-record and genotype contracts as the file reader.
+ * @param {string} text
+ * @returns {{variantsToProcess:string[],vcfRecordMap:Map<string,VcfEntry>,headerText:string,headerLines:string[],samples:string[]}}
+ */
+function parseVcfText(text) {
+  const lines = text.split(/\r?\n/);
+  const headerLines = lines.filter((line) => line.startsWith('#'));
+  if (!headerLines.length) throw new Error('No header lines found in VCF file');
+  const headerText = headerLines.join('\n');
+  const parser = new VCF({ header: headerText });
+  const samples = samplesFromHeader(headerLines);
+  /** @type {Map<string,VcfEntry>} */
+  const vcfRecordMap = new Map();
+  const variantsToProcess = [];
+  for (const [index, line] of lines.entries()) {
+    if (!line.trim() || line.startsWith('#')) continue;
+    for (const entry of parseEntries(parser, line, `line:${index + 1}`, samples)) {
+      const previous = vcfRecordMap.get(entry.key);
+      if (previous) {
+        previous.records ||= [{ ...previous, genotypes: new Map(previous.genotypes) }];
+        previous.records.push(entry);
+        // Conflicting independent observations are uncertain for inheritance.
+        for (const [sample, gt] of previous.genotypes) {
+          if (gt !== entry.genotypes.get(sample)) previous.genotypes.set(sample, './.');
+        }
+      } else {
+        vcfRecordMap.set(entry.key, entry);
+        if (!entry.passthrough) variantsToProcess.push(entry.key);
+      }
+    }
+  }
+  return { variantsToProcess, vcfRecordMap, headerText, headerLines, samples };
+}
+
+module.exports = { readVariantsFromVcf, iterateVcfRecords, parseVcfText };

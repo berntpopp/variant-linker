@@ -1,47 +1,35 @@
 'use strict';
-// src/vepHgvsAnnotation.js
-
-/**
- * Retrieves VEP (Variant Effect Predictor) annotations for a given HGVS notation.
- *
- * @param {string} hgvs - The HGVS notation of the variant to be annotated.
- * @param {string} transcript - The transcript ID to be used in the annotation request.
- * @param {Object} [options={}] - Optional query parameters for the VEP API request.
- * @param {boolean} [cacheEnabled=false] - If true, cache the API response.
- * @returns {Promise<Object>} A promise that resolves to the annotation data
- * retrieved from the VEP API.
- * @throws {Error} If the request to the VEP API fails.
- */
-const debug = require('debug')('variant-linker:main');
-const debugDetailed = require('debug')('variant-linker:detailed');
-const debugAll = require('debug')('variant-linker:all');
 const { fetchApi } = require('./apiHelper');
 const apiConfig = require('../config/apiConfig.json');
-
-/**
- * Retrieves VEP (Variant Effect Predictor) annotations for a given HGVS notation.
- *
- * @param {string} hgvs - The HGVS notation of the variant to be annotated.
- * @param {string} transcript - The transcript ID to be used in the annotation request.
- * @param {Object} [options={}] - Optional query parameters for the VEP API request.
- * @param {boolean} [cacheEnabled=false] - If true, cache the API response.
- * @returns {Promise<Object>} A promise that resolves to the annotation data from the VEP API.
- * @throws {Error} If the request to the VEP API fails.
+/** Retrieve HGVS annotations. Transcript is retained for signature compatibility.
+ * @param {string} hgvs
+ * @param {string} transcript
+ * @param {import('./apiHelper').QueryOptions} [options]
+ * @param {boolean} [cacheEnabled]
+ * @param {import('./apiHelper').RequestOptions} [requestOptions]
+ * @returns {Promise<import('./dataTypes').Annotation[]>}
  */
-async function vepHgvsAnnotation(hgvs, transcript, options = {}, cacheEnabled = false) {
-  try {
-    // Build the endpoint path using the external configuration.
-    const endpoint = `${apiConfig.ensembl.endpoints.vepHgvs}/${hgvs}`;
-    debug(`Requesting VEP Annotation for HGVS: ${hgvs} with transcript: ${transcript}`);
-    debugDetailed(`Using endpoint: ${endpoint}`);
-    debugDetailed(`Query options: ${JSON.stringify(options)}`);
-
-    const data = await fetchApi(endpoint, options, cacheEnabled);
-    return data;
-  } catch (error) {
-    debugAll(`Error in vepHgvsAnnotation: ${error.message}`);
-    throw error;
-  }
+async function vepHgvsAnnotation(
+  hgvs,
+  transcript,
+  options = {},
+  cacheEnabled = false,
+  requestOptions = {}
+) {
+  const response = await fetchApi(
+    `${apiConfig.ensembl.endpoints.vepHgvs}/${encodeURIComponent(hgvs)}`,
+    options,
+    cacheEnabled,
+    'GET',
+    null,
+    null,
+    requestOptions
+  );
+  if (
+    !Array.isArray(response) ||
+    response.some((entry) => !entry || typeof entry !== 'object' || Array.isArray(entry))
+  )
+    throw new Error('VEP response must be an array of annotation objects');
+  return /** @type {import('./dataTypes').Annotation[]} */ (response);
 }
-
 module.exports = vepHgvsAnnotation;

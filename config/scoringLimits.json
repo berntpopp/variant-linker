@@ -1,0 +1,13 @@
+{
+  "maxSourceLength": 16384,
+  "maxVariables": 2048,
+  "maxVariableNameLength": 16384,
+  "maxAstNodes": 2048,
+  "maxAstDepth": 64,
+  "maxEvaluationDepth": 128,
+  "maxValueDepth": 64,
+  "maxOperations": 100000,
+  "maxCollectionSize": 10000,
+  "expressionCacheSize": 256,
+  "conditionWarningCacheSize": 256
+}

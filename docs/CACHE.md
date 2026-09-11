@@ -80,7 +80,12 @@ const stats = getCacheStats();
 For full two-tier cache functionality:
 
 ```javascript
-const { getCacheAsync, hasCacheAsync, clearCacheAsync, getComprehensiveCacheStats } = require('./src/cache');
+const {
+  getCacheAsync,
+  hasCacheAsync,
+  clearCacheAsync,
+  getComprehensiveCacheStats,
+} = require('./src/cache');
 
 // Async operations that check both memory and persistent caches
 const data = await getCacheAsync('key');
@@ -135,6 +140,7 @@ When persistent caching is enabled:
 ### LRU Eviction
 
 When memory cache reaches `maxSize`:
+
 - Least recently used item is evicted from memory
 - Item remains in persistent cache (if enabled)
 - Accessing evicted item promotes it back to memory
@@ -242,6 +248,7 @@ The enhanced cache is fully backward compatible. No code changes required for ex
 ### Enabling Persistent Cache
 
 1. Update `config/apiConfig.json`:
+
    ```json
    {
      "cache": {
@@ -280,6 +287,16 @@ const data = await getCacheAsync('key');
 
 ## Examples
 
+### Persistent cache layout and migration
+
+Current persistent entries live in `<configured location>/entries-v1/` and have names `vl-<sha256>.json`, an ownership marker, and a key whose hash matches the filename. The byte budget, expiration cleanup, and `clearCacheAsync()` apply only to verified entries in this namespace. Unrelated files and malformed JSON are preserved.
+
+Older releases wrote unprefixed `<sha256>.json` files directly into the configured location. These legacy files are not migrated, included in current statistics or the byte budget, or removed by current cleanup. They can continue to occupy disk space after an upgrade. A matching filename or JSON shape alone does not establish that the application owns a file, so there is no automatic legacy deletion.
+
+To reclaim that space, stop applications using the old cache, confirm the exact old cache directory from your previous configuration, and back it up. Inspect the candidate files and their provenance before removing anything. Remove only files you have independently confirmed were created by Variant-Linker; if the directory was dedicated exclusively to its cache, you may archive that confirmed directory and let the application create a fresh one. Preserve unrelated files and the active `entries-v1` directory. Legacy cache contents are disposable and can be reacquired from the annotation service.
+
+Statistics are read-only snapshots. They do not create mutation locks or change the generation marker, and repeated reads do not invalidate another process's index. A refresh is published only after its complete scan observes a stable generation without an active writer. If a writer is active or a refresh fails, statistics return the last complete snapshot with an `error` field and increment `maintenanceErrors`; they do not report a partly rebuilt index as current.
+
 ### Basic Usage
 
 ```javascript
@@ -308,15 +325,15 @@ async function processVariants(variants) {
   for (const variant of variants) {
     // Check cache first (both memory and persistent)
     let result = await getCacheAsync(variant);
-    
+
     if (!result) {
       // Not in cache, process variant
       result = await processVariant(variant);
-      
+
       // Cache for future use (24 hour TTL)
       await cacheManager.set(variant, result, 86400000);
     }
-    
+
     console.log(`Processed ${variant}:`, result);
   }
 }
@@ -329,9 +346,9 @@ const { getCacheManager } = require('./src/cache');
 
 async function warmCache(commonVariants) {
   const cacheManager = getCacheManager();
-  
+
   for (const variant of commonVariants) {
-    if (!await cacheManager.has(variant)) {
+    if (!(await cacheManager.has(variant))) {
       const result = await processVariant(variant);
       await cacheManager.set(variant, result);
       console.log(`Warmed cache for ${variant}`);
@@ -349,6 +366,7 @@ node scripts/cache-demo.js
 ```
 
 This demonstrates:
+
 - Basic cache operations
 - LRU eviction behavior
 - TTL functionality
@@ -370,6 +388,7 @@ npm test
 ```
 
 Test coverage includes:
+
 - LRU eviction behavior
 - TTL expiration
 - Persistent file operations

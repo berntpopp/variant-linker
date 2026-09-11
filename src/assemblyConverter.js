@@ -1,127 +1,172 @@
 'use strict';
-
-/**
- * @fileoverview Assembly converter module for lifting over coordinates between genome assemblies.
- * @module assemblyConverter
- */
-
-const debug = require('debug')('variant-linker:assembly-converter');
 const apiConfig = require('../config/apiConfig.json');
 const { fetchApi } = require('./apiHelper');
 const { getBaseUrl } = require('./configHelper');
+/** @typedef {{chr: string, pos: number, ref: string, alt: string}} ParsedVariant */
+/** @typedef {{seq_region_name: string, start: number, end: number, strand?: number, assembly?: string}} Region */
+/** @typedef {{original?: Region, mapped: Region}} Mapping */
+/** @typedef {import('./apiHelper').RequestOptions} RequestOptions */
 
-/**
- * Lifts over coordinates from GRCh37/hg19 to GRCh38 using the Ensembl Assembly Mapper API.
- *
- * @param {string} region - The hg19 region string (e.g., "7:140453136-140453136")
- * @param {boolean} cacheEnabled - Whether to use caching for the API request
- * @returns {Promise<Object>} The API response containing mappings array
- * @throws {Error} If the API request fails
+/** Map a complete GRCh37 region with an immutable source assembly context.
+ * @param {string} region @param {boolean} [cacheEnabled] @param {RequestOptions} [requestOptions]
+ * @returns {Promise<{mappings: Mapping[]}>}
  */
-async function liftOverCoordinates(region, cacheEnabled = false) {
-  try {
-    debug(`Attempting to lift over coordinates: ${region}`);
-
-    // Construct the endpoint path with the region
-    const endpoint = apiConfig.ensembl.endpoints.assemblyMap.replace(':region', region);
-
-    // Set the environment variable to use the legacy base URL for GRCh37 assembly mapping
-    const originalBaseUrl = process.env.ENSEMBL_BASE_URL;
-    process.env.ENSEMBL_BASE_URL = getBaseUrl('hg19');
-
-    debug(`Making liftover API call to: ${process.env.ENSEMBL_BASE_URL}${endpoint}`);
-
-    try {
-      const response = await fetchApi(endpoint, {}, cacheEnabled);
-      debug(`Liftover API response for ${region}:`, JSON.stringify(response, null, 2));
-      return response;
-    } finally {
-      // Restore the original base URL
-      if (originalBaseUrl) {
-        process.env.ENSEMBL_BASE_URL = originalBaseUrl;
-      } else {
-        delete process.env.ENSEMBL_BASE_URL;
-      }
-    }
-  } catch (error) {
-    debug(`Liftover API error for region ${region}:`, error.message);
-    throw error;
-  }
+async function liftOverCoordinates(region, cacheEnabled = false, requestOptions = {}) {
+  const endpoint = apiConfig.ensembl.endpoints.assemblyMap.replace(':region', region);
+  return fetchApi(endpoint, {}, cacheEnabled, 'GET', null, null, {
+    ...requestOptions,
+    assembly: 'GRCh37',
+    baseUrl: requestOptions.baseUrl || getBaseUrl('GRCh37'),
+  });
 }
 
-/**
- * Parses a VCF-format variant string into its components.
- *
- * @param {string} variant - VCF format variant (e.g., "1-12345-A-G" or "chr1:12345:A:G")
- * @returns {Object|null} Parsed variant object with chr, pos, ref, alt or null if invalid
+/** Parse explicit small variant alleles; symbolic/spanning alleles require other mapping semantics.
+ * @param {string} variant @returns {ParsedVariant | null}
  */
 function parseVcfVariant(variant) {
-  try {
-    // Handle different VCF formats: "1-12345-A-G", "chr1:12345:A:G", "1:12345:A:G"
-    let parts;
+  if (typeof variant !== 'string') return null;
+  const match = /^(?:chr)?([^:\s-]+)[:-](\d+)[:-]([ACGTN]+)[:-]([ACGTN]+)$/i.exec(variant);
+  if (!match || !Number.isSafeInteger(Number(match[2])) || Number(match[2]) < 1) return null;
+  return {
+    chr: match[1],
+    pos: Number(match[2]),
+    ref: match[3].toUpperCase(),
+    alt: match[4].toUpperCase(),
+  };
+}
+/** @param {ParsedVariant} variant */
+function constructRegionString(variant) {
+  return `${variant.chr}:${variant.pos}-${variant.pos + variant.ref.length - 1}`;
+}
+/** @param {string} allele */
+function reverseComplement(allele) {
+  /** @type {Record<string, string>} */
+  const complement = { A: 'T', T: 'A', C: 'G', G: 'C', N: 'N' };
+  return [...allele]
+    .reverse()
+    .map((base) => complement[base])
+    .join('');
+}
+/** This low-level helper transforms strand; liftOverVariant additionally verifies and normalizes.
+ * @param {ParsedVariant} variant @param {Mapping} mapping
+ */
+function constructLiftedVariant(variant, mapping) {
+  const reverse = mapping.mapped.strand === -1;
+  return `${mapping.mapped.seq_region_name}-${mapping.mapped.start}-${reverse ? reverseComplement(variant.ref) : variant.ref}-${reverse ? reverseComplement(variant.alt) : variant.alt}`;
+}
 
-    if (variant.includes('-')) {
-      parts = variant.split('-');
-    } else if (variant.includes(':')) {
-      parts = variant.split(':');
-    } else {
-      return null;
-    }
-
-    if (parts.length !== 4) {
-      return null;
-    }
-
-    const [chr, pos, ref, alt] = parts;
-
-    // Remove 'chr' prefix if present
-    const cleanChr = chr.replace(/^chr/i, '');
-
-    // Validate that position is numeric
-    if (isNaN(parseInt(pos))) {
-      return null;
-    }
-
-    return {
-      chr: cleanChr,
-      pos: parseInt(pos),
-      ref: ref,
-      alt: alt,
-    };
-  } catch (error) {
-    debug(`Failed to parse VCF variant ${variant}:`, error.message);
-    return null;
+/** @param {string} chr @param {number} start @param {number} end
+ * @param {boolean} cacheEnabled @param {RequestOptions} context @returns {Promise<string>}
+ */
+async function referenceSequence(chr, start, end, cacheEnabled, context) {
+  if (start < 1 || end < start)
+    throw new Error('Cannot anchor lifted variant before chromosome start');
+  /** @type {{seq?: string}} */
+  const response = await fetchApi(
+    `/sequence/region/human/${chr}:${start}..${end}:1`,
+    { coord_system_version: 'GRCh38' },
+    cacheEnabled,
+    'GET',
+    null,
+    null,
+    { ...context, assembly: 'GRCh38', baseUrl: context.baseUrl || getBaseUrl('GRCh38') }
+  );
+  const sequence = response.seq?.toUpperCase();
+  if (!sequence || sequence.length !== end - start + 1 || !/^[ACGTN]+$/.test(sequence)) {
+    throw new Error('Target reference sequence unavailable or incomplete');
   }
+  return sequence;
 }
 
-/**
- * Constructs a region string from parsed variant components.
- *
- * @param {Object} parsedVariant - Parsed variant object
- * @returns {string} Region string in format "chr:start-end"
+/** Validate complete, unambiguous mapping; orient alleles, validate REF and normalize indels.
+ * @param {string} variant @param {boolean} [cacheEnabled] @param {RequestOptions} [requestOptions]
  */
-function constructRegionString(parsedVariant) {
-  const { chr, pos } = parsedVariant;
-  return `${chr}:${pos}-${pos}`;
+async function liftOverVariant(variant, cacheEnabled = false, requestOptions = {}) {
+  const original = parseVcfVariant(variant);
+  if (!original)
+    throw new Error('Liftover requires an explicit small variant with a positive position');
+  const response = await liftOverCoordinates(
+    constructRegionString(original),
+    cacheEnabled,
+    requestOptions
+  );
+  if (!Array.isArray(response.mappings) || response.mappings.length === 0)
+    throw new Error('No liftover mapping found');
+  if (response.mappings.length !== 1) throw new Error('Ambiguous liftover mapping');
+  const mapping = response.mappings[0];
+  const mapped = mapping.mapped;
+  if (
+    !mapped ||
+    !mapping.original ||
+    mapping.original.start !== original.pos ||
+    mapping.original.end !== original.pos + original.ref.length - 1 ||
+    mapping.original.seq_region_name.replace(/^chr/i, '') !== original.chr ||
+    mapped.end - mapped.start + 1 !== original.ref.length ||
+    !Number.isSafeInteger(mapped.start) ||
+    mapped.start < 1 ||
+    ![1, -1].includes(mapped.strand ?? 0) ||
+    (mapping.original.strand !== undefined && mapping.original.strand !== 1)
+  ) {
+    throw new Error('Incomplete or discontinuous liftover reference span');
+  }
+  if (mapped.assembly && mapped.assembly !== 'GRCh38')
+    throw new Error('Unexpected target assembly');
+  const strand = mapped.strand === -1 ? -1 : 1;
+  let ref = strand === -1 ? reverseComplement(original.ref) : original.ref;
+  let alt = strand === -1 ? reverseComplement(original.alt) : original.alt;
+  let pos = mapped.start;
+  const targetRef = await referenceSequence(
+    mapped.seq_region_name,
+    pos,
+    mapped.end,
+    cacheEnabled,
+    requestOptions
+  );
+  if (ref !== targetRef) throw new Error('Target reference mismatch after liftover');
+  // Suffix trimming and left extension also reanchor reverse-strand indels.
+  let shifts = 0;
+  while (ref.length !== alt.length && ref.at(-1) === alt.at(-1)) {
+    if (++shifts > 1000) throw new Error('Liftover normalization exceeds 1000 bases');
+    ref = ref.slice(0, -1);
+    alt = alt.slice(0, -1);
+    if (!ref || !alt) {
+      const preceding = await referenceSequence(
+        mapped.seq_region_name,
+        pos - 1,
+        pos - 1,
+        cacheEnabled,
+        requestOptions
+      );
+      ref = preceding + ref;
+      alt = preceding + alt;
+      pos--;
+    }
+  }
+  while (ref.length > 1 && alt.length > 1 && ref.at(-1) === alt.at(-1)) {
+    ref = ref.slice(0, -1);
+    alt = alt.slice(0, -1);
+  }
+  while (ref.length > 1 && alt.length > 1 && ref[0] === alt[0]) {
+    ref = ref.slice(1);
+    alt = alt.slice(1);
+    pos++;
+  }
+  const liftedKey = `${mapped.seq_region_name}-${pos}-${ref}-${alt}`;
+  const originalKey = `${original.chr}-${original.pos}-${original.ref}-${original.alt}`;
+  return {
+    variant: liftedKey,
+    originalVariant: variant,
+    originalKey,
+    liftedKey,
+    sourceAssembly: 'GRCh37',
+    targetAssembly: 'GRCh38',
+    strand,
+  };
 }
-
-/**
- * Constructs a lifted variant string from the original variant and mapping result.
- *
- * @param {Object} parsedVariant - Original parsed variant
- * @param {Object} mapping - Mapping result from liftover API
- * @returns {string} New variant string in GRCh38 coordinates
- */
-function constructLiftedVariant(parsedVariant, mapping) {
-  const { ref, alt } = parsedVariant;
-  const { seq_region_name: newChr, start: newPos } = mapping.mapped;
-
-  return `${newChr}-${newPos}-${ref}-${alt}`;
-}
-
 module.exports = {
   liftOverCoordinates,
   parseVcfVariant,
   constructRegionString,
   constructLiftedVariant,
+  liftOverVariant,
 };

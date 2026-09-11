@@ -14,7 +14,7 @@ const { formatVcfCsqString } = require('./dataExtractor');
 /**
  * Prepares VCF header lines with necessary INFO definitions for VL_CSQ.
  *
- * @param {Array<string>} [originalHeaderLines] - Original VCF header lines, if available.
+ * @param {Array<string>|undefined|null} originalHeaderLines - Original VCF header lines, if available.
  * @param {Array<string>} vlCsqFormatFields - Array defining fields for the VL_CSQ format.
  * @returns {Array<string>} The prepared VCF header lines.
  * @private
@@ -98,13 +98,14 @@ function _prepareVcfHeader(originalHeaderLines, vlCsqFormatFields) {
  * Groups annotation data by genomic position for VCF output.
  * Handles both VCF and non-VCF input sources appropriately.
  *
- * @param {Array<Object>} annotationData - Array of annotation results.
- * @param {Map<string, Object>} [vcfRecordMap] - Optional map of variant keys to original VCF data.
- * @returns {Map<string, Object>} Map keyed by position, containing grouped annotation data
+ * @param {import('./dataTypes').Annotation[]} annotationData - Array of annotation results.
+ * @param {Map<string, import('./dataTypes').FormatterEntry>|null|undefined} vcfRecordMap - Optional map of variant keys to original VCF data.
+ * @returns {Map<string|import('./dataTypes').OriginalVcfRecord, import('./dataTypes').VcfGroup>} Map keyed by position, containing grouped annotation data
  * and variant details.
  * @private
  */
 function _groupAnnotationsByPosition(annotationData, vcfRecordMap) {
+  /** @type {Map<string|import('./dataTypes').OriginalVcfRecord,import('./dataTypes').VcfGroup>} */
   const positionGroups = new Map();
 
   // Determine if the input was likely a VCF file based on presence of vcfRecordMap
@@ -115,105 +116,47 @@ function _groupAnnotationsByPosition(annotationData, vcfRecordMap) {
 
   // Logic depends on whether original input was VCF
   if (hasVcfInput) {
-    debugOutput('Processing results using original VCF record map.');
-    // Map results data to variant keys for faster lookup
-    // *** Annotation Lookup FIX: Use annotation.variantKey ***
-    const annotationsByKey = {};
+    /** @type {Map<string|undefined,import('./dataTypes').Annotation[]>} */
+    const annotationsByKey = new Map();
     for (const annotation of annotationData) {
-      if (annotation.variantKey) {
-        // Use the pre-assigned key
-        if (!annotationsByKey[annotation.variantKey]) {
-          annotationsByKey[annotation.variantKey] = [];
+      const key =
+        annotation.originalVariantKey ||
+        annotation.variantKey ||
+        annotation.originalInput ||
+        annotation.input;
+      if (!annotationsByKey.has(key)) annotationsByKey.set(key, []);
+      annotationsByKey.get(key)?.push(annotation);
+    }
+    for (const [key, value] of vcfRecordMap) {
+      for (const entry of value.records || [value]) {
+        const record = entry.originalRecord;
+        if (!record) continue;
+        // Object identity is the compatibility fallback for manually constructed maps.
+        const recordId = entry.originalRecordId || record;
+        if (!positionGroups.has(recordId)) {
+          positionGroups.set(recordId, {
+            chrom: record.CHROM,
+            pos: record.POS,
+            ref: record.REF,
+            id: Array.isArray(record.ID) ? record.ID.join(';') : record.ID || '.',
+            originalLine: entry.originalLine,
+            recordOrder: entry.originalRecordId
+              ? Number(entry.originalRecordId.split(':')[1])
+              : positionGroups.size,
+            alts: new Map(),
+          });
         }
-        annotationsByKey[annotation.variantKey].push(annotation);
-      } else {
-        // Fallback using originalInput (less reliable now)
-        const lookupKey = annotation.originalInput || annotation.input;
-        if (lookupKey) {
-          if (!annotationsByKey[lookupKey]) {
-            annotationsByKey[lookupKey] = [];
-          }
-          annotationsByKey[lookupKey].push(annotation);
-          debugOutput(
-            `_groupAnnotationsByPosition: Warning - Used fallback key '${lookupKey}' for annotation lookup.`
-          );
-        } else {
-          debugOutput(
-            `_groupAnnotationsByPosition: Warning - Could not determine key for annotation: ` +
-              `${JSON.stringify(annotation)}`
-          );
-        }
+        positionGroups.get(recordId)?.alts.set(entry.alt, {
+          annotations: annotationsByKey.get(key) || [],
+          originalInfo: record.INFO,
+          originalQual: record.QUAL,
+          originalFilter: record.FILTER,
+        });
       }
     }
-    debugOutput(
-      `_groupAnnotationsByPosition: Built annotationsByKey map with ${Object.keys(annotationsByKey).length} keys.`
+    return new Map(
+      [...positionGroups].sort(([, a], [, b]) => (a.recordOrder || 0) - (b.recordOrder || 0))
     );
-
-    // Process based on the original VCF structure preserved in vcfRecordMap
-    for (const [key, entry] of vcfRecordMap.entries()) {
-      // key is CHR-POS-REF-ALT
-      const { originalRecord, alt } = entry; // the specific ALT allele from the original VCF line
-      if (!originalRecord) {
-        debugOutput(`Warning: No original record found for VCF entry key: ${key}`);
-        continue;
-      }
-
-      const chrom = originalRecord.CHROM || '';
-      const pos = originalRecord.POS || '';
-      const ref = originalRecord.REF || '';
-      const id = originalRecord.ID && originalRecord.ID !== '.' ? originalRecord.ID : '.'; // Prefer original ID
-      const posKey = `${chrom}:${pos}:${ref}`;
-
-      // *** DEBUG POINT 15: Processing VCF Record Map Entry ***
-      debugOutput(
-        `_groupAnnotationsByPosition (VCF Path): Processing vcfRecordMap Key='${key}', PosKey='${posKey}', ALT='${alt}'`
-      );
-
-      if (!positionGroups.has(posKey)) {
-        positionGroups.set(posKey, {
-          chrom,
-          pos,
-          ref,
-          id, // Use ID from the first VCF record for this position
-          // Map<altAllele, { annotations[], info?, qual?, filter? }>
-          alts: new Map(),
-        });
-      }
-
-      const group = positionGroups.get(posKey);
-      // *** Use the key directly from vcfRecordMap for lookup ***
-      const matchingAnnotations = annotationsByKey[key] || [];
-      // *** DEBUG POINT 16: Annotations Found for VCF Key ***
-      debugOutput(` -> Found ${matchingAnnotations.length} annotation(s) for Key='${key}'`);
-
-      // Find the specific annotation that corresponds to this ALT allele
-      // If multiple annotations match the key (rare), we might just take the first
-      // (This assumes VEP results are appropriately associated upstream)
-      const annotationForAlt = matchingAnnotations.length > 0 ? matchingAnnotations[0] : null;
-
-      // *** DEBUG POINT 17: Annotation Matching ALT ***
-      debugOutput(
-        ` -> Annotation found for ALT='${alt}': ${!!annotationForAlt}. Content: ${JSON.stringify(annotationForAlt)}`
-      );
-
-      if (!group.alts.has(alt)) {
-        group.alts.set(alt, {
-          annotations: annotationForAlt ? [annotationForAlt] : [], // Start with the found annotation or empty
-          originalInfo: originalRecord.INFO,
-          originalQual: originalRecord.QUAL,
-          originalFilter: originalRecord.FILTER,
-        });
-      } else {
-        // Add annotation if ALT allele exists and we found one
-        if (annotationForAlt) {
-          group.alts.get(alt).annotations.push(annotationForAlt);
-        }
-      }
-      debugOutput(
-        ` -> Updated group for PosKey='${posKey}', ALT='${alt}'. ` +
-          `Annotations count: ${group.alts.get(alt)?.annotations.length || 0}`
-      );
-    }
   } else {
     // Handle non-VCF input: Construct VCF fields primarily from annotationData.vcfString
     debugOutput('Processing results assuming non-VCF input. Using annotation.vcfString.');
@@ -256,7 +199,19 @@ function _groupAnnotationsByPosition(annotationData, vcfRecordMap) {
           ? annotation.originalInput
           : '.';
 
-      const posKey = `${chrom}:${pos}:${ref}`;
+      const info = annotation.vcfInfo;
+      const structuralInfo =
+        info &&
+        typeof info === 'object' &&
+        'END' in info &&
+        typeof info.END === 'number' &&
+        'SVTYPE' in info &&
+        typeof info.SVTYPE === 'string'
+          ? { END: info.END, SVTYPE: info.SVTYPE }
+          : undefined;
+      const posKey = structuralInfo
+        ? `${chrom}:${pos}:${ref}:${alt}:${structuralInfo.END}`
+        : `${chrom}:${pos}:${ref}`;
       // Use assigned key if available
       const key = annotation.variantKey || `${chrom}-${pos}-${ref}-${alt}`;
 
@@ -277,17 +232,18 @@ function _groupAnnotationsByPosition(annotationData, vcfRecordMap) {
       }
 
       const group = positionGroups.get(posKey);
+      if (!group) continue;
       // Use the ID from the *first* annotation seen for this posKey, but allow others if '.'
       if (group.id === '.' && id !== '.') {
         group.id = id;
       }
 
       if (!group.alts.has(alt)) {
-        group.alts.set(alt, { annotations: [annotation] });
+        group.alts.set(alt, { annotations: [annotation], originalInfo: structuralInfo });
       } else {
         // If this ALT allele already exists for the position, add the annotation
         // This could happen if the same variant was input multiple times (e.g., rsID and HGVS)
-        group.alts.get(alt).annotations.push(annotation);
+        group.alts.get(alt)?.annotations.push(annotation);
       }
       debugOutput(
         ` -> Updated group for PosKey='${posKey}', ALT='${alt}'. ` +
@@ -306,7 +262,7 @@ function _groupAnnotationsByPosition(annotationData, vcfRecordMap) {
 /**
  * Formats the INFO field for a VCF line using the grouped annotations.
  *
- * @param {Object} positionGroupData - Object containing data for a position and its ALTs.
+ * @param {import('./dataTypes').VcfGroup} positionGroupData - Object containing data for a position and its ALTs.
  * @param {Array<string>} vlCsqFormatFields - Array defining fields for the VL_CSQ format.
  * @returns {string} The formatted INFO field string.
  * @private
@@ -357,7 +313,8 @@ function _formatVcfInfoField(positionGroupData, vlCsqFormatFields) {
               // Only add comphet tag if it's a confirmed or possible candidate with partners
               if (
                 (details.isCandidate || details.isPossible) &&
-                details.partnerVariantKeys?.length > 0
+                details.partnerVariantKeys &&
+                details.partnerVariantKeys.length > 0
               ) {
                 compHetDetails = {
                   partners: details.partnerVariantKeys.join(','),
@@ -392,7 +349,16 @@ function _formatVcfInfoField(positionGroupData, vlCsqFormatFields) {
   // Add original INFO fields first (excluding managed tags)
   // *** DEBUG POINT 24: Original INFO Check ***
   debugOutput(` -> Original INFO from first ALT: ${JSON.stringify(firstAltData?.originalInfo)}`);
-  if (firstAltData?.originalInfo) {
+  if (positionGroupData.originalLine) {
+    const originalInfo = positionGroupData.originalLine.split('\t')[7];
+    if (originalInfo && originalInfo !== '.') {
+      infoParts.push(
+        ...originalInfo
+          .split(';')
+          .filter((part) => !['VL_CSQ', 'VL_DED_INH', 'VL_COMPHET'].includes(part.split('=')[0]))
+      );
+    }
+  } else if (firstAltData?.originalInfo) {
     const originalInfoString = Object.entries(firstAltData.originalInfo)
       .filter(([key]) => !['VL_CSQ', 'VL_DED_INH', 'VL_COMPHET'].includes(key))
       .map(([key, value]) =>
@@ -455,12 +421,17 @@ function _formatVcfInfoField(positionGroupData, vlCsqFormatFields) {
 /**
  * Constructs a VCF data line from the position group data and INFO string.
  *
- * @param {Object} positionGroupData - Object containing data for a position and its ALTs.
+ * @param {import('./dataTypes').VcfGroup} positionGroupData - Object containing data for a position and its ALTs.
  * @param {string} infoString - The formatted INFO field string.
  * @returns {string} The formatted VCF data line.
  * @private
  */
 function _constructVcfLine(positionGroupData, infoString) {
+  if (positionGroupData.originalLine) {
+    const columns = positionGroupData.originalLine.split('\t');
+    columns[7] = infoString;
+    return columns.join('\t');
+  }
   const alts = Array.from(positionGroupData.alts.keys());
   const altAllelesString = alts.join(',');
 
@@ -527,9 +498,9 @@ function _generateDefaultVcfHeader() {
 /**
  * Formats annotation results into a complete VCF string.
  *
- * @param {Array<Object>} annotationData - Array of annotation results.
- * @param {Map<string, Object>} [vcfRecordMap] - Optional map from VCF input.
- * @param {Array<string>} [vcfHeaderLines] - Optional original VCF header lines.
+ * @param {import('./dataTypes').Annotation[]} annotationData - Array of annotation results.
+ * @param {Map<string, import('./dataTypes').FormatterEntry>|null|undefined} vcfRecordMap - Optional map from VCF input.
+ * @param {Array<string>|undefined|null} vcfHeaderLines - Optional original VCF header lines.
  * @param {Array<string>} vlCsqFormatFields - Fields for the VL_CSQ tag format.
  * @returns {string} The complete VCF formatted content.
  */
@@ -540,8 +511,37 @@ function formatAnnotationsToVcf(annotationData, vcfRecordMap, vcfHeaderLines, vl
       `Annotation count=${annotationData?.length}, vcfRecordMap size=${vcfRecordMap?.size}`
   );
   const finalHeaderLines = _prepareVcfHeader(vcfHeaderLines, vlCsqFormatFields);
+  if (annotationData?.some((annotation) => annotation.vcfInfo)) {
+    const declarations = [
+      '##INFO=<ID=END,Number=1,Type=Integer,Description="End position of the structural variant">',
+      '##INFO=<ID=SVTYPE,Number=1,Type=String,Description="Structural variant type">',
+    ];
+    const symbolicAlleles = new Set(
+      annotationData
+        .map((annotation) => annotation.vcfString?.split('-')[3])
+        .filter((allele) => allele && /^<[A-Z]+>$/.test(allele))
+    );
+    for (const allele of symbolicAlleles) {
+      declarations.push(
+        `##ALT=<ID=${allele?.slice(1, -1)},Description="Symbolic structural variant">`
+      );
+    }
+    for (const declaration of declarations) {
+      const prefix = declaration.slice(0, declaration.indexOf(','));
+      if (!finalHeaderLines.some((line) => line.startsWith(`${prefix},`))) {
+        finalHeaderLines.splice(
+          finalHeaderLines.findIndex((line) => line.startsWith('#CHROM')),
+          0,
+          declaration
+        );
+      }
+    }
+  }
 
-  if (!annotationData || !Array.isArray(annotationData) || annotationData.length === 0) {
+  if (
+    (!annotationData || !Array.isArray(annotationData) || annotationData.length === 0) &&
+    !vcfRecordMap?.size
+  ) {
     debugOutput('No annotation data provided for VCF output. Returning header only.');
     return finalHeaderLines.length > 0 ? finalHeaderLines.join('\n') + '\n' : '';
   }

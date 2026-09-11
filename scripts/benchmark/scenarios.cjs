@@ -1,0 +1,78 @@
+'use strict';
+const path = require('node:path');
+const BENCHMARK_DATA_PATH = path.resolve(__dirname, '../../examples/benchmark_data');
+const benchmarkScenarios = [
+  {
+    name: 'Single Variant VCF',
+    description: 'Processing a single VCF variant (no recoding needed)',
+    inputFile: path.join(BENCHMARK_DATA_PATH, 'single_variant.vcf'),
+    expectedVariantCount: 1,
+    variantType: 'vcf',
+    variantCount: '1',
+    assembly: 'hg38',
+  },
+  {
+    name: 'Single Variant rsID',
+    description: 'Processing a single rsID variant (requires recoding)',
+    inputFile: path.join(BENCHMARK_DATA_PATH, 'single_variant.txt'),
+    expectedVariantCount: 1,
+    variantType: 'rsid',
+    variantCount: '1',
+    assembly: 'hg38',
+  },
+  {
+    name: 'Tiny Batch VCF',
+    description: 'Processing 10 VCF variants (no recoding needed)',
+    inputFile: path.join(BENCHMARK_DATA_PATH, 'tiny_batch.vcf'),
+    expectedVariantCount: 10,
+    variantType: 'vcf',
+    variantCount: '10',
+    assembly: 'hg38',
+  },
+  {
+    name: 'Tiny Batch HGVS/rsID',
+    description: 'Processing 10 rsID variants (requires recoding)',
+    inputFile: path.join(BENCHMARK_DATA_PATH, 'tiny_batch.txt'),
+    expectedVariantCount: 10,
+    variantType: 'rsid',
+    variantCount: '10',
+    assembly: 'hg38',
+  },
+  {
+    name: 'Small Batch VCF',
+    description: 'Processing ~50 VCF variants (no recoding needed)',
+    inputFile: path.join(BENCHMARK_DATA_PATH, 'small_batch.vcf'),
+    expectedVariantCount: 50,
+    variantType: 'vcf',
+    variantCount: '50',
+    assembly: 'hg38',
+  },
+  {
+    name: 'Small Batch HGVS/rsID',
+    description: 'Processing ~50 HGVS/rsID variants (requires recoding)',
+    inputFile: path.join(BENCHMARK_DATA_PATH, 'small_batch.txt'),
+    expectedVariantCount: 50,
+    variantType: 'rsid',
+    variantCount: '50',
+    assembly: 'hg38',
+  },
+  {
+    name: 'Large Batch VCF',
+    description: 'Processing ~500 VCF variants (no recoding, triggers chunking)',
+    inputFile: path.join(BENCHMARK_DATA_PATH, 'large_batch.vcf'),
+    expectedVariantCount: 500,
+    variantType: 'vcf',
+    variantCount: '500',
+    assembly: 'hg38',
+  },
+  {
+    name: 'Large Batch HGVS/rsID',
+    description: 'Processing ~500 HGVS/rsID variants (requires recoding, triggers chunking)',
+    inputFile: path.join(BENCHMARK_DATA_PATH, 'large_batch.txt'),
+    expectedVariantCount: 500,
+    variantType: 'rsid',
+    variantCount: '500',
+    assembly: 'hg38',
+  },
+];
+module.exports = { benchmarkScenarios };

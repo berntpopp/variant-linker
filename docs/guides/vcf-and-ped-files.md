@@ -81,14 +81,14 @@ FamilyID SampleID FatherID MotherID Sex AffectedStatus
 
 #### Column Definitions
 
-| Column | Description | Values |
-|--------|-------------|---------|
-| **FamilyID** | Family group identifier | Any string |
-| **SampleID** | Unique sample identifier | Must match VCF sample names |
-| **FatherID** | Father's sample ID | Sample ID or '0' for unknown/founder |
-| **MotherID** | Mother's sample ID | Sample ID or '0' for unknown/founder |
-| **Sex** | Biological sex | 1=male, 2=female, 0=unknown |
-| **AffectedStatus** | Disease status | 0=unknown, 1=unaffected, 2=affected |
+| Column             | Description              | Values                               |
+| ------------------ | ------------------------ | ------------------------------------ |
+| **FamilyID**       | Family group identifier  | Any string                           |
+| **SampleID**       | Unique sample identifier | Must match VCF sample names          |
+| **FatherID**       | Father's sample ID       | Sample ID or '0' for unknown/founder |
+| **MotherID**       | Mother's sample ID       | Sample ID or '0' for unknown/founder |
+| **Sex**            | Biological sex           | 1=male, 2=female, 0=unknown          |
+| **AffectedStatus** | Disease status           | 0=unknown, 1=unaffected, 2=affected  |
 
 ### Example PED File
 
@@ -100,7 +100,7 @@ FAM001 MOTHER 0 0 2 1                # Unaffected female founder
 
 # Extended family example
 FAM002 CHILD1 DAD MOM 2 2            # Affected female child
-FAM002 CHILD2 DAD MOM 1 1            # Unaffected male child  
+FAM002 CHILD2 DAD MOM 1 1            # Unaffected male child
 FAM002 DAD GRANDDAD GRANDMOM 1 1     # Unaffected father
 FAM002 MOM 0 0 2 1                   # Unaffected mother
 FAM002 GRANDDAD 0 0 1 0              # Grandfather (unknown status)
@@ -167,6 +167,7 @@ When inheritance analysis is enabled, the output includes additional fields:
 ### VCF Validation
 
 Variant-Linker validates VCF files for:
+
 - Proper header format
 - Column structure compliance
 - Sample name consistency
@@ -175,6 +176,7 @@ Variant-Linker validates VCF files for:
 ### PED Validation
 
 PED file validation includes:
+
 - Column count verification
 - Sample ID uniqueness
 - Parent-child relationship consistency

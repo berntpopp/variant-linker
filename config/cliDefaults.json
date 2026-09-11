@@ -1,0 +1,7 @@
+{
+  "output": "JSON",
+  "assembly": "hg38",
+  "chunkSize": 100,
+  "recoderOptions": { "vcf_string": "1" },
+  "vepOptions": { "CADD": "1", "hgvs": "1", "merged": "1", "mane": "1" }
+}

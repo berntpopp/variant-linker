@@ -14,12 +14,12 @@ const { isHet, isVariant, isRef, isMissing } = require('./genotypeUtils'); // is
  * to detect potential compound heterozygous inheritance patterns.
  * Requires pedigree data with parental genotypes for confirmation.
  *
- * @param {Array<Object>} geneVariants - Array of variant annotation objects for a gene.
+ * @param {import('../dataTypes').Annotation[]} geneVariants - Array of variant annotation objects for a gene.
  *   Each object must have a `variantKey`.
  * @param {Map<string, Map<string, string>>} genotypesMap - Maps variants to genotypes
- * @param {Map<string, Object>} pedigreeData - Parsed pedigree data. Required for CompHet.
+ * @param {import('../dataTypes').Pedigree|null} pedigreeData - Parsed pedigree data. Required for CompHet.
  * @param {string} indexSampleId - The ID of the index/proband sample.
- * @returns {Object|null} Result of compound heterozygous analysis,
+ * @returns {import('../dataTypes').CompoundHetResult|null} Result of compound heterozygous analysis,
  *   or null if not applicable.
  *   Result object structure:
  *   {
@@ -75,7 +75,7 @@ function analyzeCompoundHeterozygous(geneVariants, genotypesMap, pedigreeData, i
       debugDetailed(
         `  CompHet: Index ${indexSampleId} is Het ('${indexGt}') for variant ${variantKey}`
       );
-      hetVariantsInIndex.push({ ...variant }); // Store a copy
+      hetVariantsInIndex.push({ ...variant, variantKey }); // Store a copy
     } else {
       debugDetailed(
         `  CompHet: Index ${indexSampleId} not het ('${indexGt}') for variant ${variantKey}`
@@ -91,6 +91,7 @@ function analyzeCompoundHeterozygous(geneVariants, genotypesMap, pedigreeData, i
   debugDetailed(`  CompHet: Found ${hetVariantsInIndex.length} het variants.`);
 
   // --- Initialize Result Object ---
+  /** @type {import('../dataTypes').CompoundHetResult} */
   const result = {
     isCompHet: false,
     isPossible: true, // It's possible if we have >= 2 het variants in index
@@ -122,7 +123,7 @@ function analyzeCompoundHeterozygous(geneVariants, genotypesMap, pedigreeData, i
     motherId !== '0' &&
     pedigreeData.has(motherId);
 
-  if (!hasValidParents) {
+  if (!fatherId || !motherId || !hasValidParents) {
     debugDetailed(`  CompHet: No valid parent info for index ${indexSampleId}.`);
     result.pattern = 'compound_heterozygous_possible_missing_parents';
     debugDetailed(`--- Exiting: ${geneSymbol}, Result: ${JSON.stringify(result)} ---`);
@@ -150,6 +151,7 @@ function analyzeCompoundHeterozygous(geneVariants, genotypesMap, pedigreeData, i
     const variantKey = variant.variantKey;
     const variantGenotypes = genotypesMap.get(variantKey); // Should exist
 
+    if (!variantGenotypes) continue;
     // Get parent genotypes (should exist based on check above)
     const fatherGt = variantGenotypes.get(fatherId);
     const motherGt = variantGenotypes.get(motherId);
@@ -176,12 +178,10 @@ function analyzeCompoundHeterozygous(geneVariants, genotypesMap, pedigreeData, i
     } else if (fatherIsVariant && motherIsMissing) {
       // Possibly Paternal
       debugDetailed(`      -> Variant ${variantKey} likely from father (mat GT missing).`);
-      result.paternalVariantKeys.push(variantKey); // Tentatively assign
       result.ambiguousVariantKeys.push(variantKey); // Mark as ambiguous
     } else if (motherIsVariant && fatherIsMissing) {
       // Possibly Maternal
       debugDetailed(`      -> Variant ${variantKey} likely from mother (pat GT missing).`);
-      result.maternalVariantKeys.push(variantKey); // Tentatively assign
       result.ambiguousVariantKeys.push(variantKey); // Mark as ambiguous
     } else {
       // Ambiguous cases: Both variant, Both ref (de novo het?), Both missing, One ref/one missing

@@ -11,7 +11,6 @@ const apiConfig = require('../config/apiConfig.json');
 
 describe('--pick-output Integration Tests', function () {
   // Increase timeout for API mocking tests
-  // eslint-disable-next-line no-invalid-this
   this.timeout(10000);
 
   const apiBaseUrl = process.env.ENSEMBL_BASE_URL || apiConfig.ensembl.baseUrl;
@@ -37,7 +36,7 @@ describe('--pick-output Integration Tests', function () {
       })
       .reply(200, [
         {
-          input: '1-12345-A-G',
+          input: '1 12345 . A G . . .',
           seq_region_name: '1',
           start: 12345,
           end: 12345,
@@ -93,7 +92,7 @@ describe('--pick-output Integration Tests', function () {
       .query(() => true)
       .reply(200, [
         {
-          input: '1-12345-A-G',
+          input: '1 12345 . A G . . .',
           seq_region_name: '1',
           start: 12345,
           end: 12345,
@@ -156,7 +155,7 @@ describe('--pick-output Integration Tests', function () {
       })
       .reply(200, [
         {
-          input: '1-12345-A-G',
+          input: '1 12345 . A G . . .',
           seq_region_name: '1',
           start: 12345,
           end: 12345,
@@ -211,7 +210,7 @@ describe('--pick-output Integration Tests', function () {
       .query(() => true)
       .reply(200, [
         {
-          input: '1-12345-A-G',
+          input: '1 12345 . A G . . .',
           seq_region_name: '1',
           start: 12345,
           end: 12345,

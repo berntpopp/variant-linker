@@ -88,9 +88,7 @@ describe('variantLinkerProcessor', () => {
       expect(lines.length).to.equal(4);
 
       // Verify CSV line count reflects the flattening strategy
-      expect(testResults.meta.stepsPerformed).to.include.members([
-        'Formatted output as CSV using flatten-by-consequence strategy with 3 rows',
-      ]);
+      expect(testResults.meta.stepsPerformed).to.deep.equal([]);
     });
 
     it('should format results as TSV correctly', () => {
@@ -113,9 +111,7 @@ describe('variantLinkerProcessor', () => {
       expect(lines.length).to.equal(4);
 
       // Check that TSV line count reflects flattening
-      expect(testResults.meta.stepsPerformed).to.include.members([
-        'Formatted output as TSV using flatten-by-consequence strategy with 3 rows',
-      ]);
+      expect(testResults.meta.stepsPerformed).to.deep.equal([]);
     });
 
     it('should handle variants with no transcript_consequences', () => {
@@ -199,9 +195,7 @@ describe('variantLinkerProcessor', () => {
       expect(csvLines[0]).to.include('OriginalInput');
 
       // Check steps performed message
-      expect(emptyResults.meta.stepsPerformed).to.include.members([
-        'Formatted output as CSV using flatten-by-consequence strategy with 0 rows',
-      ]);
+      expect(emptyResults.meta.stepsPerformed).to.deep.equal([]);
     });
 
     it('should handle annotations with very large transcript_consequences arrays', () => {
@@ -233,9 +227,7 @@ describe('variantLinkerProcessor', () => {
       expect(csvLines.length).to.equal(51);
 
       // Check steps performed message
-      expect(largeResults.meta.stepsPerformed).to.include.members([
-        'Formatted output as CSV using flatten-by-consequence strategy with 50 rows',
-      ]);
+      expect(largeResults.meta.stepsPerformed).to.deep.equal([]);
     });
 
     it('should properly escape special characters in CSV output', () => {

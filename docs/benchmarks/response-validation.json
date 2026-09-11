@@ -1,0 +1,152 @@
+{
+  "schemaVersion": 1,
+  "validatedAt": "2026-09-11T01:21:46.205Z",
+  "scope": "Offline inspection of captured raw Ensembl response bodies; no public requests or performance claims",
+  "cohort": {
+    "provenancePath": "docs/benchmarks/1000genomes-1000.json",
+    "sha256": "8e439d73dd7aad3da6d6a5f48ba3b7e0fa70d86069d793b2d1f622d4e1c55bec",
+    "variantCount": 1000,
+    "assembly": "GRCh37"
+  },
+  "recordings": {
+    "vep": {
+      "path": "local_data/benchmarks/vep-recording.json",
+      "bytes": 783524,
+      "sha256": "859e2e1957c053c9e16e9ff3cc33b47b7f52b3615f49c2c3875b01ee3c44fd95",
+      "recordedRequests": 5,
+      "recordedRequestInputs": 1000,
+      "unexpectedRequestInputs": 0,
+      "recordedResponses": 5,
+      "responseStatuses": {
+        "200": 5
+      },
+      "responseRecords": 1000,
+      "uniqueEchoedInputs": 1000,
+      "coveredCohortInputs": 1000,
+      "missingCohortInputs": 0,
+      "missingInputListSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "unexpectedInputs": 0,
+      "duplicateInputs": 0,
+      "ambiguousInputRecords": 0,
+      "invalidResponseBodies": 0,
+      "coordinateMatches": 1000,
+      "coordinateMismatches": 0,
+      "multipleAlleleBranches": 0,
+      "multipleReturnedCoordinates": 0,
+      "completeCohort": true,
+      "completeAndIdentityValid": true,
+      "fullResponsesByInputSha256": "6e08bad4b89c627a3afef02ff2a3cc2d21068ab706740621108ecc29b810725d"
+    },
+    "vep-concurrent": {
+      "path": "local_data/benchmarks/vep-concurrent-recording.json",
+      "bytes": 783524,
+      "sha256": "63a0e317a0fd000855204013fe5f89288405333de8a6497891347480d70ff531",
+      "recordedRequests": 5,
+      "recordedRequestInputs": 1000,
+      "unexpectedRequestInputs": 0,
+      "recordedResponses": 5,
+      "responseStatuses": {
+        "200": 5
+      },
+      "responseRecords": 1000,
+      "uniqueEchoedInputs": 1000,
+      "coveredCohortInputs": 1000,
+      "missingCohortInputs": 0,
+      "missingInputListSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "unexpectedInputs": 0,
+      "duplicateInputs": 0,
+      "ambiguousInputRecords": 0,
+      "invalidResponseBodies": 0,
+      "coordinateMatches": 1000,
+      "coordinateMismatches": 0,
+      "multipleAlleleBranches": 0,
+      "multipleReturnedCoordinates": 0,
+      "completeCohort": true,
+      "completeAndIdentityValid": true,
+      "fullResponsesByInputSha256": "6e08bad4b89c627a3afef02ff2a3cc2d21068ab706740621108ecc29b810725d"
+    },
+    "recoder": {
+      "path": "local_data/benchmarks/recoder-recording.json",
+      "bytes": 215389,
+      "sha256": "f2aec5fc733070719237895cb77b724a26fb14f8eb8e3e0ea7cb3121a0399114",
+      "recordedRequests": 5,
+      "recordedRequestInputs": 1000,
+      "unexpectedRequestInputs": 0,
+      "recordedResponses": 5,
+      "responseStatuses": {
+        "200": 5
+      },
+      "responseRecords": 1000,
+      "uniqueEchoedInputs": 1000,
+      "coveredCohortInputs": 1000,
+      "missingCohortInputs": 0,
+      "missingInputListSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "unexpectedInputs": 0,
+      "duplicateInputs": 0,
+      "ambiguousInputRecords": 0,
+      "invalidResponseBodies": 0,
+      "coordinateMatches": 1000,
+      "coordinateMismatches": 0,
+      "multipleAlleleBranches": 0,
+      "multipleReturnedCoordinates": 0,
+      "completeCohort": true,
+      "completeAndIdentityValid": true,
+      "fullResponsesByInputSha256": "66acba57506f9d6b487dbaf6cfd23bda2b080bdc4ae4ea88a8457e14fa051795"
+    },
+    "recoder-concurrent": {
+      "path": "local_data/benchmarks/recoder-concurrent-recording.json",
+      "bytes": 169359,
+      "sha256": "ebab3be26036dc28e1fda56262d3d8e40445064826cc995a99a46b4076c4446c",
+      "recordedRequests": 4,
+      "recordedRequestInputs": 800,
+      "unexpectedRequestInputs": 0,
+      "recordedResponses": 4,
+      "responseStatuses": {
+        "200": 4
+      },
+      "responseRecords": 800,
+      "uniqueEchoedInputs": 800,
+      "coveredCohortInputs": 800,
+      "missingCohortInputs": 200,
+      "missingInputListSha256": "969ec01d2191aeb0bd370d508365fe1c678442bec92de11f5c80b1d4bf5e49eb",
+      "unexpectedInputs": 0,
+      "duplicateInputs": 0,
+      "ambiguousInputRecords": 0,
+      "invalidResponseBodies": 0,
+      "coordinateMatches": 800,
+      "coordinateMismatches": 0,
+      "multipleAlleleBranches": 0,
+      "multipleReturnedCoordinates": 0,
+      "completeCohort": false,
+      "completeAndIdentityValid": false,
+      "fullResponsesByInputSha256": "690f0948497849759e009d3f1cdca9e78a295099785a4cbaeaae97cc5be798e3"
+    }
+  },
+  "comparisons": {
+    "vep": {
+      "sharedInputs": 1000,
+      "exactObjectKeyCanonicalMatches": 1000,
+      "differences": 0,
+      "differenceExamples": [],
+      "fullCohortEquivalent": true,
+      "comparison": "Full response objects keyed by exact echoed input; sort object keys recursively, preserve every array order and scalar value; HTTP response headers excluded"
+    },
+    "recoder": {
+      "sharedInputs": 800,
+      "exactObjectKeyCanonicalMatches": 800,
+      "differences": 0,
+      "differenceExamples": [],
+      "fullCohortEquivalent": false,
+      "comparison": "Full response objects keyed by exact echoed input; sort object keys recursively, preserve every array order and scalar value; HTTP response headers excluded"
+    }
+  },
+  "interpretation": {
+    "recoderCoordinates": "Require original chromosome, one-based position, REF and ALT among returned vcf_string values. Additional allele representations are permitted but counted; they do not replace the required target.",
+    "incompleteRecording": "Response-bearing requests only: a request that timed out without a response is absent from the recording. Missing cohort members are not counted as successes or as equivalent outputs.",
+    "semanticScope": "This verifies recorded upstream annotation identity and complete payload equivalence for shared inputs. It does not independently validate biological correctness or downstream enrichment/serialization."
+  },
+  "reproduction": {
+    "command": "node scripts/benchmark/validate-responses.cjs",
+    "node": "v22.14.0"
+  }
+}

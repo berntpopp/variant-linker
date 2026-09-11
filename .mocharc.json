@@ -1,6 +1,8 @@
 {
-  "timeout": 180000,
+  "timeout": 10000,
   "reporter": "spec",
   "bail": false,
-  "recursive": true
+  "recursive": true,
+  "spec": ["test/**/*.test.js"],
+  "require": ["./test/support/offline-setup.cjs"]
 }

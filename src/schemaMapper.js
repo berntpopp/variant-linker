@@ -1,53 +1,29 @@
-// src/schemaMapper.js
 'use strict';
-
-const Ajv = require('ajv');
-const addFormats = require('ajv-formats');
-
+const Ajv = require('ajv').default;
+const addFormats = require('ajv-formats').default;
+const schema = require('../schema/variant_annotation.schema.json');
 const ajv = new Ajv({ allErrors: true, strict: false });
 addFormats(ajv);
+const validate = ajv.compile(schema);
 
-/**
- * Maps the tool's output to a Schema.org compliant JSON structure.
- * @param {Object} output - The variant annotation output to transform
- * @returns {Object} A Schema.org compliant JSON structure for variant annotations
- */
+/** Add a JSON-LD Dataset envelope while retaining the versioned annotation payload.
+ * @template {object} T @param {T} output */
 function mapOutputToSchemaOrg(output) {
-  // ... transform output as needed ...
-  return output;
+  return {
+    ...output,
+    '@context': 'https://schema.org',
+    '@type': 'Dataset',
+    name: 'Genetic Variant Annotation Dataset',
+    schemaVersion: '1',
+  };
 }
-
-/**
- * Validates the output against the given JSON schema.
- *
- * @param {Object} output - The output to validate.
- * @param {string} schemaPath - Path to the JSON schema file.
- * @throws {Error} If validation fails.
- */
+/** @param {unknown} output @param {string} [schemaPath] */
 function validateSchemaOrgOutput(output, schemaPath) {
-  const schema = require(schemaPath);
-  const validate = ajv.compile(schema);
-  const valid = validate(output);
-  if (!valid) {
+  void schemaPath; // Compatibility argument: the bundled schema is authoritative.
+  if (!validate(output)) {
     throw new Error('Schema.org output validation failed: ' + ajv.errorsText(validate.errors));
   }
 }
-
-/**
- * Registers custom formats with the AJV instance.
- */
-function addCustomFormats() {
-  // Here you can add custom format definitions if needed.
-  // For example, if the "date-time" format is not recognized,
-  // you can define it explicitly (though ajv-formats should already do this).
-  ajv.addFormat('date-time', {
-    type: 'string',
-    validate: (dateTimeString) => {
-      // Simple validation: try to parse as Date and ensure it's valid.
-      const d = new Date(dateTimeString);
-      return !isNaN(d.valueOf());
-    },
-  });
-}
-
+/** Compatibility hook: standard formats are registered once during initialization. */
+function addCustomFormats() {}
 module.exports = { mapOutputToSchemaOrg, validateSchemaOrgOutput, addCustomFormats };

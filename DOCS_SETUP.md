@@ -1,116 +1,25 @@
-# Documentation Setup Guide
+# Documentation setup
 
-## 🔧 Quick Fix for Dependencies
+The documentation uses VitePress. Use Node.js 22.14 or newer and install the committed documentation lockfile:
 
-The documentation is built with Docusaurus but you may encounter dependency issues. Here are several ways to preview the documentation:
-
-### Option 1: Simple HTML Preview (Immediate)
-
-Open this file in your browser to see the documentation structure:
-```
-docs/preview.html
+```bash
+npm --prefix docs ci
+npm run docs:dev
 ```
 
-### Option 2: Fix Dependencies and Run Docusaurus
+Build and preview the static site with:
 
-1. **Clean and reinstall:**
-   ```bash
-   cd docs
-   rm -rf node_modules package-lock.json
-   npm cache clean --force
-   npm install --legacy-peer-deps
-   ```
+```bash
+npm run docs:build
+npm run docs:serve
+```
 
-2. **If still having issues, try with Yarn:**
-   ```bash
-   cd docs
-   yarn install
-   yarn start
-   ```
+`npm run verify` includes the documentation build and dependency audit. CI verifies Linux on Node.js 22 and 24 and Windows on Node.js 22. After the main branch passes, Pages receives the documentation artifact produced by that verified run.
 
-3. **Alternative: Use specific Node version:**
-   ```bash
-   # Install nvm if you don't have it
-   curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
-   
-   # Use Node 18 (more stable with Docusaurus)
-   nvm install 18
-   nvm use 18
-   cd docs
-   npm install
-   npm start
-   ```
+## Reviewed Vite override
 
-### Option 3: Deploy and View Online
+The documentation lockfile deliberately resolves Vite 6.4.3 through `docs/package.json`'s `vite` override. VitePress 1.6.4 declares Vite 5, whose dependency tree had security findings during the modernization. The override moves the build to a patched Vite line while retaining the latest stable VitePress release. As checked on September 11, 2026, the npm registry marks VitePress 1.6.4 as `latest`; VitePress 2 remains an alpha on the `next` tag.
 
-The easiest way is to merge this branch to main, which will trigger automatic deployment to GitHub Pages:
+This crosses VitePress's declared dependency range and is a reviewed compatibility exception. The committed tree installs with `npm --prefix docs ci`, builds successfully, and has zero reported npm audit vulnerabilities at verification time. Those checks establish installation and build compatibility for this site; they do not establish compatibility with every VitePress plugin or development-server feature. Repeat the build and audit when changing this override, and remove it when a stable VitePress release supports a patched Vite dependency directly.
 
-1. **Merge to main:**
-   ```bash
-   git checkout main
-   git merge docs/docusaurus-documentation
-   git push origin main
-   ```
-
-2. **Enable GitHub Pages:**
-   - Go to your repo Settings → Pages
-   - Set Source to "GitHub Actions"
-   - Wait 5-10 minutes for deployment
-
-3. **Visit:** `https://berntpopp.github.io/variant-linker/`
-
-## 📚 What's Been Implemented
-
-✅ **Complete Documentation Structure:**
-- Landing page with features overview
-- Installation and CLI usage guides
-- Comprehensive guides for VCF/PED files, inheritance analysis, scoring
-- Benchmarking and contributing documentation
-- Auto-generated API reference (TypeDoc integration)
-
-✅ **Modern Documentation Features:**
-- Search functionality
-- Dark/light mode toggle
-- Mobile responsive design
-- Automated deployment with GitHub Actions
-- Hot reload during development
-
-✅ **Content Migration:**
-- Converted 577-line monolithic README into structured documentation
-- Organized content into logical sections
-- Added detailed examples and tutorials
-- Created comprehensive guides for advanced features
-
-## 🚀 Benefits of the New Setup
-
-**For Users:**
-- Professional, searchable documentation site
-- Mobile-friendly access to all information
-- Clear navigation and organization
-- Always up-to-date with latest code changes
-
-**For Developers:**
-- "Docs as code" approach - maintain docs like code
-- Automatic API documentation from JSDoc comments
-- Easy contribution workflow via pull requests
-- Version control for all documentation changes
-
-## 🛠️ Customization
-
-Once the site is running, you can easily customize:
-
-- **Styling:** Edit `docs/src/css/custom.css`
-- **Content:** Modify markdown files in `docs/docs/`
-- **Navigation:** Update `docs/sidebars.js`
-- **Configuration:** Modify `docs/docusaurus.config.js`
-
-## 📞 Need Help?
-
-If you continue having issues:
-
-1. **Check Node version:** `node --version` (should be 18+ for best compatibility)
-2. **Try the HTML preview:** Open `docs/preview.html` in your browser
-3. **Deploy to GitHub Pages:** Often easier than local setup
-4. **Contact support:** Open an issue with the error details
-
-The documentation structure is complete and ready to use - the dependency issues are just local development setup challenges that don't affect the final deployed site.
+Primary package metadata: [VitePress on npm](https://www.npmjs.com/package/vitepress), [Vite on npm](https://www.npmjs.com/package/vite). Dependency details are reproducible with `npm view vitepress dist-tags --json` and `npm --prefix docs ls vite vitepress`.
