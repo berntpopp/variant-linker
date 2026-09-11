@@ -1,2 +1,2 @@
-# Auto detect text files and perform LF normalization
-* text=auto
+# Match Prettier's LF policy on every platform; preserve binary files unchanged.
+* text=auto eol=lf
