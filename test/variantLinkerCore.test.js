@@ -1,8 +1,9 @@
 // test/variantLinkerCore.test.js
 // Comprehensive tests for the variant-linker core functionality
 
-const sinon = require('sinon');
-const { expect, mockResponses } = require('./helpers');
+const { expect } = require('./helpers');
+const assert = require('node:assert/strict');
+const { useFixtureApi } = require('./support/fixture-api.cjs');
 const {
   analyzeVariant,
   detectInputFormat,
@@ -10,20 +11,10 @@ const {
   stripTranscriptVersion,
 } = require('../src/variantLinkerCore');
 
-// Test doubles for mocking dependencies
-const mockVepResponse = mockResponses.vepVcfResponse;
-
 describe('variantLinkerCore.js', () => {
-  // Sample variants for testing
-  const vcfVariant = '1-65568-A-C';
-  const hgvsVariant = 'ENST00000366667:c.803C>T'; // Example HGVS
-  const realHgvsVariant = 'ENST00000302118:c.137G>A'; // Variant from test 3
-  const correctVcfKeyForRealHgvs = '1-55039974-G-A'; // Correct key for realHgvsVariant
+  useFixtureApi();
 
-  // Use a simpler approach to test the core functionality
-  // Following KISS principle for tests
-
-  // Focus just on detectInputFormat tests
+  // Input format contract
   describe('detectInputFormat()', () => {
     it('should correctly identify VCF format', () => {
       expect(detectInputFormat('1-65568-A-C')).to.equal('VCF');
@@ -115,432 +106,50 @@ describe('variantLinkerCore.js', () => {
     });
   });
 
-  afterEach(() => {
-    // Restore original functions
-    sinon.restore();
-  });
-
-  describe('analyzeVariant() - Basic Functionality', () => {
-    // We'll use a simpler approach to test analyzeVariant that doesn't depend on stubs
-    // This follows the KISS principle for testing
-
-    it('should process a single VCF variant correctly', async function () {
-      // This test uses the actual implementation but with a mock API response through apiHelper
-      this.timeout(process.env.CI ? 60000 : 5000);
-
-      // Mock the API response for VEP
-      const apiHelperMock = require('../src/apiHelper');
-      const fetchApiStub = sinon.stub(apiHelperMock, 'fetchApi');
-      // Simulate VEP response for the specific VCF variant
-      const vepResponseForVcf = [
-        {
-          input: '1 65568 . A C . . .', // Matches formatted VCF input
-          id: 'variant1_1_65568_A_C',
-          most_severe_consequence: 'missense_variant',
-          seq_region_name: '1',
-          start: 65568,
-          allele_string: 'A/C',
-          transcript_consequences: [
-            /* ... consequences ... */
-          ],
-        },
-      ];
-      fetchApiStub.resolves(vepResponseForVcf);
-
-      try {
-        const params = {
-          variant: vcfVariant, // Use the old single variant param
-          recoderOptions: {},
-          vepOptions: {},
-          cache: false,
-          output: 'JSON',
-        };
-
-        const result = await analyzeVariant(params);
-
-        // Verify result structure
-        expect(result).to.have.property('meta');
-        expect(result).to.have.property('annotationData').that.is.an('array');
-
-        // *** FIX: Check meta object exists before asserting properties ***
-        expect(result.meta).to.be.an('object');
-        expect(result.meta).to.have.property('batchSize', 1);
-        // *** FIX: Assert batchProcessing property on the meta object ***
-        expect(result.meta).to.have.property('batchProcessing', false); // Should be false for single variant
-      } finally {
-        fetchApiStub.restore();
-      }
+  describe('Actual pipeline with offline HTTP transport', () => {
+    it('processes a single VCF variant with exact identity and annotations', async () => {
+      const result = await analyzeVariant({ variant: '1-65568-A-C', output: 'JSON', cache: false });
+      expect(result.annotationData).to.have.lengthOf(1);
+      expect(result.annotationData[0]).to.include({ start: 65568, originalInput: '1-65568-A-C' });
+      expect(result.annotationData[0].transcript_consequences).to.have.lengthOf(2);
+      expect(result.annotationData[0].transcript_consequences[0].gene_symbol).to.equal('OR4F5');
     });
 
-    it('should detect different variant formats correctly', async function () {
-      // Test the input format detection, which is a key function
-      // VCF format
-      expect(detectInputFormat('1-65568-A-C')).to.equal('VCF');
-      expect(detectInputFormat('chr1-65568-A-C')).to.equal('VCF');
-
-      // HGVS format
-      expect(detectInputFormat('rs123')).to.equal('HGVS');
-      expect(detectInputFormat('ENST00000366667:c.803C>T')).to.equal('HGVS');
+    it('processes each mixed batch variant and reports its count', async () => {
+      const variants = ['1-65568-A-C', 'rs6025'];
+      const result = await analyzeVariant({ variants, output: 'JSON', cache: false });
+      expect(result.meta).to.include({ batchProcessing: true, batchSize: 2 });
+      expect(result.annotationData).to.have.lengthOf(2);
+      expect(result.annotationData.map((v) => v.originalInput)).to.have.members(variants);
+      expect(result.annotationData.map((v) => v.start)).to.have.members([65568, 169549811]);
     });
 
-    it('should throw an error for invalid input', async function () {
-      // Test error handling for invalid input
-      // Empty variant array
-      const emptyParams = {
-        variants: [],
-        recoderOptions: {},
-        vepOptions: {},
-        cache: false,
-      };
-
-      try {
-        await analyzeVariant(emptyParams);
-        throw new Error('Expected to throw but did not');
-      } catch (error) {
-        expect(error.message).to.include('No variants provided');
-      }
-
-      // No variant parameter
-      const noVariantParams = {
-        recoderOptions: {},
-        vepOptions: {},
-        cache: false,
-      };
-
-      try {
-        await analyzeVariant(noVariantParams);
-        throw new Error('Expected to throw but did not');
-      } catch (error) {
-        expect(error.message).to.include('No variants provided');
-      }
+    it('joins HGVS recoder and VEP responses to the original input', async () => {
+      const variant = 'ENST00000302118:c.137G>A';
+      const result = await analyzeVariant({ variant, output: 'JSON', cache: false });
+      expect(result.annotationData).to.have.lengthOf(1);
+      expect(result.annotationData[0]).to.include({
+        originalInput: variant,
+        inputFormat: 'HGVS',
+        variantKey: '1-55039974-G-A',
+      });
     });
-  });
 
-  describe('analyzeVariant() - Batch Processing Mode', () => {
-    // Following KISS principles: use a simpler test that focuses on batch processing logic
-    // Create a direct test of the batch mode flag without making real API calls
-    it('should identify batch processing mode', function () {
-      // Direct test of the internal batch detection logic
-      const singleInput = { variant: vcfVariant };
-      const batchInput = { variants: [vcfVariant, hgvsVariant] };
-      const vcfFileInput = { vcfInput: 'some/path.vcf', variants: ['1-100-A-T'] }; // vcfInput implies batch
+    for (const params of [{ variants: [] }, {}]) {
+      it('rejects an empty request before transport', async () => {
+        await assert.rejects(analyzeVariant({ ...params, output: 'JSON' }), /No variants provided/);
+      });
+    }
 
-      // Simulate the logic in analyzeVariant
-      // Function to simulate the variant array finalization
-      const getFinalVariants = (p) => {
-        let v = [];
-        if (p.vcfInput && Array.isArray(p.variants)) {
-          v = p.variants;
-        } else if (Array.isArray(p.variants)) {
-          v = p.variants;
-        } else if (p.variant) {
-          v = [p.variant];
+    for (const output of ['JSON', 'CSV', 'TSV']) {
+      it('serializes supported ' + output + ' output', async () => {
+        const result = await analyzeVariant({ variant: '1-65568-A-C', output, cache: false });
+        if (output === 'JSON') expect(result.annotationData).to.have.lengthOf(1);
+        else {
+          expect(result).to.be.a('string');
+          expect(result).to.include('OriginalInput').and.include('OR4F5');
         }
-        return v;
-      };
-
-      // Simulate the batchProcessing calculation based on the final variants array
-      const isBatch1 = getFinalVariants(singleInput).length > 1 || Boolean(singleInput.vcfInput);
-      const isBatch2 = getFinalVariants(batchInput).length > 1 || Boolean(batchInput.vcfInput);
-      const isBatch3 = getFinalVariants(vcfFileInput).length > 1 || Boolean(vcfFileInput.vcfInput);
-
-      expect(isBatch1).to.be.false;
-      expect(isBatch2).to.be.true;
-      expect(isBatch3).to.be.true; // vcfInput makes it batch mode
-    });
-
-    // Test batch processing metadata values in a simpler integration test
-    it('should process multiple variants in a batch', async function () {
-      this.timeout(process.env.CI ? 60000 : 3000);
-
-      // Keep it simple with just two variants
-      const batchVariants = [vcfVariant, vcfVariant]; // Use same variant type to simplify
-
-      // Mock just the api helper
-      const apiHelper = require('../src/apiHelper');
-      const fetchApiStub = sinon.stub(apiHelper, 'fetchApi');
-
-      // Mock a response with TWO annotation objects to match the TWO input variants
-      // VEP returns one annotation object per input variant
-      const batchMockResponse = [
-        {
-          input: '1 65568 . A C . . .', // First variant
-          id: 'variant1_1_65568_A_C',
-          most_severe_consequence: 'missense_variant',
-          seq_region_name: '1',
-          start: 65568,
-          allele_string: 'A/C',
-          transcript_consequences: [
-            {
-              transcript_id: 'ENST00000001',
-              gene_id: 'ENSG00000001',
-              gene_symbol: 'GENE1',
-              consequence_terms: ['missense_variant'],
-              impact: 'MODERATE',
-              polyphen_score: 0.85,
-              sift_score: 0.1,
-            },
-          ],
-        },
-        {
-          input: '1 65568 . A C . . .', // Second variant (same as first)
-          id: 'variant2_1_65568_A_C',
-          most_severe_consequence: 'missense_variant',
-          seq_region_name: '1',
-          start: 65568,
-          allele_string: 'A/C',
-          transcript_consequences: [
-            {
-              transcript_id: 'ENST00000001',
-              gene_id: 'ENSG00000001',
-              gene_symbol: 'GENE1',
-              consequence_terms: ['missense_variant'],
-              impact: 'MODERATE',
-              polyphen_score: 0.85,
-              sift_score: 0.1,
-            },
-          ],
-        },
-      ];
-
-      fetchApiStub.resolves(batchMockResponse);
-
-      try {
-        const result = await analyzeVariant({
-          variants: batchVariants,
-          recoderOptions: {},
-          vepOptions: {},
-          cache: false,
-          output: 'JSON',
-        });
-
-        // Verify the batch processing metadata
-        // *** FIX: Check meta object exists before asserting properties ***
-        expect(result.meta).to.be.an('object');
-        expect(result.meta.batchProcessing).to.be.true; // Should be true for batch
-        expect(result.meta.batchSize).to.equal(batchVariants.length);
-        expect(result.annotationData).to.be.an('array');
-        expect(result.annotationData).to.have.lengthOf(batchVariants.length);
-
-        // Verify steps performed includes batch processing
-        const batchStepFound = result.meta.stepsPerformed.some((step) =>
-          step.includes('batch mode')
-        );
-        expect(batchStepFound).to.be.true;
-      } finally {
-        fetchApiStub.restore();
-      }
-    });
-
-    it('should maintain backward compatibility with single variant input', async function () {
-      // Test backward compatibility with single variant input
-      this.timeout(process.env.CI ? 60000 : 5000);
-
-      // Mock the API response using apiHelper
-      const apiHelperMock = require('../src/apiHelper');
-      const fetchApiStub = sinon.stub(apiHelperMock, 'fetchApi');
-      // Simulate VEP response for the specific VCF variant
-      const vepResponseForVcf = [
-        {
-          input: '1 65568 . A C . . .', // Matches formatted VCF input
-          id: 'variant1_1_65568_A_C',
-          most_severe_consequence: 'missense_variant',
-          seq_region_name: '1',
-          start: 65568,
-          allele_string: 'A/C',
-          transcript_consequences: [
-            /* ... consequences ... */
-          ],
-        },
-      ];
-      fetchApiStub.resolves(vepResponseForVcf);
-
-      try {
-        // Use the old style 'variant' parameter instead of 'variants' array
-        const params = {
-          variant: vcfVariant,
-          recoderOptions: {},
-          vepOptions: {},
-          cache: false,
-          output: 'JSON',
-        };
-
-        const result = await analyzeVariant(params);
-
-        // Verify it processed as a single variant
-        // *** FIX: Check meta object exists before asserting properties ***
-        expect(result.meta).to.be.an('object');
-        expect(result.meta).to.have.property('batchSize', 1);
-        // *** FIX: Assert batchProcessing property on the meta object ***
-        expect(result.meta).to.have.property('batchProcessing', false); // Should be false for single variant
-
-        // Check the annotation data
-        expect(result).to.have.property('annotationData').that.is.an('array');
-        expect(result.annotationData).to.have.lengthOf(1);
-      } finally {
-        fetchApiStub.restore();
-      }
-    });
-
-    it('should handle different output formats', async function () {
-      // Following KISS principle: Test only the JSON output format
-      // which is more reliable in tests and doesn't require schema validation
-      this.timeout(process.env.CI ? 60000 : 5000);
-
-      // Mock the API response
-      const apiHelperMock = require('../src/apiHelper');
-      const fetchApiStub = sinon.stub(apiHelperMock, 'fetchApi');
-      fetchApiStub.resolves(mockVepResponse);
-
-      try {
-        // Use standard JSON output format
-        const params = {
-          variant: vcfVariant,
-          recoderOptions: {},
-          vepOptions: {},
-          cache: false,
-          output: 'JSON',
-        };
-
-        const result = await analyzeVariant(params);
-
-        // Verify the JSON output structure
-        expect(result).to.have.property('meta');
-        expect(result).to.have.property('annotationData').that.is.an('array');
-      } finally {
-        fetchApiStub.restore();
-      }
-    });
-  });
-
-  // Simple unit test for filter-related functionality
-  describe('Filter Parameter Detection', () => {
-    // Ultra-simple test that doesn't rely on actual filter implementation
-    it('should detect presence of filter parameter', function () {
-      // Test that the code can identify when a filter is present
-      const withFilterParams = {
-        variant: 'dummy',
-        filter: '{}', // Empty but valid JSON
-      };
-
-      const withoutFilterParams = {
-        variant: 'dummy',
-        // No filter parameter
-      };
-
-      // Directly verify the conditions that would enable filtering
-      // This is the same logic used in the variantLinkerCore.js implementation
-      expect(withFilterParams.filter).to.exist;
-      expect(withoutFilterParams.filter).to.be.undefined;
-    });
-  });
-
-  describe('Integration with VCF, Recoder, and VEP', () => {
-    // For more thorough testing, use real functions instead of stubs
-    beforeEach(() => {
-      sinon.restore();
-    });
-
-    it('should detect, process, and annotate the ENST00000302118:c.137G>A variant correctly', async function () {
-      // Problematic variant from issues
-      this.timeout(process.env.CI ? 120000 : 30000); // Allow more time for this test in CI
-
-      // Mock only the network calls to avoid actual API requests
-      const apiHelperMock = require('../src/apiHelper');
-      const fetchApiStub = sinon.stub(apiHelperMock, 'fetchApi');
-
-      // *** FIX: Correct the mock recoder response ***
-      // Mock response for variant recoder providing the CORRECT vcf_string
-      fetchApiStub.withArgs(sinon.match(/variant_recoder\/ENST00000302118:c.137G>A/)).resolves([
-        {
-          // Wrapped in array as per recoder GET response format
-          'ENST00000302118:c.137G>A': {
-            // Use the correct allele ('A' is the ALT allele from c.137G>A)
-            A: {
-              hgvsg: ['NC_000001.11:g.55039974G>A'], // Optional: Update hgvsg if known
-              vcf_string: [correctVcfKeyForRealHgvs], // Provide the CORRECT VCF string
-            },
-            // It's possible the API returns info for the reference allele too
-            G: {
-              // ... potentially other info ...
-            },
-          },
-        },
-      ]);
-
-      // Mock response for VEP, assuming it's called with the CORRECT formatted variant
-      fetchApiStub.withArgs(sinon.match(/vep\/homo_sapiens\/region/)).resolves([
-        {
-          input: '1 55039974 . G A . . .', // VEP input based on CORRECT coordinates
-          id: '1_55039974_G_A', // ID based on CORRECT coordinates
-          most_severe_consequence: 'missense_variant',
-          seq_region_name: '1', // Ensure these are present for key generation
-          start: 55039974,
-          allele_string: 'G/A', // Correct REF/ALT
-          transcript_consequences: [
-            {
-              transcript_id: 'ENST00000302118',
-              gene_id: 'ENSG00000169174', // Correct gene ID for PCSK9
-              gene_symbol: 'PCSK9', // Correct gene symbol
-              consequence_terms: ['missense_variant'],
-              impact: 'MODERATE',
-              polyphen_score: 0.95, // Example score
-              sift_score: 0.05, // Example score
-              cadd_phred: 28.5, // Example score
-            },
-          ],
-        },
-      ]);
-
-      const params = {
-        variant: realHgvsVariant, // Use single variant param with the correct HGVS
-        recoderOptions: {},
-        vepOptions: {},
-        cache: false,
-        output: 'JSON',
-      };
-
-      try {
-        const result = await analyzeVariant(params);
-
-        // Check the annotation data
-        expect(result.annotationData).to.be.an('array').with.lengthOf(1);
-        expect(result.annotationData[0]).to.have.property('inputFormat', 'HGVS');
-        expect(result.annotationData[0]).to.have.property('originalInput', realHgvsVariant);
-        // Check the transcript consequence details if needed
-        expect(result.annotationData[0].transcript_consequences[0]).to.have.property(
-          'transcript_id',
-          'ENST00000302118'
-        );
-        expect(result.annotationData[0].transcript_consequences[0]).to.have.property(
-          'gene_symbol',
-          'PCSK9'
-        );
-        // *** FIX: Assert against the CORRECT variantKey ***
-        expect(result.annotationData[0]).to.have.property('variantKey', correctVcfKeyForRealHgvs);
-      } finally {
-        // Clean up
-        fetchApiStub.restore();
-      }
-    });
-  });
-
-  // Tests for transcript version fallback mechanism
-  describe('Transcript Version Fallback Mechanism', () => {
-    it('should demonstrate fallback functionality in real scenario', function () {
-      // This test documents that the fallback mechanism was implemented and tested manually
-      // The actual integration test with the problematic variant showed:
-      // 1. Original variant: "NM_001009944.3:c.540dup"
-      // 2. Fallback variant: "NM_001009944:c.540dup"
-      // 3. Metadata tracking: transcriptVersionFallback object present
-      // 4. Successful processing after fallback
-
-      expect(hasTranscriptVersion('NM_001009944.3:c.540dup')).to.be.true;
-      expect(stripTranscriptVersion('NM_001009944.3:c.540dup')).to.equal('NM_001009944:c.540dup');
-
-      // Manual testing with the actual command confirmed fallback works:
-      // node src/main.js --variant "NM_001009944.3:c.540dup" --output JSON
-      // Result: successful processing with transcriptVersionFallback metadata present
-    });
+      });
+    }
   });
 });

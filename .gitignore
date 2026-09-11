@@ -63,3 +63,6 @@ clinvar_*.txt
 
 # local data folder
 local_data/
+# Local verification output
+coverage/
+.nyc_output/
