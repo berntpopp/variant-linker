@@ -39,28 +39,22 @@ describe('variantRecoder', () => {
     expect(result[0]).to.have.property('vcf_string').that.includes('1-1000-A-T');
   });
 
-  it('should handle API errors gracefully', async function () {
-    this.timeout(30000); // Increase timeout for retries
-
+  it('should propagate API errors when retries are disabled', async () => {
     nock.cleanAll(); // Remove previous interceptors
 
-    // Get retry configuration values
-    const maxRetries = apiConfig.requests?.retry?.maxRetries ?? 4;
-
-    // Set up mock to respond with 500 error enough times to exhaust all retries
-    nock(apiBaseUrl)
+    const scope = nock(apiBaseUrl)
       .get(`${apiConfig.ensembl.endpoints.variantRecoder}/${variant}`)
       .query(true)
-      .times(maxRetries + 1) // Original request + retries
       .reply(500, { error: 'Internal Server Error' });
 
     try {
-      await variantRecoder(variant);
+      await variantRecoder(variant, {}, false, null, { maxRetries: 0 });
       throw new Error('Expected variantRecoder to throw an error for 500 status code');
     } catch (error) {
       // AxiosError is an error object but has specific structure
       expect(error).to.be.an.instanceof(Error);
       expect(error.response.status).to.equal(500);
     }
+    expect(scope.isDone()).to.equal(true);
   });
 });

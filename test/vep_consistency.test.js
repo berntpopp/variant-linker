@@ -22,7 +22,6 @@ const { applyScoring } = require('../src/scoring');
 
 describe('VEP Consistency Tests', function () {
   // Allow more time for these comprehensive tests
-  // eslint-disable-next-line no-invalid-this
   this.timeout(10000);
 
   // Load baseline data once for all tests
@@ -57,7 +56,7 @@ describe('VEP Consistency Tests', function () {
       console.log(`Loaded ${testVariants.length} test variants`);
       console.log(`Parsed baseline data for ${parsedVepData.size} variants`);
     } catch (error) {
-      throw new Error(`Failed to load test data: ${error.message}`);
+      throw new Error(`Failed to load test data: ${error.message}`, { cause: error });
     }
   });
 
@@ -227,7 +226,6 @@ describe('VEP Consistency Tests', function () {
     const baselineConsequences = findVepDataForVariant(variantKey, parsedVepData);
 
     if (!baselineConsequences || baselineConsequences.length === 0) {
-      // eslint-disable-next-line no-invalid-this
       this.skip(`No baseline data available for variant ${variantKey}`);
       return;
     }
@@ -265,7 +263,6 @@ describe('VEP Consistency Tests', function () {
     const baselineConsequences = findVepDataForVariant(variantKey, parsedVepData);
 
     if (!baselineConsequences || baselineConsequences.length === 0) {
-      // eslint-disable-next-line no-invalid-this
       this.skip(`No baseline data available for variant ${variantKey}`);
       return;
     }

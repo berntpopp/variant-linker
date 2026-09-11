@@ -117,31 +117,23 @@ describe('variantRecoderPost', () => {
     }
   });
 
-  it('should handle API errors gracefully', async function () {
-    this.timeout(30000); // Increase timeout for retries
-
-    // We're using real timers for all tests now
-
+  it('should propagate API errors when retries are disabled', async () => {
     nock.cleanAll(); // Remove previous interceptors
 
-    // Get retry configuration values
-    const maxRetries = apiConfig.requests?.retry?.maxRetries ?? 4;
-
-    // Set up mock to respond with 500 error enough times to exhaust all retries
-    nock(apiBaseUrl)
+    const scope = nock(apiBaseUrl)
       .post(`${apiConfig.ensembl.endpoints.variantRecoderBase}/homo_sapiens`)
       .query(true)
-      .times(maxRetries + 1) // Original request + retries
       .reply(500, { error: 'Internal Server Error' });
 
     try {
-      await variantRecoderPost(variants);
+      await variantRecoderPost(variants, {}, false, null, { maxRetries: 0 });
       throw new Error('Expected variantRecoderPost to throw an error for 500 status code');
     } catch (error) {
       // AxiosError is an error object but has specific structure
       expect(error).to.be.an.instanceof(Error);
       expect(error.response.status).to.equal(500);
     }
+    expect(scope.isDone()).to.equal(true);
   });
 
   it('should chunk large variant arrays and make multiple requests', function () {

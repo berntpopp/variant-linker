@@ -156,8 +156,9 @@ describe('apiHelper', () => {
     // Second attempt succeeds
     nock(apiBaseUrl).post(testEndpoint, requestBody).reply(200, mockResponse);
 
-    const result = await apiHelper.fetchApi(testEndpoint, {}, false, 'POST', requestBody, null,
-      { maxRetryDelayMs: 10 });
+    const result = await apiHelper.fetchApi(testEndpoint, {}, false, 'POST', requestBody, null, {
+      maxRetryDelayMs: 10,
+    });
 
     expect(result).to.deep.equal(mockResponse);
   });

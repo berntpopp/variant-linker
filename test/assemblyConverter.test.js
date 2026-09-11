@@ -121,20 +121,21 @@ describe('assemblyConverter', () => {
     });
 
     it('should throw error on API failure', async () => {
-      // Mock multiple retries for 500 error
-      nock(grch37BaseUrl)
+      // Retry behavior belongs to the API transport suite; this verifies propagation.
+      const scope = nock(grch37BaseUrl)
         .get(`/map/human/GRCh37/${testRegion}/GRCh38`)
-        .times(5) // Match the retry attempts
         .reply(500, { error: 'Internal server error' });
 
       try {
-        await liftOverCoordinates(testRegion, false);
+        await liftOverCoordinates(testRegion, false, { maxRetries: 0 });
         expect.fail('Should have thrown an error');
       } catch (error) {
         expect(error).to.be.instanceOf(Error);
         expect(error.message).to.be.a('string');
+        expect(error.response.status).to.equal(500);
       }
-    }).timeout(30000); // Increase timeout for retry testing
+      expect(scope.isDone()).to.equal(true);
+    });
 
     it('should handle network errors', async () => {
       nock(grch37BaseUrl)
