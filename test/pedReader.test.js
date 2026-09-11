@@ -185,10 +185,10 @@ describe('pedReader', function () {
     });
 
     it('should throw an error if the file does not exist', async function () {
-      // Stub fs.access to fail with ENOENT
+      // Stub fs.readFile to fail with ENOENT
       const error = new Error('File not found');
       error.code = 'ENOENT';
-      sandbox.stub(fs, 'access').rejects(error);
+      sandbox.stub(fs, 'readFile').rejects(error);
 
       try {
         await readPedigree('/path/to/nonexistent.ped');
@@ -199,10 +199,10 @@ describe('pedReader', function () {
     });
 
     it('should throw an error if the file cannot be read (permission denied)', async function () {
-      // Stub fs.access to fail with EACCES
+      // Stub fs.readFile to fail with EACCES
       const error = new Error('Permission denied');
       error.code = 'EACCES';
-      sandbox.stub(fs, 'access').rejects(error);
+      sandbox.stub(fs, 'readFile').rejects(error);
 
       try {
         await readPedigree('/path/to/nopermission.ped');
@@ -213,7 +213,7 @@ describe('pedReader', function () {
     });
 
     it('should throw an error for other file reading errors', async function () {
-      // Stub fs.access to succeed but fs.readFile to fail
+      // Stub fs.readFile to fail
       sandbox.stub(fs, 'access').resolves();
       sandbox.stub(fs, 'readFile').rejects(new Error('Disk error'));
 

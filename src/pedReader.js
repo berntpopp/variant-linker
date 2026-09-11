@@ -31,10 +31,7 @@ const debug = require('debug')('variant-linker:ped-reader');
  */
 async function readPedigree(filePath) {
   try {
-    // Verify file exists and is readable
-    await fs.access(filePath);
-
-    // Read file content
+    // Read directly so path checks cannot race with acquisition.
     const fileContent = await fs.readFile(filePath, 'utf8');
 
     return parsePedigreeText(fileContent);

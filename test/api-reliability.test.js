@@ -205,6 +205,6 @@ describe('API reliability contracts', () => {
       assembly: 'GRCh38',
     });
     assert.match(transport.firstCall.args[0], /grch37/);
-    assert.match(transport.secondCall.args[0], /^https:\/\/rest.ensembl.org/);
+    assert.equal(new URL(transport.secondCall.args[0]).origin, 'https://rest.ensembl.org');
   });
 });
