@@ -27,6 +27,7 @@ For persistent proxy configuration, set environment variables that variant-linke
 ### Linux/macOS
 
 #### Temporary (current session only)
+
 ```bash
 export HTTP_PROXY=http://proxy.company.com:8080
 export HTTPS_PROXY=http://proxy.company.com:8080
@@ -37,6 +38,7 @@ variant-linker --variant "rs123" --output JSON
 ```
 
 #### Permanent (all sessions)
+
 Add to your shell profile (`.bashrc`, `.zshrc`, or `.profile`):
 
 ```bash
@@ -53,6 +55,7 @@ source ~/.bashrc
 ```
 
 #### System-wide (all users)
+
 ```bash
 # Edit system environment
 sudo nano /etc/environment
@@ -68,6 +71,7 @@ NO_PROXY=localhost,127.0.0.1
 ### Windows
 
 #### Temporary (current PowerShell session)
+
 ```powershell
 $env:HTTP_PROXY="http://proxy.company.com:8080"
 $env:HTTPS_PROXY="http://proxy.company.com:8080"
@@ -78,6 +82,7 @@ variant-linker --variant "rs123" --output JSON
 ```
 
 #### Permanent (current user)
+
 ```powershell
 [Environment]::SetEnvironmentVariable("HTTP_PROXY", "http://proxy.company.com:8080", "User")
 [Environment]::SetEnvironmentVariable("HTTPS_PROXY", "http://proxy.company.com:8080", "User")
@@ -87,6 +92,7 @@ variant-linker --variant "rs123" --output JSON
 ```
 
 #### Permanent (all users - requires admin)
+
 ```powershell
 [Environment]::SetEnvironmentVariable("HTTP_PROXY", "http://proxy.company.com:8080", "Machine")
 [Environment]::SetEnvironmentVariable("HTTPS_PROXY", "http://proxy.company.com:8080", "Machine")
@@ -96,6 +102,7 @@ variant-linker --variant "rs123" --output JSON
 ```
 
 #### Alternative - System Properties GUI
+
 1. Press `Win + R`, type `sysdm.cpl`, press Enter
 2. Go to **Advanced** tab → **Environment Variables**
 3. Add variables under **User variables** (current user) or **System variables** (all users):
@@ -109,12 +116,14 @@ variant-linker --variant "rs123" --output JSON
 ### Check Environment Variables
 
 **Linux/macOS:**
+
 ```bash
 echo $HTTP_PROXY
 echo $HTTPS_PROXY
 ```
 
 **Windows:**
+
 ```powershell
 [Environment]::GetEnvironmentVariable("HTTP_PROXY", "User")
 [Environment]::GetEnvironmentVariable("HTTPS_PROXY", "User")
@@ -140,21 +149,25 @@ When multiple proxy configurations are present, variant-linker uses this priorit
 ## Common Proxy Formats
 
 ### Basic HTTP Proxy
+
 ```bash
 --proxy http://proxy.example.com:8080
 ```
 
 ### HTTPS Proxy
+
 ```bash
 --proxy https://proxy.example.com:8443
 ```
 
 ### Authenticated Proxy
+
 ```bash
 --proxy http://username:password@proxy.example.com:8080
 ```
 
 ### Corporate Domain Authentication
+
 ```bash
 --proxy http://domain\\username:password@proxy.example.com:8080
 ```
@@ -164,13 +177,15 @@ When multiple proxy configurations are present, variant-linker uses this priorit
 ### Connection Issues
 
 **Problem:** `ECONNRESET` or `ETIMEDOUT` errors
-**Solution:** 
+**Solution:**
+
 - Verify proxy URL and port
 - Check authentication credentials
 - Test proxy connectivity with curl/wget
 
 **Problem:** Authentication failures
 **Solution:**
+
 - Use `--proxy-auth` parameter for special characters in passwords
 - URL-encode special characters in proxy URL
 - Try domain\\username format for Windows domains
@@ -191,7 +206,7 @@ Look for proxy-related messages in the debug output.
 # Test environment variables
 curl --proxy $HTTP_PROXY https://rest.ensembl.org
 
-# Test CLI proxy parameter  
+# Test CLI proxy parameter
 variant-linker --variant "rs123" --proxy http://proxy:8080 --output JSON -d
 ```
 

@@ -7,17 +7,20 @@ Thank you for your interest in contributing to Variant-Linker! This guide will h
 ### Development Setup
 
 1. **Fork and Clone the Repository**
+
    ```bash
    git clone https://github.com/your-username/variant-linker.git
    cd variant-linker
    ```
 
 2. **Install Dependencies**
+
    ```bash
    npm install
    ```
 
 3. **Run Tests**
+
    ```bash
    npm test
    ```
@@ -30,6 +33,7 @@ Thank you for your interest in contributing to Variant-Linker! This guide will h
 ### Development Workflow
 
 1. **Create a Feature Branch**
+
    ```bash
    git checkout -b feature/your-feature-name
    ```
@@ -40,6 +44,7 @@ Thank you for your interest in contributing to Variant-Linker! This guide will h
    - Update documentation as needed
 
 3. **Test Your Changes**
+
    ```bash
    npm test
    npm run lint
@@ -47,6 +52,7 @@ Thank you for your interest in contributing to Variant-Linker! This guide will h
    ```
 
 4. **Commit Your Changes**
+
    ```bash
    git add .
    git commit -m "feat: add new feature description"
@@ -82,18 +88,21 @@ npm run lint:fix
 When contributing code, please follow these guidelines:
 
 #### Naming Conventions
+
 - Use **camelCase** for variable and function names
 - Use **PascalCase** for constructor functions and classes
 - Use **UPPER_SNAKE_CASE** for constants
 - Use descriptive names that clearly indicate purpose
 
 #### Code Structure
+
 - Keep functions small and focused (KISS principle)
 - Avoid code duplication (DRY principle)
 - Use consistent indentation (2 spaces)
 - Maintain line length under 100 characters
 
 #### Documentation
+
 - Provide clear JSDoc comments for all functions
 - Include parameter and return type information
 - Document complex algorithms and business logic
@@ -111,12 +120,12 @@ When contributing code, please follow these guidelines:
  * @returns {Promise<Object>} Processed variant annotation data
  */
 async function processVariant(variant, options = {}) {
-  const {output = 'JSON', debug = false} = options;
-  
+  const { output = 'JSON', debug = false } = options;
+
   if (debug) {
     console.log(`Processing variant: ${variant}`);
   }
-  
+
   try {
     const annotation = await getVariantAnnotation(variant);
     return formatOutput(annotation, output);
@@ -183,33 +192,33 @@ Follow these patterns when writing tests:
 ```javascript
 describe('Module Name', () => {
   let sandbox;
-  
+
   beforeEach(() => {
     sandbox = sinon.createSandbox();
   });
-  
+
   afterEach(() => {
     sandbox.restore();
     nock.cleanAll();
   });
-  
+
   describe('functionName', () => {
     it('should handle normal input correctly', async () => {
       // Arrange
       const input = 'test-input';
       const expected = 'expected-output';
-      
+
       // Act
       const result = await functionName(input);
-      
+
       // Assert
       expect(result).to.equal(expected);
     });
-    
+
     it('should handle error conditions gracefully', async () => {
       // Arrange
       const invalidInput = null;
-      
+
       // Act & Assert
       await expect(functionName(invalidInput)).to.be.rejected;
     });
@@ -228,11 +237,13 @@ beforeEach(() => {
   nock('https://rest.ensembl.org')
     .get('/variant_recoder/human/rs6025')
     .reply(200, {
-      "rs6025": [{
-        "id": "rs6025",
-        "input": "rs6025",
-        "vcf_string": "1\t169519049\trs6025\tT\tC\t.\t.\t."
-      }]
+      rs6025: [
+        {
+          id: 'rs6025',
+          input: 'rs6025',
+          vcf_string: '1\t169519049\trs6025\tT\tC\t.\t.\t.',
+        },
+      ],
     });
 });
 ```
@@ -254,6 +265,7 @@ When adding new features:
 This project uses [Conventional Commits](https://www.conventionalcommits.org/) with [semantic-release](https://github.com/semantic-release/semantic-release) for automated versioning and releases.
 
 **Commit message format:**
+
 ```
 <type>[optional scope]: <description>
 
@@ -264,19 +276,19 @@ This project uses [Conventional Commits](https://www.conventionalcommits.org/) w
 
 ### Commit Types
 
-| Type | Description | Version Impact |
-|------|-------------|----------------|
-| `feat` | New feature | Minor version bump |
-| `fix` | Bug fix | Patch version bump |
-| `perf` | Performance improvements | Patch version bump |
-| `revert` | Revert previous commit | Patch version bump |
-| `docs` | Documentation changes | **No release** |
-| `style` | Code style changes | **No release** |
-| `refactor` | Code refactoring | **No release** |
-| `test` | Test additions/changes | **No release** |
-| `build` | Build system changes | **No release** |
-| `ci` | CI configuration changes | **No release** |
-| `chore` | Other maintenance | **No release** |
+| Type       | Description              | Version Impact     |
+| ---------- | ------------------------ | ------------------ |
+| `feat`     | New feature              | Minor version bump |
+| `fix`      | Bug fix                  | Patch version bump |
+| `perf`     | Performance improvements | Patch version bump |
+| `revert`   | Revert previous commit   | Patch version bump |
+| `docs`     | Documentation changes    | **No release**     |
+| `style`    | Code style changes       | **No release**     |
+| `refactor` | Code refactoring         | **No release**     |
+| `test`     | Test additions/changes   | **No release**     |
+| `build`    | Build system changes     | **No release**     |
+| `ci`       | CI configuration changes | **No release**     |
+| `chore`    | Other maintenance        | **No release**     |
 
 **📝 Documentation-Only Changes**: Commits with types `docs`, `style`, `chore`, `refactor`, `test`, `build`, or `ci` will NOT trigger a new release. This is perfect for documentation updates, code formatting, and development workflow improvements.
 
@@ -400,6 +412,7 @@ cd docs && npm run build
 ### Before Submitting
 
 1. **Code Quality Checks**
+
    ```bash
    npm run lint
    npm test
@@ -455,6 +468,7 @@ A: Document breaking changes clearly and provide migration guidance. Use semanti
 ## Recognition
 
 Contributors are recognized in:
+
 - GitHub contributor list
 - Release notes for significant contributions
 - Documentation acknowledgments

@@ -3,8 +3,8 @@
 layout: home
 
 hero:
-  name: "Variant-Linker"
-  text: "CLI and library for genetic variant annotation"
+  name: 'Variant-Linker'
+  text: 'CLI and library for genetic variant annotation'
   tagline: Built on Ensembl VEP and Variant Recoder APIs for comprehensive variant analysis
   actions:
     - theme: brand

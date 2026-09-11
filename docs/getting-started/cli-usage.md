@@ -56,6 +56,7 @@ echo "1-65568-A-C" | variant-linker --output TSV --vep_params "CADD=1,hgvs=1"
 ```
 
 **Streaming Features:**
+
 - Automatic detection when no input files are specified and stdin is available
 - Memory-efficient chunked processing (default: 100 variants per API call)
 - Incremental output with header printed once
@@ -69,6 +70,7 @@ Variant-Linker supports structural variants including copy number variants (CNVs
 ### CNV Input Format
 
 CNVs use the format: `chr:start-end:TYPE` where:
+
 - **chr**: Chromosome (1-22, X, Y, M)
 - **start**: Start coordinate (1-based)
 - **end**: End coordinate (1-based, inclusive)
@@ -76,13 +78,13 @@ CNVs use the format: `chr:start-end:TYPE` where:
 
 ### Supported CNV Types
 
-| Type | Description | VEP Format |
-|------|-------------|------------|
-| `DEL` | Deletion | `deletion` |
-| `DUP` | Duplication | `duplication` |
-| `CNV` | Generic copy number variant | `CNV` |
-| `INS` | Insertion | `CNV` (default) |
-| `INV` | Inversion | `CNV` (default) |
+| Type  | Description                 | VEP Format      |
+| ----- | --------------------------- | --------------- |
+| `DEL` | Deletion                    | `deletion`      |
+| `DUP` | Duplication                 | `duplication`   |
+| `CNV` | Generic copy number variant | `CNV`           |
+| `INS` | Insertion                   | `CNV` (default) |
+| `INV` | Inversion                   | `CNV` (default) |
 
 ### CNV Examples
 
@@ -104,67 +106,67 @@ variant-linker --variant "22:10000-20000:CNV" --scoring_config_path scoring/cnv_
 
 When processing CNVs, additional columns are automatically included in CSV/TSV output:
 
-| Column | Description |
-|--------|-------------|
-| `BP_Overlap` | Base pairs overlapping with features |
-| `Percentage_Overlap` | Percentage of feature overlap |
-| `Phenotypes` | Associated phenotypes from databases |
-| `DosageSensitivity` | Gene dosage sensitivity scores |
+| Column               | Description                          |
+| -------------------- | ------------------------------------ |
+| `BP_Overlap`         | Base pairs overlapping with features |
+| `Percentage_Overlap` | Percentage of feature overlap        |
+| `Phenotypes`         | Associated phenotypes from databases |
+| `DosageSensitivity`  | Gene dosage sensitivity scores       |
 
 ## Command-Line Options
 
 ### Input Options
 
-| Option | Short | Description |
-|--------|-------|-------------|
-| `--variant` | `-v` | Specify a single genetic variant to be analyzed |
+| Option            | Short | Description                                       |
+| ----------------- | ----- | ------------------------------------------------- |
+| `--variant`       | `-v`  | Specify a single genetic variant to be analyzed   |
 | `--variants-file` | `-vf` | Path to a file containing variants (one per line) |
-| `--variants` | `-vs` | Comma-separated list of variants |
-| `--vcf-input` | `-vi` | Path to a VCF file containing variants |
+| `--variants`      | `-vs` | Comma-separated list of variants                  |
+| `--vcf-input`     | `-vi` | Path to a VCF file containing variants            |
 
 ### Output Options
 
-| Option | Short | Description |
-|--------|-------|-------------|
-| `--output` | `-o` | Output format: JSON, CSV, TSV, VCF (default: JSON) |
-| `--save` | `-s` | Filename to save results (prints to console if not specified) |
+| Option     | Short | Description                                                   |
+| ---------- | ----- | ------------------------------------------------------------- |
+| `--output` | `-o`  | Output format: JSON, CSV, TSV, VCF (default: JSON)            |
+| `--save`   | `-s`  | Filename to save results (prints to console if not specified) |
 
 ### API Parameters
 
-| Option | Short | Description |
-|--------|-------|-------------|
-| `--vep_params` | `--vp` | VEP annotation parameters in key=value format, comma-separated (default: "CADD=1") |
+| Option             | Short  | Description                                                                               |
+| ------------------ | ------ | ----------------------------------------------------------------------------------------- |
+| `--vep_params`     | `--vp` | VEP annotation parameters in key=value format, comma-separated (default: "CADD=1")        |
 | `--recoder_params` | `--rp` | Variant Recoder parameters in key=value format, comma-separated (default: "vcf_string=1") |
 
 ### Family Analysis Options
 
-| Option | Short | Description |
-|--------|-------|-------------|
-| `--ped` | `-p` | Path to PED file defining family structure |
-| `--calculate-inheritance` | `-ci` | Enable inheritance pattern analysis |
-| `--sample-map` | `-sm` | Comma-separated sample IDs for Index, Mother, Father |
+| Option                    | Short | Description                                          |
+| ------------------------- | ----- | ---------------------------------------------------- |
+| `--ped`                   | `-p`  | Path to PED file defining family structure           |
+| `--calculate-inheritance` | `-ci` | Enable inheritance pattern analysis                  |
+| `--sample-map`            | `-sm` | Comma-separated sample IDs for Index, Mother, Father |
 
 ### Scoring Options
 
-| Option | Short | Description |
-|--------|-------|-------------|
+| Option                  | Short   | Description                                 |
+| ----------------------- | ------- | ------------------------------------------- |
 | `--scoring_config_path` | `--scp` | Path to the scoring configuration directory |
 
 ### Custom Annotation Options
 
-| Option | Short | Description |
-|--------|-------|-------------|
-| `--bed-file` | `--bf` | Path to BED file(s) containing genomic regions. Can be used multiple times |
-| `--gene-list` | `--gl` | Path to text file(s) with gene symbols/IDs (one per line). Can be used multiple times |
-| `--json-genes` | `--jg` | Path to JSON file(s) containing gene information. Can be used multiple times |
-| `--json-gene-mapping` | | JSON string to map fields in JSON gene files (required with --json-genes) |
+| Option                | Short  | Description                                                                           |
+| --------------------- | ------ | ------------------------------------------------------------------------------------- |
+| `--bed-file`          | `--bf` | Path to BED file(s) containing genomic regions. Can be used multiple times            |
+| `--gene-list`         | `--gl` | Path to text file(s) with gene symbols/IDs (one per line). Can be used multiple times |
+| `--json-genes`        | `--jg` | Path to JSON file(s) containing gene information. Can be used multiple times          |
+| `--json-gene-mapping` |        | JSON string to map fields in JSON gene files (required with --json-genes)             |
 
 ### Configuration Options
 
-| Option | Short | Description |
-|--------|-------|-------------|
-| `--config` | `-c` | Path to JSON configuration file |
-| `--debug` | `-d` | Enable debug mode for detailed logging |
+| Option         | Short | Description                                                                  |
+| -------------- | ----- | ---------------------------------------------------------------------------- |
+| `--config`     | `-c`  | Path to JSON configuration file                                              |
+| `--debug`      | `-d`  | Enable debug mode for detailed logging                                       |
 | `--chunk-size` | `-cs` | Number of variants to process per API batch in streaming mode (default: 100) |
 
 ## Configuration File Usage
@@ -194,6 +196,7 @@ variant-linker --config config.json
 ## Output Formats
 
 ### JSON Output
+
 Default format providing complete annotation data:
 
 ```bash
@@ -201,6 +204,7 @@ variant-linker --variant "rs6025" --output JSON
 ```
 
 ### CSV/TSV Output
+
 Tabular format with "flatten by consequence" strategy:
 
 ```bash
@@ -209,6 +213,7 @@ variant-linker --variant "rs6025" --output TSV
 ```
 
 ### VCF Output
+
 Annotated VCF format with `VL_CSQ` INFO field:
 
 ```bash
@@ -300,14 +305,17 @@ variant-linker --vcf-input input.vcf --output VCF --save annotated.vcf
 ## Performance Considerations
 
 ### Batch Size Optimization
+
 - Single variants: No chunking needed
 - Small batches (< 200 variants): Processed in single API calls
 - Large batches (> 200 variants): Automatically chunked for optimal performance
 
 ### Assembly Selection
+
 Variant-Linker automatically detects the appropriate genome assembly (GRCh37/GRCh38) based on variant coordinates, but you can specify assembly-specific endpoints if needed.
 
 ### Retry and Rate Limiting
+
 The tool automatically handles API rate limits and temporary failures with exponential backoff retry logic.
 
 ## Streaming Considerations
@@ -315,21 +323,25 @@ The tool automatically handles API rate limits and temporary failures with expon
 When using streaming mode with stdin input, keep these considerations in mind:
 
 ### Output Format Recommendations
+
 - **TSV/CSV**: Optimal for streaming pipelines due to incremental output and easy parsing
 - **JSON**: Works but outputs complete JSON objects, less ideal for line-by-line processing
 
 ### Performance Tuning
+
 - **Chunk Size**: Adjust `--chunk-size` based on your use case:
   - Smaller chunks (10-50): Better for real-time processing and faster initial output
   - Larger chunks (100-200): Better throughput for batch processing
   - Default 100 provides a good balance for most use cases
 
 ### Limitations in Streaming Mode
+
 - File output options (`--save`, `--output-file`) are disabled in streaming mode
 - Use shell redirection instead: `cat input.txt | variant-linker --output TSV > output.tsv`
 - VCF output in streaming mode has limited header preservation capabilities
 
 ### Pipeline Integration
+
 Streaming mode is designed for Unix-style pipeline integration:
 
 ```bash
@@ -347,6 +359,6 @@ gunzip -c huge_variants.txt.gz | \
 ## Next Steps
 
 - Learn about [VCF and PED file handling](../guides/vcf-and-ped-files.md)
-- Explore [inheritance analysis features](../guides/inheritance-analysis.md)  
+- Explore [inheritance analysis features](../guides/inheritance-analysis.md)
 - Set up [custom scoring](../guides/scoring-engine.md)
 - Add [custom annotations with local files](../guides/custom-annotations.md)

@@ -7,6 +7,7 @@ The documentation is built with Docusaurus but you may encounter dependency issu
 ### Option 1: Simple HTML Preview (Immediate)
 
 Open this file in your browser to see the documentation structure:
+
 ```
 docs/preview.html
 ```
@@ -14,6 +15,7 @@ docs/preview.html
 ### Option 2: Fix Dependencies and Run Docusaurus
 
 1. **Clean and reinstall:**
+
    ```bash
    cd docs
    rm -rf node_modules package-lock.json
@@ -22,6 +24,7 @@ docs/preview.html
    ```
 
 2. **If still having issues, try with Yarn:**
+
    ```bash
    cd docs
    yarn install
@@ -32,7 +35,7 @@ docs/preview.html
    ```bash
    # Install nvm if you don't have it
    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
-   
+
    # Use Node 18 (more stable with Docusaurus)
    nvm install 18
    nvm use 18
@@ -46,6 +49,7 @@ docs/preview.html
 The easiest way is to merge this branch to main, which will trigger automatic deployment to GitHub Pages:
 
 1. **Merge to main:**
+
    ```bash
    git checkout main
    git merge docs/docusaurus-documentation
@@ -62,6 +66,7 @@ The easiest way is to merge this branch to main, which will trigger automatic de
 ## 📚 What's Been Implemented
 
 ✅ **Complete Documentation Structure:**
+
 - Landing page with features overview
 - Installation and CLI usage guides
 - Comprehensive guides for VCF/PED files, inheritance analysis, scoring
@@ -69,6 +74,7 @@ The easiest way is to merge this branch to main, which will trigger automatic de
 - Auto-generated API reference (TypeDoc integration)
 
 ✅ **Modern Documentation Features:**
+
 - Search functionality
 - Dark/light mode toggle
 - Mobile responsive design
@@ -76,6 +82,7 @@ The easiest way is to merge this branch to main, which will trigger automatic de
 - Hot reload during development
 
 ✅ **Content Migration:**
+
 - Converted 577-line monolithic README into structured documentation
 - Organized content into logical sections
 - Added detailed examples and tutorials
@@ -84,12 +91,14 @@ The easiest way is to merge this branch to main, which will trigger automatic de
 ## 🚀 Benefits of the New Setup
 
 **For Users:**
+
 - Professional, searchable documentation site
 - Mobile-friendly access to all information
 - Clear navigation and organization
 - Always up-to-date with latest code changes
 
 **For Developers:**
+
 - "Docs as code" approach - maintain docs like code
 - Automatic API documentation from JSDoc comments
 - Easy contribution workflow via pull requests

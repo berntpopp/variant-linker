@@ -80,7 +80,12 @@ const stats = getCacheStats();
 For full two-tier cache functionality:
 
 ```javascript
-const { getCacheAsync, hasCacheAsync, clearCacheAsync, getComprehensiveCacheStats } = require('./src/cache');
+const {
+  getCacheAsync,
+  hasCacheAsync,
+  clearCacheAsync,
+  getComprehensiveCacheStats,
+} = require('./src/cache');
 
 // Async operations that check both memory and persistent caches
 const data = await getCacheAsync('key');
@@ -135,6 +140,7 @@ When persistent caching is enabled:
 ### LRU Eviction
 
 When memory cache reaches `maxSize`:
+
 - Least recently used item is evicted from memory
 - Item remains in persistent cache (if enabled)
 - Accessing evicted item promotes it back to memory
@@ -242,6 +248,7 @@ The enhanced cache is fully backward compatible. No code changes required for ex
 ### Enabling Persistent Cache
 
 1. Update `config/apiConfig.json`:
+
    ```json
    {
      "cache": {
@@ -308,15 +315,15 @@ async function processVariants(variants) {
   for (const variant of variants) {
     // Check cache first (both memory and persistent)
     let result = await getCacheAsync(variant);
-    
+
     if (!result) {
       // Not in cache, process variant
       result = await processVariant(variant);
-      
+
       // Cache for future use (24 hour TTL)
       await cacheManager.set(variant, result, 86400000);
     }
-    
+
     console.log(`Processed ${variant}:`, result);
   }
 }
@@ -329,9 +336,9 @@ const { getCacheManager } = require('./src/cache');
 
 async function warmCache(commonVariants) {
   const cacheManager = getCacheManager();
-  
+
   for (const variant of commonVariants) {
-    if (!await cacheManager.has(variant)) {
+    if (!(await cacheManager.has(variant))) {
       const result = await processVariant(variant);
       await cacheManager.set(variant, result);
       console.log(`Warmed cache for ${variant}`);
@@ -349,6 +356,7 @@ node scripts/cache-demo.js
 ```
 
 This demonstrates:
+
 - Basic cache operations
 - LRU eviction behavior
 - TTL functionality
@@ -370,6 +378,7 @@ npm test
 ```
 
 Test coverage includes:
+
 - LRU eviction behavior
 - TTL expiration
 - Persistent file operations

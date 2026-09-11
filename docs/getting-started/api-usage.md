@@ -5,6 +5,7 @@ Variant-Linker can be used as both a command-line tool and a JavaScript library.
 ## Overview: API vs CLI
 
 ### When to Use the API
+
 - **Node.js applications**: Integrating variant annotation into existing JavaScript/Node.js projects
 - **Custom workflows**: Building complex pipelines with custom logic and data processing
 - **Real-time processing**: Interactive applications requiring immediate responses
@@ -12,6 +13,7 @@ Variant-Linker can be used as both a command-line tool and a JavaScript library.
 - **Custom error handling**: Applications requiring specific error handling strategies
 
 ### When to Use the CLI
+
 - **Standalone analysis**: One-off variant annotation tasks
 - **Batch processing**: Large-scale file-based variant processing
 - **Shell scripting**: Integration into bash/shell-based workflows
@@ -36,9 +38,9 @@ async function analyzeVariants() {
     // Single variant analysis
     const result = await analyzeVariant({
       variant: 'rs6025',
-      output: 'JSON'
+      output: 'JSON',
     });
-    
+
     console.log(result);
   } catch (error) {
     console.error('Analysis failed:', error.message);
@@ -55,14 +57,14 @@ const { analyzeVariant } = require('variant-linker');
 
 async function processBatch() {
   const variants = ['rs6025', 'ENST00000366667:c.803C>T', 'rs1799963'];
-  
+
   const result = await analyzeVariant({
     variants: variants,
     recoderOptions: { vcf_string: '1' },
     vepOptions: { CADD: '1', SIFT: '1', PolyPhen: '1' },
-    output: 'JSON'
+    output: 'JSON',
   });
-  
+
   return result;
 }
 ```
@@ -72,6 +74,7 @@ async function processBatch() {
 ### 1. Configuration
 
 #### CLI Configuration
+
 ```bash
 # File-based configuration
 variant-linker --config config.json --scoring_config_path scoring/nephro_variant_score/
@@ -81,6 +84,7 @@ variant-linker --variant "rs6025" --vep_params "CADD=1,SIFT=1" --output JSON
 ```
 
 #### API Configuration
+
 ```javascript
 // Object-based configuration
 const { analyzeVariant, scoring } = require('variant-linker');
@@ -90,19 +94,20 @@ const scoringConfig = await scoring.readScoringConfigFromFiles('scoring/nephro_v
 
 // Or parse configuration objects directly
 const scoringConfig = scoring.parseScoringConfig(
-  { variables: { /* variable definitions */ } },
-  { formulas: { /* scoring formulas */ } }
+  { variables: {/* variable definitions */} },
+  { formulas: {/* scoring formulas */} }
 );
 
 const result = await analyzeVariant({
   variant: 'rs6025',
   vepOptions: { CADD: '1', SIFT: '1' },
   scoringConfig: scoringConfig,
-  output: 'JSON'
+  output: 'JSON',
 });
 ```
 
 **Key Differences:**
+
 - **CLI**: Uses file paths and comma-separated parameter strings
 - **API**: Uses JavaScript objects and structured data
 - **Scoring**: CLI loads from directory path; API accepts parsed objects or loads via helper functions
@@ -110,6 +115,7 @@ const result = await analyzeVariant({
 ### 2. Error Handling
 
 #### CLI Error Handling
+
 ```bash
 # CLI exits with status codes
 variant-linker --variant "invalid" --output JSON
@@ -123,12 +129,13 @@ echo $?  # Returns non-zero exit code on failure
 ```
 
 #### API Error Handling
+
 ```javascript
 // API throws exceptions
 try {
   const result = await analyzeVariant({
     variant: 'invalid',
-    output: 'JSON'
+    output: 'JSON',
   });
 } catch (error) {
   // Handle different error types
@@ -143,6 +150,7 @@ try {
 ```
 
 **Key Differences:**
+
 - **CLI**: Uses exit codes (0 = success, non-zero = error) and JSON error output
 - **API**: Throws typed exceptions with detailed error information
 - **Recovery**: API allows for programmatic error recovery and retry logic
@@ -150,6 +158,7 @@ try {
 ### 3. Input/Output Handling
 
 #### CLI Input/Output
+
 ```bash
 # File-based I/O
 variant-linker --vcf-input sample.vcf --output VCF --save annotated.vcf
@@ -159,6 +168,7 @@ variant-linker --variant "rs6025" --output JSON > result.json
 ```
 
 #### API Input/Output
+
 ```javascript
 // Data structure I/O
 const fs = require('fs');
@@ -170,17 +180,18 @@ const variants = convertVcfToEnsemblFormat(vcfContent);
 
 const results = await analyzeVariant({
   variants: variants,
-  output: 'JSON'
+  output: 'JSON',
 });
 
 // Results are JavaScript objects/arrays
-results.forEach(variant => {
+results.forEach((variant) => {
   console.log(`Variant: ${variant.input}`);
   console.log(`Consequences: ${variant.most_severe_consequence}`);
 });
 ```
 
 **Key Differences:**
+
 - **CLI**: File streams, command-line strings, and saved output files
 - **API**: JavaScript arrays, objects, and in-memory data structures
 - **Flexibility**: API provides direct access to parsed data structures
@@ -188,6 +199,7 @@ results.forEach(variant => {
 ### 4. Dependencies and Environment
 
 #### CLI Environment
+
 ```bash
 # Global installation
 npm install -g variant-linker
@@ -203,6 +215,7 @@ done
 ```
 
 #### API Environment
+
 ```javascript
 // Node.js environment required
 const { analyzeVariant, cache } = require('variant-linker');
@@ -222,6 +235,7 @@ if (typeof window !== 'undefined') {
 ```
 
 **Key Differences:**
+
 - **CLI**: Requires Node.js runtime, works in any shell environment
 - **API**: Node.js for full functionality, limited browser support via webpack bundle
 - **File operations**: CLI has full file system access; browser API is limited
@@ -229,6 +243,7 @@ if (typeof window !== 'undefined') {
 ### 5. State Management and Caching
 
 #### CLI State Management
+
 ```bash
 # Each CLI invocation is independent
 variant-linker --variant "rs6025" --output JSON  # Fresh cache
@@ -238,20 +253,22 @@ variant-linker --variant "rs6025" --output JSON  # Cache may be used
 ```
 
 #### API State Management
+
 ```javascript
 const { analyzeVariant, cache } = require('variant-linker');
 
 // Persistent cache across API calls
-await analyzeVariant({ variant: 'rs6025', output: 'JSON' });  // API call made
-await analyzeVariant({ variant: 'rs6025', output: 'JSON' });  // Cache hit
+await analyzeVariant({ variant: 'rs6025', output: 'JSON' }); // API call made
+await analyzeVariant({ variant: 'rs6025', output: 'JSON' }); // Cache hit
 
 // Manual cache management
-cache.clearCache();  // Clear all cached data
+cache.clearCache(); // Clear all cached data
 
 // Cache is shared across all API usage in the same Node.js process
 ```
 
 **Key Differences:**
+
 - **CLI**: Independent cache per process, automatically cleaned up
 - **API**: Persistent cache within Node.js process, manual management available
 - **Memory**: API cache persists until process ends or manually cleared
@@ -259,93 +276,94 @@ cache.clearCache();  // Clear all cached data
 ## Advanced API Usage
 
 ### Custom Error Handling
+
 ```javascript
 const { analyzeVariant, apiHelper } = require('variant-linker');
 
 async function robustAnalysis(variants) {
   const results = [];
   const errors = [];
-  
+
   for (const variant of variants) {
     try {
       const result = await analyzeVariant({
         variant: variant,
-        output: 'JSON'
+        output: 'JSON',
       });
       results.push(result);
     } catch (error) {
       errors.push({ variant, error: error.message });
-      
+
       // Implement custom retry logic
-      if (error.statusCode === 429) {  // Rate limited
-        await new Promise(resolve => setTimeout(resolve, 5000));
+      if (error.statusCode === 429) {
+        // Rate limited
+        await new Promise((resolve) => setTimeout(resolve, 5000));
         // Retry logic here
       }
     }
   }
-  
+
   return { results, errors };
 }
 ```
 
 ### Custom Processing Pipeline
+
 ```javascript
-const { 
-  variantRecoderPost, 
-  vepRegionsAnnotation, 
+const {
+  variantRecoderPost,
+  vepRegionsAnnotation,
   processVariantLinking,
-  scoring 
+  scoring,
 } = require('variant-linker');
 
 async function customPipeline(variants) {
   // Step 1: Variant recoding
   const recodedVariants = await variantRecoderPost(variants, {
-    vcf_string: '1'
+    vcf_string: '1',
   });
-  
+
   // Step 2: VEP annotation
   const annotations = await vepRegionsAnnotation(recodedVariants, {
     CADD: '1',
     SIFT: '1',
-    PolyPhen: '1'
+    PolyPhen: '1',
   });
-  
+
   // Step 3: Custom processing
   const processed = processVariantLinking(recodedVariants, annotations);
-  
+
   // Step 4: Apply custom scoring
-  const scoringConfig = scoring.parseScoringConfig(
-    myVariableConfig,
-    myFormulaConfig
-  );
-  
+  const scoringConfig = scoring.parseScoringConfig(myVariableConfig, myFormulaConfig);
+
   const scored = scoring.applyScoring(processed, scoringConfig);
-  
+
   return scored;
 }
 ```
 
 ### Memory-Efficient Batch Processing
+
 ```javascript
 async function processLargeBatch(variants, chunkSize = 200) {
   const results = [];
-  
+
   for (let i = 0; i < variants.length; i += chunkSize) {
     const chunk = variants.slice(i, i + chunkSize);
-    
+
     const chunkResults = await analyzeVariant({
       variants: chunk,
-      output: 'JSON'
+      output: 'JSON',
     });
-    
+
     results.push(...chunkResults);
-    
+
     // Optional: Clear cache periodically to manage memory
     if (i % 1000 === 0) {
       cache.clearCache();
     }
   }
-  
+
   return results;
 }
 ```
@@ -353,6 +371,7 @@ async function processLargeBatch(variants, chunkSize = 200) {
 ## Best Practices
 
 ### API Best Practices
+
 1. **Error Handling**: Always wrap API calls in try-catch blocks
 2. **Batching**: Use batch processing for multiple variants to reduce API calls
 3. **Caching**: Monitor cache usage and clear when processing large datasets
@@ -360,12 +379,14 @@ async function processLargeBatch(variants, chunkSize = 200) {
 5. **Memory Management**: Consider clearing cache for long-running processes
 
 ### When to Choose API vs CLI
+
 - **Choose API** for: Integration into applications, custom error handling, memory efficiency, real-time processing
 - **Choose CLI** for: File-based workflows, shell scripting, standalone analysis, standard output formats
 
 ## Migration from CLI to API
 
 ### CLI Command Translation
+
 ```bash
 # CLI command
 variant-linker --variants-file variants.txt --scoring_config_path scoring/nephro/ --output CSV --save results.csv
@@ -379,18 +400,18 @@ const { analyzeVariant, scoring } = require('variant-linker');
 async function migrate() {
   // Read variants file
   const variantsFile = fs.readFileSync('variants.txt', 'utf8');
-  const variants = variantsFile.split('\n').filter(line => line.trim());
-  
+  const variants = variantsFile.split('\n').filter((line) => line.trim());
+
   // Load scoring configuration
   const scoringConfig = await scoring.readScoringConfigFromFiles('scoring/nephro/');
-  
+
   // Analyze variants
   const results = await analyzeVariant({
     variants: variants,
     scoringConfig: scoringConfig,
-    output: 'CSV'
+    output: 'CSV',
   });
-  
+
   // Save results
   fs.writeFileSync('results.csv', results);
 }

@@ -15,23 +15,29 @@ We're excited to announce the launch of the new Variant-Linker documentation web
 ## What's New
 
 ### 🎯 Organized Structure
+
 The documentation is now organized into clear sections:
+
 - **Getting Started** - Installation and basic usage
 - **Guides** - In-depth tutorials for specific features
 - **API Reference** - Auto-generated from JSDoc comments
 - **Benchmarking** - Performance testing and optimization
 
 ### 📖 Comprehensive Guides
+
 We've created detailed guides covering:
+
 - VCF and PED file handling
 - Inheritance pattern analysis
 - Custom scoring engine configuration
 - Best practices and troubleshooting
 
 ### ⚡ Auto-Generated API Documentation
+
 Using TypeDoc integration, our API documentation is automatically generated from the source code comments, ensuring it stays up-to-date with every release.
 
 ### 🔄 Automated Deployment
+
 The documentation is automatically built and deployed on every push to the main branch using GitHub Actions, so you'll always have access to the latest information.
 
 ## Getting Started
@@ -52,6 +58,7 @@ Check out our [Contributing Guide](/contributing) to get started.
 ## What's Next
 
 We're continuously improving the documentation based on user feedback. Upcoming additions include:
+
 - Video tutorials for complex workflows
 - More real-world examples and case studies
 - Integration guides for popular bioinformatics pipelines

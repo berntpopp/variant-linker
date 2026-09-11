@@ -11,28 +11,33 @@ A powerful CLI tool and JavaScript library for genetic variant annotation using 
 ## Quick Start
 
 ### Installation
+
 ```bash
 git clone https://github.com/berntpopp/variant-linker.git
 cd variant-linker
-npm install
+npm ci
 npm link  # Optional: for global CLI access
 ```
 
 #### Windows Installation Issues
+
 If the `variant-linker` command isn't recognized on Windows PowerShell:
 
 **Option 1: Use npx (recommended)**
+
 ```powershell
 npx variant-linker --help
 ```
 
 **Option 2: Reinstall globally**
+
 ```powershell
 npm uninstall -g variant-linker
 npm install -g variant-linker
 ```
 
 ### Basic Usage
+
 ```bash
 # Analyze a single variant
 variant-linker --variant "rs6025" --output JSON
@@ -57,6 +62,7 @@ variant-linker --variant "rs6025" --proxy http://user:pass@proxy.company.com:808
 ```
 
 ## Key Features
+
 - 🔄 **Variant Translation** - Convert between rsID, HGVS, VCF, and CNV formats
 - 📊 **VEP Annotations** - Comprehensive variant effect predictions including CNV-specific annotations
 - 🧬 **Genome Assembly Liftover** - Transparent hg19→hg38 coordinate conversion
@@ -78,14 +84,14 @@ const { analyzeVariant, variantRecoderPost, vepRegionsAnnotation } = require('va
 // Analyze a single variant
 const result = await analyzeVariant({
   variant: 'rs6025',
-  output: 'JSON'
+  output: 'JSON',
 });
 
 // Analyze a copy number variant (CNV)
 const cnvResult = await analyzeVariant({
   variant: '7:117559600-117559609:DEL',
   vepOptions: { Phenotypes: '1', numbers: '1' },
-  output: 'JSON'
+  output: 'JSON',
 });
 
 // Batch processing with mixed variant types
@@ -93,7 +99,7 @@ const batchResult = await analyzeVariant({
   variants: ['rs123', 'ENST00000366667:c.803C>T', '1:1000-5000:DUP'],
   recoderOptions: { vcf_string: '1' },
   vepOptions: { CADD: '1', hgvs: '1' },
-  output: 'JSON'
+  output: 'JSON',
 });
 ```
 
@@ -102,15 +108,27 @@ const batchResult = await analyzeVariant({
 Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
 
 ### Development Setup
+
 ```bash
 git clone https://github.com/berntpopp/variant-linker.git
 cd variant-linker
-npm install
-npm test
-npm run lint
+npm ci
+npm --prefix docs ci
+npm run verify
 ```
 
 See our [Contributing Guide](https://berntpopp.github.io/variant-linker/contributing) for detailed information.
+
+Use Node.js >=22.14. `npm run verify` runs the local and CI gates, including strict
+lint/types/formatting, files below 650 lines, offline tests and >=81% coverage.
+[AGENTS.md](AGENTS.md) defines the shared agent development contract.
+
+For large VCFs, use `--stream --chunk-size 100`; inheritance requires full-file mode.
+JSON/SCHEMA streams emit one compact JSON document per chunk. `--spreadsheet-safe`
+protects CSV/TSV text cells for spreadsheet import. Scoring formulas and conditions
+are **trusted executable JavaScript**, not sandboxed configuration.
+See [reliable processing](docs/guide/reliable-processing.md) for output, cache,
+liftover, benchmark and failure semantics.
 
 ## License
 

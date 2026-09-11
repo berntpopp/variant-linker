@@ -71,3 +71,13 @@ Interfaces: retain analyzeVariant and public exports; normalize assembly/request
 - [ ] Run clean-lock installation checks, documentation build, browser/packed-package smoke and production dependency audit; distinguish unresolved advisories by reachability.
 - [ ] Dispatch an independent final review against spec, audit and complete diff; fix important findings and run relevant gates again.
 - [ ] Record evidence, coverage percentages, audit dispositions and exact final command outcomes in execution ledger. Leave local changes reviewable; do not publish or merge.
+
+## Accepted additions during execution
+
+The user authorized regular commits and a consolidated draft PR, then requested
+Dependabot, GitHub security checks and faster local/CI gates. These extend the
+same plan: enable available repository security features, schedule reviewed
+root/docs/Actions updates, add CodeQL and dependency review, cache static analysis,
+parallelize independent checks, and deploy only artifacts from the successful
+verification run. Keep all strict and coverage thresholds intact. Run the complete
+local verifier before pushing the branch; inspect the draft PR checks before handoff.
