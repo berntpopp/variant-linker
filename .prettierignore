@@ -1,6 +1,8 @@
 node_modules/
 dist/
 coverage/
+coverage-*/
+temp/
 docs/.vitepress/dist/
 docs/.vitepress/cache/
 local_data/

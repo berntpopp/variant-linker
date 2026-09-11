@@ -16,7 +16,9 @@ Use Node >=22.14. Install committed dependency trees with `npm ci` and
 
 `npm run verify` runs the same gates as CI: lint, formatting, strict source types,
 physical line limits, offline tests with coverage, browser build, package smoke checks,
-documentation build and production dependency audit. Run focused tests while editing.
+documentation build and complete root/docs dependency audits. Run `npm run verify:static` for parallel static gates; use
+`npm run test:focus -- test/example.test.js` for one offline suite. Content caches
+and incremental types live under node_modules/.cache; npm ci clears them.
 
 - `npm run lint`: ESLint correctness rules; warnings fail.
 - `npm run format:check`: non-mutating formatting; `npm run format` applies it.
@@ -32,9 +34,8 @@ Write a failing behavior regression before fixes. Use real parsers and temporary
 mock the external HTTP boundary. Unexpected external requests must fail immediately.
 Put shared fixtures in `test/support`; use the CLI helper so child processes inherit
 the offline guard. Never hide integration failures behind conditional assertions.
-Run one suite with `npx mocha --no-config --require ./test/support/offline-setup.cjs
-test/example.test.js` (join the command onto one line). The default config discovers
-all ordinary suites; live tests have a separate command.
+Use `npm run test:focus -- test/example.test.js` for focused work. The default
+config discovers all ordinary suites; live tests have a separate command.
 
 Keep source, tests, scripts and handwritten configs below 650 physical lines;
 split by responsibility. Keep AGENTS.md and CLAUDE.md below 80 lines each.

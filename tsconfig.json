@@ -12,7 +12,9 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "types": ["node"],
-    "lib": ["ES2022", "DOM"]
+    "lib": ["ES2022", "DOM"],
+    "incremental": true,
+    "tsBuildInfoFile": "./node_modules/.cache/typescript/variant-linker.tsbuildinfo"
   },
   "include": ["src/**/*.js", "src/**/*.d.ts"],
   "exclude": ["node_modules", "dist", "test", "docs"]

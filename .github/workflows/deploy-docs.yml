@@ -1,80 +1,22 @@
 name: Deploy Documentation
-
 on:
-  push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
-
+  workflow_call:
 permissions:
   contents: read
-  pages: write
-  id-token: write
-
 concurrency:
-  group: 'pages'
-  cancel-in-progress: true
-
+  group: pages-${{ github.ref }}
+  cancel-in-progress: false
 jobs:
-  # Build job
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-
-      - name: Install root dependencies
-        run: |
-          rm -rf node_modules package-lock.json
-          npm cache clean --force
-          npm install --legacy-peer-deps
-
-      - name: Install documentation dependencies
-        run: |
-          cd docs
-          # Clean install for docs
-          rm -rf node_modules package-lock.json
-          npm cache clean --force
-          npm install
-
-      - name: Build documentation site
-        run: |
-          cd docs
-          npm run build
-
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: docs-build
-          path: docs/.vitepress/dist
-
-      - name: Setup GitHub Pages
-        if: github.ref == 'refs/heads/main'
-        uses: actions/configure-pages@v4
-
-      - name: Upload pages artifact
-        if: github.ref == 'refs/heads/main'
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: './docs/.vitepress/dist'
-
-  # Deploy job (only on main branch)
   deploy:
-    if: github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    needs: build
     steps:
-      - name: Deploy to GitHub Pages
+      - uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
         id: deployment
-        uses: actions/deploy-pages@v4
