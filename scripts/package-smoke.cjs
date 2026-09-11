@@ -30,7 +30,26 @@ async function smoke() {
     Blob,
     fetch: async (request) => {
       requests.push(typeof request === 'string' ? request : request.url);
-      return new Response(JSON.stringify({ fixture: true }), {
+      const data = requests.at(-1).includes('/vep/')
+        ? [
+            {
+              input: (await request.json()).variants[0],
+              seq_region_name: '1',
+              start: 100,
+              end: 100,
+              allele_string: 'A/C',
+              most_severe_consequence: 'missense_variant',
+              transcript_consequences: [
+                {
+                  gene_symbol: 'GENE1',
+                  transcript_id: 'ENST1',
+                  consequence_terms: ['missense_variant'],
+                },
+              ],
+            },
+          ]
+        : { fixture: true };
+      return new Response(JSON.stringify(data), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       });
@@ -59,6 +78,56 @@ async function smoke() {
     },
   });
   assert.equal(scored[0].score, 6);
+  const annotated = await context.VariantLinker.analyzeVariant({
+    variants: ['1-100-A-C'],
+    features: {
+      featuresByChrom: {},
+      geneSets: new Map([['GENE1', [{ source: '/public/genes.json', type: 'json' }]]]),
+    },
+  });
+  assert.equal(annotated.annotationData[0].user_feature_overlap[0].source, 'genes.json');
+
+  const browser = context.VariantLinker;
+  const vcf = browser.parseVcfText(
+    '##fileformat=VCFv4.2\n##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tchild\tmom\tdad\n1\t100\tpublic-fixture\tA\tC\t.\tPASS\t.\tGT\t0/1\t0/0\t0/0\n'
+  );
+  const features = browser.buildFeatures({
+    beds: [{ source: 'regions.bed', regions: browser.parseBedText('1\t99\t100\tregion\n') }],
+    geneLists: [{ source: 'genes.txt', genes: browser.parseGeneListText('GENE1\n') }],
+    jsonGenes: [
+      {
+        source: 'genes.json',
+        genes: browser.parseJsonGenesData([{ symbol: 'GENE1', rank: 7 }], {
+          identifier: 'symbol',
+          dataFields: ['rank'],
+        }),
+      },
+    ],
+  });
+  const family = await browser.analyzeVariant({
+    variants: vcf.variantsToProcess,
+    vcfInput: true,
+    vcfRecordMap: vcf.vcfRecordMap,
+    vcfHeaderLines: vcf.headerLines,
+    samples: vcf.samples,
+    pedigreeData: browser.parsePedigreeText(
+      'fam child dad mom 1 2\nfam mom 0 0 2 1\nfam dad 0 0 1 1\n'
+    ),
+    calculateInheritance: true,
+    features,
+    scoringConfig: {
+      variables: {},
+      formulas: { annotationLevel: [{ score: '7' }], transcriptLevel: [] },
+    },
+  });
+  assert.equal(family.annotationData[0].score, 7);
+  assert.equal(family.annotationData[0].user_feature_overlap.length, 3);
+  const familyVcf = browser.filterAndFormatResults(family, null, 'VCF', {});
+  assert.match(familyVcf, /VL_DED_INH=de_novo/);
+  assert.match(familyVcf, /GT\t0\/1\t0\/0\t0\/0/);
+  const dataset = JSON.parse(browser.filterAndFormatResults(family, null, 'SCHEMA', {}));
+  assert.equal(dataset['@type'], 'Dataset');
+  assert.equal(dataset.annotationData.length, 1);
 
   const npmCli = process.env.npm_execpath;
   if (!npmCli) throw new Error('Run this smoke through npm run test:package');

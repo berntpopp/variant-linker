@@ -17,6 +17,7 @@ export default defineConfig({
     nav: [
       { text: 'Home', link: '/' },
       { text: 'Documentation', link: '/introduction' },
+      { text: 'Package & Browser', link: '/guide/browser-and-package' },
       { text: 'Blog', link: '/blog/' },
     ],
 
@@ -32,6 +33,7 @@ export default defineConfig({
               { text: 'Installation', link: '/getting-started/installation' },
               { text: 'CLI Usage', link: '/getting-started/cli-usage' },
               { text: 'API Usage', link: '/getting-started/api-usage' },
+              { text: 'Browser & Package', link: '/guide/browser-and-package' },
             ],
           },
           {
@@ -43,6 +45,8 @@ export default defineConfig({
               { text: 'Inheritance Analysis', link: '/guides/inheritance-analysis' },
               { text: 'Scoring Engine', link: '/guides/scoring-engine' },
               { text: 'Custom Annotations', link: '/guides/custom-annotations' },
+              { text: 'Proxy Configuration', link: '/guides/proxy-configuration' },
+              { text: 'Cache Configuration', link: '/CACHE' },
             ],
           },
           { text: 'Benchmarking', link: '/benchmarking' },

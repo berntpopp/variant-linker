@@ -3,15 +3,18 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const { dataset: defaults } = require('../../config/benchmarkConfig.json');
 const ROOT = path.resolve(__dirname, '../..');
 const sha256 = (value) => crypto.createHash('sha256').update(value).digest('hex');
 
 /** Derive an equivalent, ordered HGVS workload without making annotation calls. */
 function deriveRecoderDataset(options = {}) {
   const sourceManifestPath =
-    options.sourceManifestPath ?? path.join(ROOT, 'docs/benchmarks/1000genomes-1000.json');
+    options.sourceManifestPath ??
+    path.join(ROOT, defaults.provenanceDirectory, `1000genomes-${defaults.count}.json`);
   const source = JSON.parse(fs.readFileSync(sourceManifestPath, 'utf8'));
-  if (source.source.assembly !== 'GRCh37') throw new Error('Expected a GRCh37 dataset');
+  if (source.source.assembly !== defaults.assembly)
+    throw new Error(`Expected a ${defaults.assembly} dataset`);
   const inputPath = path.resolve(ROOT, source.dataset.path);
   const input = fs.readFileSync(inputPath);
   if (sha256(input) !== source.dataset.sha256) throw new Error('Source VCF SHA-256 mismatch');
@@ -24,40 +27,39 @@ function deriveRecoderDataset(options = {}) {
   const identifiers = variants.map((line) => {
     const [chromosome, position, , ref, alt] = line.split('\t');
     if (
-      chromosome !== '22' ||
+      chromosome !== defaults.chromosome ||
       !/^[1-9]\d*$/.test(position) ||
       !/^[ACGT]$/.test(ref) ||
       !/^[ACGT]$/.test(alt) ||
       ref === alt
     )
       throw new Error('Expected a chromosome 22 biallelic SNV');
-    return `NC_000022.10:g.${position}${ref}>${alt}`;
+    return `${defaults.refseqAccession}:g.${position}${ref}>${alt}`;
   });
   const output = identifiers.join('\n') + '\n';
   const count = identifiers.length;
   const outputPath =
     options.outputPath ??
-    path.join(ROOT, `local_data/benchmarks/1000genomes-chr22-grch37-${count}.hgvs.txt`);
+    path.join(ROOT, defaults.dataDirectory, `${defaults.name}-${count}.hgvs.txt`);
   const manifestPath =
-    options.manifestPath ?? path.join(ROOT, `docs/benchmarks/recoder-${count}.json`);
+    options.manifestPath ?? path.join(ROOT, defaults.provenanceDirectory, `recoder-${count}.json`);
   const manifest = {
     schemaVersion: 1,
     source: {
       provenancePath: path.relative(ROOT, sourceManifestPath).replace(/\\/g, '/'),
       vcfPath: path.relative(ROOT, inputPath).replace(/\\/g, '/'),
       sha256: source.dataset.sha256,
-      assembly: 'GRCh37',
+      assembly: defaults.assembly,
       originalSourceUrl: source.source.url ?? null,
     },
     transformation: {
-      algorithm:
-        'One-to-one VCF file-order conversion of biallelic SNVs to NC_000022.10:g.{POS}{REF}>{ALT}; retain original one-based coordinate and alleles',
-      accession: 'NC_000022.10',
-      chromosome: '22',
+      algorithm: `One-to-one VCF file-order conversion of biallelic SNVs to ${defaults.refseqAccession}:g.{POS}{REF}>{ALT}; retain original one-based coordinate and alleles`,
+      accession: defaults.refseqAccession,
+      chromosome: defaults.chromosome,
       assembly: 'GRCh37.p13 primary chromosome sequence (unchanged by assembly patches)',
-      accessionEvidenceUrl: 'https://www.ncbi.nlm.nih.gov/nuccore/NC_000022.10',
-      assemblyEvidenceUrl: 'https://www.ncbi.nlm.nih.gov/datasets/genome/GCF_000001405.25/',
-      evidenceCheckedOn: '2026-09-11',
+      accessionEvidenceUrl: defaults.accessionEvidenceUrl,
+      assemblyEvidenceUrl: defaults.assemblyEvidenceUrl,
+      evidenceCheckedOn: defaults.evidenceCheckedOn,
       referenceValidation:
         'Reference alleles are inherited from the SHA-verified public VCF. This derivation does not independently download or compare the reference sequence.',
       samplePolicy: 'No sample genotype fields; identical sites and order to the VCF benchmark',

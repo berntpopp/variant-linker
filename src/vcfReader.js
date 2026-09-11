@@ -13,7 +13,7 @@ const { projectGenotype } = require('./inheritance/genotypeUtils');
  * @property {number} pos
  * @property {string} ref
  * @property {string} alt
- * @property {number} altIndex One-based ALT position in original record.
+ * @property {number} altIndex One-based ALT position; zero for reference-only passthrough records.
  * @property {string} originalRecordId Stable source line identity.
  * @property {string} originalLine Exact fields without line terminator.
  * @property {ParsedRecord & {CHROM:string, REF:string}} originalRecord
@@ -158,33 +158,7 @@ async function* iterateVcfRecords(filePath) {
 async function readVariantsFromVcf(filePath) {
   if (!fs.existsSync(filePath)) throw new Error(`VCF file not found: ${filePath}`);
   try {
-    const lines = fs.readFileSync(filePath, 'utf8').split(/\r?\n/);
-    const headerLines = lines.filter((line) => line.startsWith('#'));
-    if (!headerLines.length) throw new Error('No header lines found in VCF file');
-    const headerText = headerLines.join('\n');
-    const parser = new VCF({ header: headerText });
-    const samples = samplesFromHeader(headerLines);
-    /** @type {Map<string,VcfEntry>} */
-    const vcfRecordMap = new Map();
-    const variantsToProcess = [];
-    for (const [index, line] of lines.entries()) {
-      if (!line.trim() || line.startsWith('#')) continue;
-      for (const entry of parseEntries(parser, line, `line:${index + 1}`, samples)) {
-        const previous = vcfRecordMap.get(entry.key);
-        if (previous) {
-          previous.records ||= [{ ...previous, genotypes: new Map(previous.genotypes) }];
-          previous.records.push(entry);
-          // Conflicting independent observations are uncertain for inheritance.
-          for (const [sample, gt] of previous.genotypes) {
-            if (gt !== entry.genotypes.get(sample)) previous.genotypes.set(sample, './.');
-          }
-        } else {
-          vcfRecordMap.set(entry.key, entry);
-          if (!entry.passthrough) variantsToProcess.push(entry.key);
-        }
-      }
-    }
-    return { variantsToProcess, vcfRecordMap, headerText, headerLines, samples };
+    return parseVcfText(fs.readFileSync(filePath, 'utf8'));
   } catch (error) {
     throw new Error(
       `Error parsing VCF file: ${error instanceof Error ? error.message : String(error)}`,
@@ -193,4 +167,38 @@ async function readVariantsFromVcf(filePath) {
   }
 }
 
-module.exports = { readVariantsFromVcf, iterateVcfRecords };
+/** Parse complete VCF text with the same original-record and genotype contracts as the file reader.
+ * @param {string} text
+ * @returns {{variantsToProcess:string[],vcfRecordMap:Map<string,VcfEntry>,headerText:string,headerLines:string[],samples:string[]}}
+ */
+function parseVcfText(text) {
+  const lines = text.split(/\r?\n/);
+  const headerLines = lines.filter((line) => line.startsWith('#'));
+  if (!headerLines.length) throw new Error('No header lines found in VCF file');
+  const headerText = headerLines.join('\n');
+  const parser = new VCF({ header: headerText });
+  const samples = samplesFromHeader(headerLines);
+  /** @type {Map<string,VcfEntry>} */
+  const vcfRecordMap = new Map();
+  const variantsToProcess = [];
+  for (const [index, line] of lines.entries()) {
+    if (!line.trim() || line.startsWith('#')) continue;
+    for (const entry of parseEntries(parser, line, `line:${index + 1}`, samples)) {
+      const previous = vcfRecordMap.get(entry.key);
+      if (previous) {
+        previous.records ||= [{ ...previous, genotypes: new Map(previous.genotypes) }];
+        previous.records.push(entry);
+        // Conflicting independent observations are uncertain for inheritance.
+        for (const [sample, gt] of previous.genotypes) {
+          if (gt !== entry.genotypes.get(sample)) previous.genotypes.set(sample, './.');
+        }
+      } else {
+        vcfRecordMap.set(entry.key, entry);
+        if (!entry.passthrough) variantsToProcess.push(entry.key);
+      }
+    }
+  }
+  return { variantsToProcess, vcfRecordMap, headerText, headerLines, samples };
+}
+
+module.exports = { readVariantsFromVcf, iterateVcfRecords, parseVcfText };

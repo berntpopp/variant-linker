@@ -95,6 +95,9 @@ export interface AnalysisResult extends ProcessingResult {
   pedigreeData?: Record<string, import('./dataTypes').PedigreeMember>;
 }
 export interface CliParams extends Omit<AnalysisParams, 'variants' | 'sampleMap'> {
+  apiBaseUrl?: string;
+  apiTimeout?: number;
+  apiConcurrency?: 1 | 2;
   variants?: string;
   sampleMap?: string;
   output: string;

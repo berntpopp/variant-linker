@@ -19,3 +19,30 @@
 - GitHub configuration: weekly grouped npm root/docs and Actions updates; CodeQL JavaScript/TypeScript and Actions; dependency review and full audits. Remote main had 123 existing Dependabot alerts; local refreshed locks report zero. Existing alerts require merged locks and rescanning.
 - Efficiency: content-aware ESLint/Prettier caches, incremental strict types, parallel independent gates, focused test/watch commands. Warm `npm run verify:static` passed in 5.87s. Wrapper/API subset runs 61 tests in about 2s after removing irrelevant retry waits. Dedicated retry regressions remain.
 - CI verifies Node22/24 once and shares the tested bundle and Pages artifacts with reusable release/deploy workflows. All actions are pinned; draft PR cannot publish or deploy.
+
+## Final expanded scope
+
+- Implemented provenanced 1,000-variant 1000 Genomes VCF and paired genomic-HGVS
+  Recoder workloads, bounded downloads, capture/replay, exact response validation
+  and measured live/replay reports under `docs/benchmarks/`.
+- Added optional two-worker POST batching, shared rate/cooldown control and full
+  Retry-After handling. Retained sequential defaults because live Recoder results
+  were variable. Both complete recordings reproduce identical outputs at either
+  concurrency setting.
+- Replaced executable scoring JavaScript with a restricted expression interpreter.
+  Three parallel Opus xhigh reviews plus focused scoring/batching reviews were
+  reproduced and dispositioned in the adversarial review report.
+- Added shared in-memory VCF/PED/BED/gene parsers and public browser/package
+  integration documentation. The built bundle exercises features, inheritance,
+  scoring and VCF/Schema.org output; an isolated packed consumer also builds with
+  a browser bundler without resolving repository development dependencies.
+- Centralized transport, batching, pacing, cache timing, scoring budgets, CLI
+  presets and benchmark defaults in JSON configuration, with validated overrides.
+- User explicitly authorized merging after Actions pass, choosing an appropriate
+  version bump and verifying the package release. Selected 4.0.0 because the
+  scoring language and Node compatibility baseline change; the installed release
+  analyzer independently confirms the intended squash commit produces a major.
+- Package version is set before the verified build. Final `npm run verify` passed
+  in 92.04 seconds: 611 tests; 91.59% statements/lines, 86.59% branches and 97.86%
+  functions. The isolated 4.0.0 tarball passes Node API/CLI usage and a fresh browser
+  consumer build. Actions, conditional merge and release confirmation follow.

@@ -4,7 +4,9 @@ const path = require('path');
 const crypto = require('crypto');
 const os = require('os');
 const debug = require('debug')('variant-linker:persistent-cache');
-/** @typedef {{location?: string, ttl?: number, maxSize?: string, enabled?: boolean}} PersistentConfig */
+const apiConfig = require('../../config/apiConfig.json');
+/** @typedef {{location?: string, ttl?: number, maxSize?: string, enabled?: boolean,
+ * lockTimeoutMs?: number, lockPollMs?: number, cleanupIntervalMs?: number}} PersistentConfig */
 /** @typedef {{owner: string, key: string, data: unknown, expiresAt: number, createdAt: number}} Entry */
 /** @typedef {{bytes: number, expiresAt: number, createdAt: number}} IndexEntry */
 /** @typedef {{queue: Promise<unknown>, index: Map<string, IndexEntry>, generation: string,
@@ -20,8 +22,16 @@ class PersistentCache {
   constructor(config = {}) {
     this.disabled = typeof window !== 'undefined' || typeof fs.mkdirSync !== 'function';
     this.isBrowser = this.disabled;
-    this.defaultTTL = config.ttl ?? 86400000;
-    this.maxSize = this._parseSizeString(config.maxSize || '100MB');
+    const defaults = apiConfig.cache.persistent;
+    this.defaultTTL = config.ttl ?? defaults.ttl;
+    this.maxSize = this._parseSizeString(config.maxSize || defaults.maxSize);
+    this.lockTimeoutMs = config.lockTimeoutMs ?? defaults.lockTimeoutMs;
+    this.lockPollMs = config.lockPollMs ?? defaults.lockPollMs;
+    this.cleanupIntervalMs = config.cleanupIntervalMs ?? defaults.cleanupIntervalMs;
+    for (const key of /** @type {const} */ (['lockTimeoutMs', 'lockPollMs', 'cleanupIntervalMs'])) {
+      if (!Number.isFinite(this[key]) || this[key] <= 0)
+        throw new Error(`${key} must be a positive finite number`);
+    }
     this.cacheDir = '';
     this.writeErrors = 0;
     this.maintenanceErrors = 0;
@@ -36,9 +46,7 @@ class PersistentCache {
       nextCleanup: 0,
     };
     if (this.disabled) return;
-    const location = config.location
-      ? config.location.replace(/^~(?=[/\\]|$)/, os.homedir())
-      : path.join(os.homedir(), '.cache', 'variant-linker');
+    const location = (config.location || defaults.location).replace(/^~(?=[/\\]|$)/, os.homedir());
     this.cacheDir = path.join(path.resolve(location), 'entries-v1');
     this._ensureCacheDir();
     const shared = directories.get(this.cacheDir);
@@ -114,7 +122,7 @@ class PersistentCache {
   _exclusive(operation) {
     const run = this.state.queue.then(async () => {
       const lockPath = path.join(this.cacheDir, '.lock');
-      const deadline = Date.now() + 10000;
+      const deadline = Date.now() + this.lockTimeoutMs;
       for (;;) {
         try {
           await fs.promises.mkdir(lockPath);
@@ -126,7 +134,7 @@ class PersistentCache {
           )
             throw error;
           await new Promise((resolve) => {
-            setTimeout(resolve, 10);
+            setTimeout(resolve, Math.min(this.lockPollMs, Math.max(1, deadline - Date.now())));
           });
         }
       }
@@ -260,7 +268,7 @@ class PersistentCache {
           for (const [existing, metadata] of this.state.index) {
             if (metadata.expiresAt <= Date.now()) await this._removeOwned(existing);
           }
-          this.state.nextCleanup = Date.now() + 60000;
+          this.state.nextCleanup = Date.now() + this.cleanupIntervalMs;
         }
         const replacedBytes = this.state.index.get(name)?.bytes || 0;
         for (const existing of this.state.index.keys()) {

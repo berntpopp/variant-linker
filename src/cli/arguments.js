@@ -6,6 +6,16 @@ function parseArguments(rawArgs) {
   return /** @type {import('../analysisTypes').CliParams} */ (
     yargs(rawArgs) // Use process.argv.slice(2) for better compatibility
       .option('config', { alias: 'c', description: 'Path to configuration file', type: 'string' })
+      .option('api-base-url', { description: 'Explicit Ensembl REST mirror URL', type: 'string' })
+      .option('api-timeout', {
+        description: 'Timeout per HTTP attempt in milliseconds',
+        type: 'number',
+      })
+      .option('api-concurrency', {
+        description: 'Maximum concurrent POST batches (1 or 2)',
+        type: 'number',
+        choices: [1, 2],
+      })
       .option('variant', {
         alias: 'v',
         description: 'Single variant to analyze (VCF or HGVS)',

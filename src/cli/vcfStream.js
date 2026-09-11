@@ -1,4 +1,5 @@
 'use strict';
+const defaults = require('../../config/cliDefaults.json');
 const fs = require('fs');
 const { finished } = require('stream/promises');
 const { iterateVcfRecords } = require('../vcfReader');
@@ -49,7 +50,7 @@ async function processVcfStream(params) {
           if (!entry.passthrough) chunk.push(entry.key);
         }
       }
-      if (retainedEntries >= (params.chunkSize || 100)) await flush();
+      if (retainedEntries >= (params.chunkSize ?? defaults.chunkSize)) await flush();
     }
     if (retainedEntries) await flush();
     if (first && !common.streamState.failed) {

@@ -17,6 +17,7 @@ const debugAll = require('debug')('variant-linker:all');
 const { getValueByPath } = require('./utils/pathUtils');
 const { evaluateExpression } = require('./scoring/expressionEvaluator');
 const { checkName } = require('./scoring/expressionParser');
+const { limits } = require('./scoring/limits');
 
 /**
  * Parses scoring configuration from the provided JSON objects.
@@ -158,7 +159,7 @@ function evaluateCondition(rawValue, condition, defaultValue) {
     if (!(e instanceof Error)) throw e;
     const diagnostic = JSON.stringify([condition, e.message]);
     if (!conditionWarnings.has(diagnostic)) {
-      if (conditionWarnings.size >= 256) conditionWarnings.clear();
+      if (conditionWarnings.size >= limits.conditionWarningCacheSize) conditionWarnings.clear();
       conditionWarnings.add(diagnostic);
       console.warn(`Error evaluating condition "${condition}": ${e.message}`);
     }

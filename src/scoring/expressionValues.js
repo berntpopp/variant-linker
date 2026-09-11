@@ -1,5 +1,6 @@
 'use strict';
 const { checkName } = require('./expressionParser');
+const { limits } = require('./limits');
 /** @typedef {{remaining:number, depth:number}} Budget */
 /** @param {Budget} budget @param {number} [amount] */
 function spend(budget, amount = 1) {
@@ -33,7 +34,7 @@ function read(value, key) {
 function array(value, budget) {
   if (!Array.isArray(value)) throw new Error('Scoring method requires an array');
   const length = read(value, 'length');
-  if (typeof length !== 'number' || length > 10000)
+  if (typeof length !== 'number' || length > limits.maxCollectionSize)
     throw new Error('Scoring collection size limit exceeded');
   spend(budget, length);
   return Array.from({ length }, (_, index) => read(value, String(index)));
@@ -43,7 +44,7 @@ function array(value, budget) {
  * @returns {string|number|boolean|null|undefined}
  */
 function primitive(value, budget, depth = 0) {
-  if (depth > 64) throw new Error('Scoring value depth limit exceeded');
+  if (depth > limits.maxValueDepth) throw new Error('Scoring value depth limit exceeded');
   if (typeof value === 'string') spend(budget, value.length);
   if (value === null || ['undefined', 'number', 'string', 'boolean'].includes(typeof value)) {
     return /** @type {string|number|boolean|null|undefined} */ (value);

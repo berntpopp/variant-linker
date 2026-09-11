@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 'use strict';
 const { parseArguments } = require('./cli/arguments');
+const defaults = require('../config/cliDefaults.json');
 const {
   readConfigFile,
   mergeParams,
@@ -28,8 +29,19 @@ async function main() {
   }
   const params = mergeParams(readConfigFile(argv.config), argv);
   if (params.debug && params.debug > 0) enableDebugging(params.debug, params.log_file);
-  params.assembly = params.assembly || 'hg38';
-  params.proxyConfig = parseProxyConfig(params.proxy, params.proxyAuth);
+  params.assembly = params.assembly || defaults.assembly;
+  params.proxyConfig = params.proxy ? parseProxyConfig(params.proxy, params.proxyAuth) : null;
+  params.requestOptions = {
+    ...params.requestOptions,
+    ...(params.apiBaseUrl || params.requestOptions?.baseUrl || process.env.ENSEMBL_BASE_URL
+      ? {
+          baseUrl:
+            params.apiBaseUrl || params.requestOptions?.baseUrl || process.env.ENSEMBL_BASE_URL,
+        }
+      : {}),
+    ...(params.apiTimeout !== undefined ? { timeoutMs: params.apiTimeout } : {}),
+    ...(params.apiConcurrency !== undefined ? { postConcurrency: params.apiConcurrency } : {}),
+  };
   params.isStreaming =
     !params.variant &&
     !params.variants &&

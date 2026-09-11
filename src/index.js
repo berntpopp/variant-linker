@@ -24,11 +24,37 @@ const apiHelper = require('./apiHelper');
 const cache = require('./cache');
 const configHelper = require('./configHelper');
 const schemaMapper = require('./schemaMapper');
+const { parseVcfText, readVariantsFromVcf, iterateVcfRecords } = require('./vcfReader');
+const { parsePedigreeText, readPedigree } = require('./pedReader');
+const {
+  parseBedText,
+  parseGeneListText,
+  parseJsonGenesData,
+  buildFeatures,
+  loadFeatures,
+} = require('./featureParser');
+const { formatAnnotationsToVcf } = require('./vcfFormatter');
+const { annotateOverlaps } = require('./featureAnnotator');
+const inheritance = require('./inheritance');
 
 const exportsObj = {
   // Core analysis functions
   analyzeVariant,
   detectInputFormat,
+  parseVcfText,
+  parsePedigreeText,
+  parseBedText,
+  parseGeneListText,
+  parseJsonGenesData,
+  buildFeatures,
+  formatAnnotationsToVcf,
+  annotateOverlaps,
+  inheritance,
+  // File-system helpers are available to Node callers.
+  readVariantsFromVcf,
+  iterateVcfRecords,
+  readPedigree,
+  loadFeatures,
 
   // API calls and format conversion
   variantRecoder,

@@ -1,0 +1,28 @@
+{
+  "repeat": 1,
+  "assembly": "GRCh38",
+  "format": "table",
+  "stage": "annotation",
+  "variantType": "all",
+  "variantCount": "all",
+  "processTimeoutMs": 300000,
+  "maxOutputBytes": 52428800,
+  "maxOldSpaceMiB": 4096,
+  "dataset": {
+    "count": 1000,
+    "maxCompressedBytes": 8388608,
+    "timeoutMs": 120000,
+    "sourceUrl": "https://ftp.1000genomes.ebi.ac.uk/vol1/ftp/release/20130502/ALL.chr22.phase3_shapeit2_mvncall_integrated_v5b.20130502.genotypes.vcf.gz",
+    "name": "1000genomes-chr22-grch37",
+    "project": "1000 Genomes Project, phase 3",
+    "release": "20130502, integrated v5b chromosome 22",
+    "assembly": "GRCh37",
+    "chromosome": "22",
+    "refseqAccession": "NC_000022.10",
+    "accessionEvidenceUrl": "https://www.ncbi.nlm.nih.gov/nuccore/NC_000022.10",
+    "assemblyEvidenceUrl": "https://www.ncbi.nlm.nih.gov/datasets/genome/GCF_000001405.25/",
+    "evidenceCheckedOn": "2026-09-11",
+    "dataDirectory": "local_data/benchmarks",
+    "provenanceDirectory": "docs/benchmarks"
+  }
+}

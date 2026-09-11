@@ -11,6 +11,9 @@ Use Node >=22.14. Install committed dependency trees with `npm ci` and
 - VCF/inheritance modules: preserve original records, target ALT, phase and uncertainty.
 - Scoring uses a bounded expression interpreter; never reintroduce eval or Function.
 - Serializers own schema and escaping. Keep browser and Node capabilities explicit.
+- Keep tunable defaults in `config/`; runtime options override defaults. Do not copy
+  timeout, batching, pacing, scoring-budget or CLI-preset values into implementations.
+  Validate protocol and security constraints even when values come from configuration.
 
 ## Required local checks
 

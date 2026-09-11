@@ -87,6 +87,32 @@ describe('Benchmark measurement boundaries', () => {
     assert.ok(
       result.runs.every((run) => run.measurement.inputSha256 === result.measurement.inputSha256)
     );
+    assert.ok(result.runs.every((run) => run.profile.requestCount === 2));
+    assert.ok(result.runs.every((run) => run.profile.maxInFlight === 1));
+    assert.equal(result.runs[0].annotationSha256, result.runs[1].annotationSha256);
     assert.doesNotMatch(child.stdout, /variant-linker:/);
+  });
+
+  it('isolates Variant Recoder timing without making VEP requests', function () {
+    this.timeout(35000);
+    const child = spawnSync(
+      process.execPath,
+      [
+        path.resolve('scripts/benchmark.js'),
+        '--input',
+        scenario.inputFile,
+        '--stage',
+        'recoder',
+        '--format',
+        'json',
+      ],
+      { encoding: 'utf8', timeout: 30000 }
+    );
+    assert.equal(child.status, 0, child.stderr);
+    const [result] = JSON.parse(child.stdout);
+    assert.equal(result.variantsProcessed, 2);
+    assert.equal(result.measurement.stage, 'recoder');
+    assert.equal(result.profile.requestCount, 1);
+    assert.equal(result.profile.requests[0].endpoint, '/variant_recoder/homo_sapiens');
   });
 });

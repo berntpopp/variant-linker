@@ -1,0 +1,1251 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-09-11T01:30:25.188Z",
+  "datasetProvenance": [
+    "docs/benchmarks/1000genomes-1000.json",
+    "docs/benchmarks/recoder-1000.json"
+  ],
+  "command": "node scripts/benchmark/summarize.cjs",
+  "scope": "Measured live and offline runs; unknown or unavailable metrics remain null. Failures are retained.",
+  "live": [
+    {
+      "name": "vep-live-baseline",
+      "source": "local_data/benchmarks/vep-live-baseline.json",
+      "sourceSha256": "d3e72a84f36f0e87d8c1b0743bb0a1e36c60dc9474ab43883cb406dfbea031b9",
+      "status": "success",
+      "error": null,
+      "wallSeconds": 11.576198999999999,
+      "startupSeconds": 1.4859061000000002,
+      "annotations": 1000,
+      "annotationsPerSecond": 86.38414042467653,
+      "failures": 0,
+      "annotationSha256": "cacc505297f254004dd9f6d6bc5a9865173b085bcd9eec62e417a05cdbbfa2b1",
+      "annotationHashScope": "Initial JSON serialization order",
+      "http": {
+        "requests": 5,
+        "retries": null,
+        "chunks": null,
+        "failedAttempts": 0,
+        "maxInFlight": 1,
+        "latencyMs": {
+          "p50": 2033.7081000000007,
+          "p95": 2863.332,
+          "total": 9967.028
+        },
+        "requestBodyBytes": null,
+        "responseBodyBytes": null,
+        "requestsDetail": [
+          {
+            "index": 0,
+            "method": "POST",
+            "host": "grch37.rest.ensembl.org",
+            "endpoint": "/vep/homo_sapiens/region",
+            "inputCount": 200,
+            "startMs": 596.4622999999999,
+            "durationMs": 1436.9753000000003,
+            "status": 200,
+            "errorCode": null,
+            "rateLimit": {
+              "limit": "55000",
+              "remaining": "54999",
+              "resetSeconds": "3216",
+              "periodSeconds": "3600"
+            }
+          },
+          {
+            "index": 1,
+            "method": "POST",
+            "host": "grch37.rest.ensembl.org",
+            "endpoint": "/vep/homo_sapiens/region",
+            "inputCount": 200,
+            "startMs": 2036.2716999999998,
+            "durationMs": 1285.5550000000003,
+            "status": 200,
+            "errorCode": null,
+            "rateLimit": {
+              "limit": "55000",
+              "remaining": "54998",
+              "resetSeconds": "3214",
+              "periodSeconds": "3600"
+            }
+          },
+          {
+            "index": 2,
+            "method": "POST",
+            "host": "grch37.rest.ensembl.org",
+            "endpoint": "/vep/homo_sapiens/region",
+            "inputCount": 200,
+            "startMs": 3326.7777,
+            "durationMs": 2863.332,
+            "status": 200,
+            "errorCode": null,
+            "rateLimit": {
+              "limit": "55000",
+              "remaining": "54997",
+              "resetSeconds": "3211",
+              "periodSeconds": "3600"
+            }
+          },
+          {
+            "index": 3,
+            "method": "POST",
+            "host": "grch37.rest.ensembl.org",
+            "endpoint": "/vep/homo_sapiens/region",
+            "inputCount": 200,
+            "startMs": 6194.5403,
+            "durationMs": 2033.7081000000007,
+            "status": 200,
+            "errorCode": null,
+            "rateLimit": {
+              "limit": "55000",
+              "remaining": "54996",
+              "resetSeconds": "3209",
+              "periodSeconds": "3600"
+            }
+          },
+          {
+            "index": 4,
+            "method": "POST",
+            "host": "grch37.rest.ensembl.org",
+            "endpoint": "/vep/homo_sapiens/region",
+            "inputCount": 200,
+            "startMs": 8235.2312,
+            "durationMs": 2347.4575999999997,
+            "status": 200,
+            "errorCode": null,
+            "rateLimit": {
+              "limit": "55000",
+              "remaining": "54995",
+              "resetSeconds": "3207",
+              "periodSeconds": "3600"
+            }
+          }
+        ]
+      },
+      "peakRssBytes": 88170496,
+      "eventLoopDelayMs": {
+        "mean": 16.099072414910857,
+        "p95": 22.462463,
+        "max": 79.167487
+      },
+      "measurement": {
+        "scope": "End-to-end CLI wall time including Node startup, annotation, and serialization",
+        "stage": "annotation",
+        "startupScope": "Separate CLI --semver invocation; not subtracted from annotation timings",
+        "inputSha256": "8e439d73dd7aad3da6d6a5f48ba3b7e0fa70d86069d793b2d1f622d4e1c55bec",
+        "inputFile": "C:\\development\\variant-linker\\local_data\\benchmarks\\1000genomes-chr22-grch37-1000.vcf",
+        "assembly": "hg19",
+        "node": "v22.14.0",
+        "variantLinker": "3.12.2",
+        "platform": "win32 10.0.26200 x64",
+        "fixtures": false,
+        "transport": "live",
+        "replaySha256": null,
+        "cache": false,
+        "diagnosticsEnabled": false,
+        "measuredAt": "2026-09-11T01:06:20.618Z"
+      }
+    },
+    {
+      "name": "vep-live-concurrent",
+      "source": "local_data/benchmarks/vep-live-concurrent.json",
+      "sourceSha256": "30ddb8d08376eb5e9176a8f36b4785d5a601ed84723463e2ac2c3b571c771413",
+      "status": "success",
+      "error": null,
+      "wallSeconds": 7.9798917000000005,
+      "startupSeconds": 0.7500783,
+      "annotations": 1000,
+      "annotationsPerSecond": 125.31498391137312,
+      "failures": 0,
+      "annotationSha256": "95db9fc8671e41912978d1dfc23475b70dc3aed7d53e4ff7673c719c68c1291e",
+      "annotationHashScope": "Canonical object keys, array order retained",
+      "http": {
+        "requests": 5,
+        "retries": null,
+        "chunks": null,
+        "failedAttempts": 0,
+        "maxInFlight": 2,
+        "latencyMs": {
+          "p50": 2564.0065999999997,
+          "p95": 3397.2403,
+          "total": 12500.834499999999
+        },
+        "requestBodyBytes": null,
+        "responseBodyBytes": null,
+        "requestsDetail": [
+          {
+            "index": 0,
+            "method": "POST",
+            "host": "grch37.rest.ensembl.org",
+            "endpoint": "/vep/homo_sapiens/region",
+            "inputCount": 200,
+            "startMs": 412.91790000000003,
+            "durationMs": 1506.6389000000001,
+            "status": 200,
+            "errorCode": null,
+            "rateLimit": {
+              "limit": "55000",
+              "remaining": "54989",
+              "resetSeconds": "2892",
+              "periodSeconds": "3600"
+            }
+          },
+          {
+            "index": 1,
+            "method": "POST",
+            "host": "grch37.rest.ensembl.org",
+            "endpoint": "/vep/homo_sapiens/region",
+            "inputCount": 200,
+            "startMs": 527.2662,
+            "durationMs": 2025.5881,
+            "status": 200,
+            "errorCode": null,
+            "rateLimit": {
+              "limit": "55000",
+              "remaining": "54988",
+              "resetSeconds": "2891",
+              "periodSeconds": "3600"
+            }
+          },
+          {
+            "index": 2,
+            "method": "POST",
+            "host": "grch37.rest.ensembl.org",
+            "endpoint": "/vep/homo_sapiens/region",
+            "inputCount": 200,
+            "startMs": 1922.1141000000002,
+            "durationMs": 3007.3605999999995,
+            "status": 200,
+            "errorCode": null,
+            "rateLimit": {
+              "limit": "55000",
+              "remaining": "54987",
+              "resetSeconds": "2889",
+              "periodSeconds": "3600"
+            }
+          },
+          {
+            "index": 3,
+            "method": "POST",
+            "host": "grch37.rest.ensembl.org",
+            "endpoint": "/vep/homo_sapiens/region",
+            "inputCount": 200,
+            "startMs": 2555.3599,
+            "durationMs": 3397.2403,
+            "status": 200,
+            "errorCode": null,
+            "rateLimit": {
+              "limit": "55000",
+              "remaining": "54986",
+              "resetSeconds": "2887",
+              "periodSeconds": "3600"
+            }
+          },
+          {
+            "index": 4,
+            "method": "POST",
+            "host": "grch37.rest.ensembl.org",
+            "endpoint": "/vep/homo_sapiens/region",
+            "inputCount": 200,
+            "startMs": 4933.6394,
+            "durationMs": 2564.0065999999997,
+            "status": 200,
+            "errorCode": null,
+            "rateLimit": {
+              "limit": "55000",
+              "remaining": "54985",
+              "resetSeconds": "2886",
+              "periodSeconds": "3600"
+            }
+          }
+        ]
+      },
+      "peakRssBytes": 97906688,
+      "eventLoopDelayMs": {
+        "mean": 16.23854943187067,
+        "p95": 21.872639,
+        "max": 76.742655
+      },
+      "measurement": {
+        "scope": "End-to-end CLI wall time including Node startup, annotation, and serialization",
+        "stage": "annotation",
+        "postConcurrency": 2,
+        "timeoutMs": 60000,
+        "startupScope": "Separate CLI --semver invocation; not subtracted from annotation timings",
+        "inputSha256": "8e439d73dd7aad3da6d6a5f48ba3b7e0fa70d86069d793b2d1f622d4e1c55bec",
+        "inputFile": "C:\\development\\variant-linker\\local_data\\benchmarks\\1000genomes-chr22-grch37-1000.vcf",
+        "assembly": "hg19",
+        "node": "v22.14.0",
+        "variantLinker": "3.12.2",
+        "platform": "win32 10.0.26200 x64",
+        "fixtures": false,
+        "transport": "live",
+        "replaySha256": null,
+        "cache": false,
+        "diagnosticsEnabled": false,
+        "measuredAt": "2026-09-11T01:11:46.074Z"
+      }
+    },
+    {
+      "name": "recoder-live-baseline",
+      "source": "local_data/benchmarks/recoder-live-baseline.json",
+      "sourceSha256": "68a3dee930481a73959cc7a87c65aba58c43c1c0473fff9ce9e4e3ce0ee4309b",
+      "status": "success",
+      "error": null,
+      "wallSeconds": 54.810164799999995,
+      "startupSeconds": 0.4888432,
+      "annotations": 1000,
+      "annotationsPerSecond": 18.24479097351665,
+      "failures": 0,
+      "annotationSha256": "0f54e7aab259aa0e9a42642838949aed042996fb78c60551d4aaf509a544bd0c",
+      "annotationHashScope": "Initial JSON serialization order",
+      "http": {
+        "requests": 5,
+        "retries": null,
+        "chunks": null,
+        "failedAttempts": 0,
+        "maxInFlight": 1,
+        "latencyMs": {
+          "p50": 10298.786100000001,
+          "p95": 13921.834300000002,
+          "total": 54238.4608
+        },
+        "requestBodyBytes": null,
+        "responseBodyBytes": null,
+        "requestsDetail": [
+          {
+            "index": 0,
+            "method": "POST",
+            "host": "grch37.rest.ensembl.org",
+            "endpoint": "/variant_recoder/homo_sapiens",
+            "inputCount": 200,
+            "startMs": 76.23939999999999,
+            "durationMs": 10220.130500000001,
+            "status": 200,
+            "errorCode": null,
+            "rateLimit": {
+              "limit": "55000",
+              "remaining": "54994",
+              "resetSeconds": "3095",
+              "periodSeconds": "3600"
+            }
+          },
+          {
+            "index": 1,
+            "method": "POST",
+            "host": "grch37.rest.ensembl.org",
+            "endpoint": "/variant_recoder/homo_sapiens",
+            "inputCount": 200,
+            "startMs": 10299.859,
+            "durationMs": 8985.151600000001,
+            "status": 200,
+            "errorCode": null,
+            "rateLimit": {
+              "limit": "55000",
+              "remaining": "54993",
+              "resetSeconds": "3086",
+              "periodSeconds": "3600"
+            }
+          },
+          {
+            "index": 2,
+            "method": "POST",
+            "host": "grch37.rest.ensembl.org",
+            "endpoint": "/variant_recoder/homo_sapiens",
+            "inputCount": 200,
+            "startMs": 19288.4824,
+            "durationMs": 10298.786100000001,
+            "status": 200,
+            "errorCode": null,
+            "rateLimit": {
+              "limit": "55000",
+              "remaining": "54992",
+              "resetSeconds": "3076",
+              "periodSeconds": "3600"
+            }
+          },
+          {
+            "index": 3,
+            "method": "POST",
+            "host": "grch37.rest.ensembl.org",
+            "endpoint": "/variant_recoder/homo_sapiens",
+            "inputCount": 200,
+            "startMs": 29589.6182,
+            "durationMs": 10812.558299999997,
+            "status": 200,
+            "errorCode": null,
+            "rateLimit": {
+              "limit": "55000",
+              "remaining": "54991",
+              "resetSeconds": "3065",
+              "periodSeconds": "3600"
+            }
+          },
+          {
+            "index": 4,
+            "method": "POST",
+            "host": "grch37.rest.ensembl.org",
+            "endpoint": "/variant_recoder/homo_sapiens",
+            "inputCount": 200,
+            "startMs": 40404.2063,
+            "durationMs": 13921.834300000002,
+            "status": 200,
+            "errorCode": null,
+            "rateLimit": {
+              "limit": "55000",
+              "remaining": "54990",
+              "resetSeconds": "3051",
+              "periodSeconds": "3600"
+            }
+          }
+        ]
+      },
+      "peakRssBytes": 69046272,
+      "eventLoopDelayMs": {
+        "mean": 16.855298231631384,
+        "p95": 24.100863,
+        "max": 92.012543
+      },
+      "measurement": {
+        "scope": "End-to-end CLI wall time including Node startup, annotation, and serialization",
+        "stage": "recoder",
+        "startupScope": "Separate CLI --semver invocation; not subtracted from annotation timings",
+        "inputSha256": "9bec9502fd24f919a2955b202f5ba5ae89c2b20228c30ee0931c80f0fcad8ae1",
+        "inputFile": "C:\\development\\variant-linker\\local_data\\benchmarks\\1000genomes-chr22-grch37-1000.hgvs.txt",
+        "assembly": "hg19",
+        "node": "v22.14.0",
+        "variantLinker": "3.12.2",
+        "platform": "win32 10.0.26200 x64",
+        "fixtures": false,
+        "transport": "live",
+        "replaySha256": null,
+        "cache": false,
+        "diagnosticsEnabled": false,
+        "measuredAt": "2026-09-11T01:08:14.394Z"
+      }
+    },
+    {
+      "name": "recoder-live-concurrent",
+      "source": "local_data/benchmarks/recoder-live-concurrent.json",
+      "sourceSha256": "b320f2314658074b71b0fb5e8eced40ac0154f2cd7009092fd54c6e39cc52a82",
+      "status": "error",
+      "error": "CLI exited 1: Request deadline exceeded\n",
+      "wallSeconds": null,
+      "startupSeconds": 0.38448530000000003,
+      "annotations": null,
+      "annotationsPerSecond": null,
+      "failures": null,
+      "annotationSha256": null,
+      "annotationHashScope": "Canonical object keys, array order retained",
+      "http": null,
+      "peakRssBytes": null,
+      "eventLoopDelayMs": null,
+      "measurement": {
+        "scope": "End-to-end CLI wall time including Node startup, annotation, and serialization",
+        "stage": "recoder",
+        "postConcurrency": 2,
+        "timeoutMs": 60000,
+        "startupScope": "Separate CLI --semver invocation; not subtracted from annotation timings",
+        "inputSha256": "9bec9502fd24f919a2955b202f5ba5ae89c2b20228c30ee0931c80f0fcad8ae1",
+        "inputFile": "C:\\development\\variant-linker\\local_data\\benchmarks\\1000genomes-chr22-grch37-1000.hgvs.txt",
+        "assembly": "hg19",
+        "node": "v22.14.0",
+        "variantLinker": "3.12.2",
+        "platform": "win32 10.0.26200 x64",
+        "fixtures": false,
+        "transport": "live",
+        "replaySha256": null,
+        "cache": false,
+        "diagnosticsEnabled": false,
+        "measuredAt": "2026-09-11T01:12:58.723Z"
+      }
+    },
+    {
+      "name": "vep-matched-1",
+      "source": "local_data/benchmarks/vep-matched-1.json",
+      "sourceSha256": "63e8d51acdb12f7b9f1e3b703b9979967c7c8c448c6048f7c40ff1ed3ae1655c",
+      "status": "success",
+      "error": null,
+      "wallSeconds": 22.726284200000002,
+      "startupSeconds": 1.8579287999999998,
+      "annotations": 1000,
+      "annotationsPerSecond": 44.00191387204424,
+      "failures": 0,
+      "annotationSha256": "95db9fc8671e41912978d1dfc23475b70dc3aed7d53e4ff7673c719c68c1291e",
+      "annotationHashScope": "Canonical object keys, array order retained",
+      "http": {
+        "requests": 5,
+        "retries": 0,
+        "chunks": 5,
+        "failedAttempts": 0,
+        "maxInFlight": 1,
+        "latencyMs": {
+          "p50": 2112.723,
+          "p95": 12954.380100000002,
+          "total": 21174.738700000005
+        },
+        "requestBodyBytes": 26070,
+        "responseBodyBytes": 755066,
+        "requestsDetail": [
+          {
+            "index": 0,
+            "requestId": 0,
+            "attempt": 1,
+            "method": "POST",
+            "host": "grch37.rest.ensembl.org",
+            "endpoint": "/vep/homo_sapiens/region",
+            "inputCount": 200,
+            "startMs": 721.6086,
+            "durationMs": 2112.723,
+            "status": 200,
+            "errorCode": null,
+            "requestBodyBytes": 5214,
+            "responseBodyBytes": 114612,
+            "responseByteSource": "adapter-body",
+            "rateLimit": {
+              "limit": "55000",
+              "remaining": "54978",
+              "resetSeconds": "2322",
+              "periodSeconds": "3600"
+            }
+          },
+          {
+            "index": 1,
+            "requestId": 1,
+            "attempt": 1,
+            "method": "POST",
+            "host": "grch37.rest.ensembl.org",
+            "endpoint": "/vep/homo_sapiens/region",
+            "inputCount": 200,
+            "startMs": 2841.8233,
+            "durationMs": 2107.5968000000003,
+            "status": 200,
+            "errorCode": null,
+            "requestBodyBytes": 5214,
+            "responseBodyBytes": 148136,
+            "responseByteSource": "adapter-body",
+            "rateLimit": {
+              "limit": "55000",
+              "remaining": "54977",
+              "resetSeconds": "2320",
+              "periodSeconds": "3600"
+            }
+          },
+          {
+            "index": 2,
+            "requestId": 2,
+            "attempt": 1,
+            "method": "POST",
+            "host": "grch37.rest.ensembl.org",
+            "endpoint": "/vep/homo_sapiens/region",
+            "inputCount": 200,
+            "startMs": 4956.8666,
+            "durationMs": 12954.380100000002,
+            "status": 200,
+            "errorCode": null,
+            "requestBodyBytes": 5214,
+            "responseBodyBytes": 150944,
+            "responseByteSource": "adapter-body",
+            "rateLimit": {
+              "limit": "55000",
+              "remaining": "54976",
+              "resetSeconds": "2307",
+              "periodSeconds": "3600"
+            }
+          },
+          {
+            "index": 3,
+            "requestId": 3,
+            "attempt": 1,
+            "method": "POST",
+            "host": "grch37.rest.ensembl.org",
+            "endpoint": "/vep/homo_sapiens/region",
+            "inputCount": 200,
+            "startMs": 17917.208499999997,
+            "durationMs": 2175.8182000000015,
+            "status": 200,
+            "errorCode": null,
+            "requestBodyBytes": 5214,
+            "responseBodyBytes": 180282,
+            "responseByteSource": "adapter-body",
+            "rateLimit": {
+              "limit": "55000",
+              "remaining": "54975",
+              "resetSeconds": "2305",
+              "periodSeconds": "3600"
+            }
+          },
+          {
+            "index": 4,
+            "requestId": 4,
+            "attempt": 1,
+            "method": "POST",
+            "host": "grch37.rest.ensembl.org",
+            "endpoint": "/vep/homo_sapiens/region",
+            "inputCount": 200,
+            "startMs": 20104.002399999998,
+            "durationMs": 1824.2206000000006,
+            "status": 200,
+            "errorCode": null,
+            "requestBodyBytes": 5214,
+            "responseBodyBytes": 161092,
+            "responseByteSource": "adapter-body",
+            "rateLimit": {
+              "limit": "55000",
+              "remaining": "54974",
+              "resetSeconds": "2303",
+              "periodSeconds": "3600"
+            }
+          }
+        ]
+      },
+      "peakRssBytes": 87216128,
+      "eventLoopDelayMs": {
+        "mean": 17.527000120603013,
+        "p95": 27.000831,
+        "max": 231.211007
+      },
+      "measurement": {
+        "scope": "End-to-end CLI wall time including Node startup, annotation, and JSON serialization",
+        "git": {
+          "revision": "3e37d1eb3e3dc42291c9ffa4eef7d616113be277",
+          "dirty": true
+        },
+        "stage": "annotation",
+        "postConcurrency": 1,
+        "timeoutMs": 60000,
+        "startupScope": "Separate CLI --semver invocation; not subtracted from annotation timings",
+        "inputSha256": "8e439d73dd7aad3da6d6a5f48ba3b7e0fa70d86069d793b2d1f622d4e1c55bec",
+        "inputFile": "C:\\development\\variant-linker\\local_data\\benchmarks\\1000genomes-chr22-grch37-1000.vcf",
+        "assembly": "hg19",
+        "node": "v22.14.0",
+        "variantLinker": "3.12.2",
+        "platform": "win32 10.0.26200 x64",
+        "fixtures": false,
+        "transport": "live",
+        "replaySha256": null,
+        "cache": false,
+        "diagnosticsEnabled": false,
+        "measuredAt": "2026-09-11T01:21:13.278Z"
+      }
+    },
+    {
+      "name": "vep-matched-2",
+      "source": "local_data/benchmarks/vep-matched-2.json",
+      "sourceSha256": "a23c32f18527226220c7e05e78a7a6c7cfae171ab1dcbf6422286d369a31a6ce",
+      "status": "success",
+      "error": null,
+      "wallSeconds": 12.7766495,
+      "startupSeconds": 1.6302692,
+      "annotations": 1000,
+      "annotationsPerSecond": 78.26778061024528,
+      "failures": 0,
+      "annotationSha256": "95db9fc8671e41912978d1dfc23475b70dc3aed7d53e4ff7673c719c68c1291e",
+      "annotationHashScope": "Canonical object keys, array order retained",
+      "http": {
+        "requests": 5,
+        "retries": 0,
+        "chunks": 5,
+        "failedAttempts": 0,
+        "maxInFlight": 2,
+        "latencyMs": {
+          "p50": 2639.0190999999995,
+          "p95": 11200.6387,
+          "total": 21036.0898
+        },
+        "requestBodyBytes": 26070,
+        "responseBodyBytes": 755066,
+        "requestsDetail": [
+          {
+            "index": 0,
+            "requestId": 0,
+            "attempt": 1,
+            "method": "POST",
+            "host": "grch37.rest.ensembl.org",
+            "endpoint": "/vep/homo_sapiens/region",
+            "inputCount": 200,
+            "startMs": 814.1064999999999,
+            "durationMs": 11200.6387,
+            "status": 200,
+            "errorCode": null,
+            "requestBodyBytes": 5214,
+            "responseBodyBytes": 114612,
+            "responseByteSource": "adapter-body",
+            "rateLimit": {
+              "limit": "55000",
+              "remaining": "54973",
+              "resetSeconds": "2287",
+              "periodSeconds": "3600"
+            }
+          },
+          {
+            "index": 1,
+            "requestId": 1,
+            "attempt": 1,
+            "method": "POST",
+            "host": "grch37.rest.ensembl.org",
+            "endpoint": "/vep/homo_sapiens/region",
+            "inputCount": 200,
+            "startMs": 1043.5969,
+            "durationMs": 3617.0529,
+            "status": 200,
+            "errorCode": null,
+            "requestBodyBytes": 5214,
+            "responseBodyBytes": 148136,
+            "responseByteSource": "adapter-body",
+            "rateLimit": {
+              "limit": "55000",
+              "remaining": "54973",
+              "resetSeconds": "2295",
+              "periodSeconds": "3600"
+            }
+          },
+          {
+            "index": 2,
+            "requestId": 2,
+            "attempt": 1,
+            "method": "POST",
+            "host": "grch37.rest.ensembl.org",
+            "endpoint": "/vep/homo_sapiens/region",
+            "inputCount": 200,
+            "startMs": 4667.9952,
+            "durationMs": 2639.0190999999995,
+            "status": 200,
+            "errorCode": null,
+            "requestBodyBytes": 5214,
+            "responseBodyBytes": 150944,
+            "responseByteSource": "adapter-body",
+            "rateLimit": {
+              "limit": "55000",
+              "remaining": "54971",
+              "resetSeconds": "2292",
+              "periodSeconds": "3600"
+            }
+          },
+          {
+            "index": 3,
+            "requestId": 3,
+            "attempt": 1,
+            "method": "POST",
+            "host": "grch37.rest.ensembl.org",
+            "endpoint": "/vep/homo_sapiens/region",
+            "inputCount": 200,
+            "startMs": 7309.9699,
+            "durationMs": 2008.5051000000003,
+            "status": 200,
+            "errorCode": null,
+            "requestBodyBytes": 5214,
+            "responseBodyBytes": 180282,
+            "responseByteSource": "adapter-body",
+            "rateLimit": {
+              "limit": "55000",
+              "remaining": "54970",
+              "resetSeconds": "2290",
+              "periodSeconds": "3600"
+            }
+          },
+          {
+            "index": 4,
+            "requestId": 4,
+            "attempt": 1,
+            "method": "POST",
+            "host": "grch37.rest.ensembl.org",
+            "endpoint": "/vep/homo_sapiens/region",
+            "inputCount": 200,
+            "startMs": 9331.4895,
+            "durationMs": 1570.8739999999998,
+            "status": 200,
+            "errorCode": null,
+            "requestBodyBytes": 5214,
+            "responseBodyBytes": 161092,
+            "responseByteSource": "adapter-body",
+            "rateLimit": {
+              "limit": "55000",
+              "remaining": "54969",
+              "resetSeconds": "2288",
+              "periodSeconds": "3600"
+            }
+          }
+        ]
+      },
+      "peakRssBytes": 87982080,
+      "eventLoopDelayMs": {
+        "mean": 16.15242907174231,
+        "p95": 22.478847,
+        "max": 69.992447
+      },
+      "measurement": {
+        "scope": "End-to-end CLI wall time including Node startup, annotation, and JSON serialization",
+        "git": {
+          "revision": "3e37d1eb3e3dc42291c9ffa4eef7d616113be277",
+          "dirty": true
+        },
+        "stage": "annotation",
+        "postConcurrency": 2,
+        "timeoutMs": 60000,
+        "startupScope": "Separate CLI --semver invocation; not subtracted from annotation timings",
+        "inputSha256": "8e439d73dd7aad3da6d6a5f48ba3b7e0fa70d86069d793b2d1f622d4e1c55bec",
+        "inputFile": "C:\\development\\variant-linker\\local_data\\benchmarks\\1000genomes-chr22-grch37-1000.vcf",
+        "assembly": "hg19",
+        "node": "v22.14.0",
+        "variantLinker": "3.12.2",
+        "platform": "win32 10.0.26200 x64",
+        "fixtures": false,
+        "transport": "live",
+        "replaySha256": null,
+        "cache": false,
+        "diagnosticsEnabled": false,
+        "measuredAt": "2026-09-11T01:21:38.972Z"
+      }
+    },
+    {
+      "name": "recoder-matched-1",
+      "source": "local_data/benchmarks/recoder-matched-1.json",
+      "sourceSha256": "60dfb7d866a8a86dfb694a02d34df7ad398ec9c20771bd449d4333c157707750",
+      "status": "error",
+      "error": "CLI exited 1: Request deadline exceeded\n",
+      "wallSeconds": 148.07828179999998,
+      "startupSeconds": 0.6568855000000001,
+      "annotations": null,
+      "annotationsPerSecond": null,
+      "failures": null,
+      "annotationSha256": null,
+      "annotationHashScope": "Canonical object keys, array order retained",
+      "http": {
+        "requests": 4,
+        "retries": 1,
+        "chunks": 3,
+        "failedAttempts": 2,
+        "maxInFlight": 1,
+        "latencyMs": {
+          "p50": 14582.4708,
+          "p95": 60016.4583,
+          "total": 146330.6776
+        },
+        "requestBodyBytes": 23236,
+        "responseBodyBytes": 69936,
+        "requestsDetail": [
+          {
+            "index": 0,
+            "requestId": 0,
+            "attempt": 1,
+            "method": "POST",
+            "host": "grch37.rest.ensembl.org",
+            "endpoint": "/variant_recoder/homo_sapiens",
+            "inputCount": 200,
+            "startMs": 139.46120000000008,
+            "durationMs": 14582.4708,
+            "status": 200,
+            "errorCode": null,
+            "requestBodyBytes": 5809,
+            "responseBodyBytes": 34966,
+            "responseByteSource": "adapter-body",
+            "rateLimit": {
+              "limit": "55000",
+              "remaining": "54968",
+              "resetSeconds": "2270",
+              "periodSeconds": "3600"
+            }
+          },
+          {
+            "index": 1,
+            "requestId": 1,
+            "attempt": 1,
+            "method": "POST",
+            "host": "grch37.rest.ensembl.org",
+            "endpoint": "/variant_recoder/homo_sapiens",
+            "inputCount": 200,
+            "startMs": 14726.855,
+            "durationMs": 12728.591499999999,
+            "status": 200,
+            "errorCode": null,
+            "requestBodyBytes": 5809,
+            "responseBodyBytes": 34970,
+            "responseByteSource": "adapter-body",
+            "rateLimit": {
+              "limit": "55000",
+              "remaining": "54967",
+              "resetSeconds": "2258",
+              "periodSeconds": "3600"
+            }
+          },
+          {
+            "index": 2,
+            "requestId": 2,
+            "attempt": 1,
+            "method": "POST",
+            "host": "grch37.rest.ensembl.org",
+            "endpoint": "/variant_recoder/homo_sapiens",
+            "inputCount": 200,
+            "startMs": 27458.6341,
+            "durationMs": 60016.4583,
+            "status": null,
+            "errorCode": "ECONNABORTED",
+            "requestBodyBytes": 5809,
+            "responseBodyBytes": null,
+            "responseByteSource": null,
+            "rateLimit": {}
+          },
+          {
+            "index": 3,
+            "requestId": 2,
+            "attempt": 2,
+            "method": "POST",
+            "host": "grch37.rest.ensembl.org",
+            "endpoint": "/variant_recoder/homo_sapiens",
+            "inputCount": 200,
+            "startMs": 88489.0714,
+            "durationMs": 59003.15699999999,
+            "status": null,
+            "errorCode": "ERR_CANCELED",
+            "requestBodyBytes": 5809,
+            "responseBodyBytes": null,
+            "responseByteSource": null,
+            "rateLimit": {}
+          }
+        ]
+      },
+      "peakRssBytes": 69443584,
+      "eventLoopDelayMs": {
+        "mean": 17.494301598191985,
+        "p95": 27.099135,
+        "max": 98.762751
+      },
+      "measurement": {
+        "scope": "End-to-end CLI wall time including Node startup, recoding, and JSON serialization",
+        "git": {
+          "revision": "3e37d1eb3e3dc42291c9ffa4eef7d616113be277",
+          "dirty": true
+        },
+        "stage": "recoder",
+        "postConcurrency": 1,
+        "timeoutMs": 60000,
+        "startupScope": "Separate CLI --semver invocation; not subtracted from annotation timings",
+        "inputSha256": "9bec9502fd24f919a2955b202f5ba5ae89c2b20228c30ee0931c80f0fcad8ae1",
+        "inputFile": "C:\\development\\variant-linker\\local_data\\benchmarks\\1000genomes-chr22-grch37-1000.hgvs.txt",
+        "assembly": "hg19",
+        "node": "v22.14.0",
+        "variantLinker": "3.12.2",
+        "platform": "win32 10.0.26200 x64",
+        "fixtures": false,
+        "transport": "live",
+        "replaySha256": null,
+        "cache": false,
+        "diagnosticsEnabled": false,
+        "measuredAt": "2026-09-11T01:21:54.277Z"
+      }
+    },
+    {
+      "name": "recoder-matched-2",
+      "source": "local_data/benchmarks/recoder-matched-2.json",
+      "sourceSha256": "71710de48267ec0e15db0c158d209ab3123bd615706bae830f4c2228ea508f5a",
+      "status": "success",
+      "error": null,
+      "wallSeconds": 104.4664624,
+      "startupSeconds": 1.1085777999999997,
+      "annotations": 1000,
+      "annotationsPerSecond": 9.572450114860978,
+      "failures": 0,
+      "annotationSha256": "7590ff5dc6e8d390d301d2108728276baaa985bf21bdf19d38cc1e457475b3da",
+      "annotationHashScope": "Canonical object keys, array order retained",
+      "http": {
+        "requests": 7,
+        "retries": 2,
+        "chunks": 5,
+        "failedAttempts": 2,
+        "maxInFlight": 2,
+        "latencyMs": {
+          "p50": 14668.5039,
+          "p95": 60026.1548,
+          "total": 187509.8157
+        },
+        "requestBodyBytes": 40663,
+        "responseBodyBytes": 184029,
+        "requestsDetail": [
+          {
+            "index": 0,
+            "requestId": 0,
+            "attempt": 1,
+            "method": "POST",
+            "host": "grch37.rest.ensembl.org",
+            "endpoint": "/variant_recoder/homo_sapiens",
+            "inputCount": 200,
+            "startMs": 281.2129,
+            "durationMs": 13450.0047,
+            "status": 200,
+            "errorCode": null,
+            "requestBodyBytes": 5809,
+            "responseBodyBytes": 34966,
+            "responseByteSource": "adapter-body",
+            "rateLimit": {
+              "limit": "55000",
+              "remaining": "54963",
+              "resetSeconds": "2120",
+              "periodSeconds": "3600"
+            }
+          },
+          {
+            "index": 1,
+            "requestId": 1,
+            "attempt": 1,
+            "method": "POST",
+            "host": "grch37.rest.ensembl.org",
+            "endpoint": "/variant_recoder/homo_sapiens",
+            "inputCount": 200,
+            "startMs": 544.9723999999999,
+            "durationMs": 14668.5039,
+            "status": 200,
+            "errorCode": null,
+            "requestBodyBytes": 5809,
+            "responseBodyBytes": 34970,
+            "responseByteSource": "adapter-body",
+            "rateLimit": {
+              "limit": "55000",
+              "remaining": "54964",
+              "resetSeconds": "2119",
+              "periodSeconds": "3600"
+            }
+          },
+          {
+            "index": 2,
+            "requestId": 2,
+            "attempt": 1,
+            "method": "POST",
+            "host": "grch37.rest.ensembl.org",
+            "endpoint": "/variant_recoder/homo_sapiens",
+            "inputCount": 200,
+            "startMs": 13736.846500000001,
+            "durationMs": 60019.246999999996,
+            "status": null,
+            "errorCode": "ECONNABORTED",
+            "requestBodyBytes": 5809,
+            "responseBodyBytes": null,
+            "responseByteSource": null,
+            "rateLimit": {}
+          },
+          {
+            "index": 3,
+            "requestId": 3,
+            "attempt": 1,
+            "method": "POST",
+            "host": "grch37.rest.ensembl.org",
+            "endpoint": "/variant_recoder/homo_sapiens",
+            "inputCount": 200,
+            "startMs": 15216.347800000001,
+            "durationMs": 10758.2696,
+            "status": 200,
+            "errorCode": null,
+            "requestBodyBytes": 5809,
+            "responseBodyBytes": 39779,
+            "responseByteSource": "adapter-body",
+            "rateLimit": {
+              "limit": "55000",
+              "remaining": "54961",
+              "resetSeconds": "2108",
+              "periodSeconds": "3600"
+            }
+          },
+          {
+            "index": 4,
+            "requestId": 4,
+            "attempt": 1,
+            "method": "POST",
+            "host": "grch37.rest.ensembl.org",
+            "endpoint": "/variant_recoder/homo_sapiens",
+            "inputCount": 200,
+            "startMs": 25979.606,
+            "durationMs": 60026.1548,
+            "status": null,
+            "errorCode": "ECONNABORTED",
+            "requestBodyBytes": 5809,
+            "responseBodyBytes": null,
+            "responseByteSource": null,
+            "rateLimit": {}
+          },
+          {
+            "index": 5,
+            "requestId": 2,
+            "attempt": 2,
+            "method": "POST",
+            "host": "grch37.rest.ensembl.org",
+            "endpoint": "/variant_recoder/homo_sapiens",
+            "inputCount": 200,
+            "startMs": 74763.19750000001,
+            "durationMs": 12047.449500000002,
+            "status": 200,
+            "errorCode": null,
+            "requestBodyBytes": 5809,
+            "responseBodyBytes": 35966,
+            "responseByteSource": "adapter-body",
+            "rateLimit": {
+              "limit": "55000",
+              "remaining": "54959",
+              "resetSeconds": "2047",
+              "periodSeconds": "3600"
+            }
+          },
+          {
+            "index": 6,
+            "requestId": 4,
+            "attempt": 2,
+            "method": "POST",
+            "host": "grch37.rest.ensembl.org",
+            "endpoint": "/variant_recoder/homo_sapiens",
+            "inputCount": 200,
+            "startMs": 87017.0748,
+            "durationMs": 16540.18620000001,
+            "status": 200,
+            "errorCode": null,
+            "requestBodyBytes": 5809,
+            "responseBodyBytes": 38348,
+            "responseByteSource": "adapter-body",
+            "rateLimit": {
+              "limit": "55000",
+              "remaining": "54958",
+              "resetSeconds": "2030",
+              "periodSeconds": "3600"
+            }
+          }
+        ]
+      },
+      "peakRssBytes": 70643712,
+      "eventLoopDelayMs": {
+        "mean": 17.606625946684893,
+        "p95": 27.967487,
+        "max": 107.675647
+      },
+      "measurement": {
+        "scope": "End-to-end CLI wall time including Node startup, recoding, and JSON serialization",
+        "git": {
+          "revision": "40232b22396b7d7066f295e919e3d7dd2f2181fa",
+          "dirty": true
+        },
+        "stage": "recoder",
+        "postConcurrency": 2,
+        "timeoutMs": 60000,
+        "startupScope": "Separate CLI --semver invocation; not subtracted from annotation timings",
+        "inputSha256": "9bec9502fd24f919a2955b202f5ba5ae89c2b20228c30ee0931c80f0fcad8ae1",
+        "inputFile": "C:\\development\\variant-linker\\local_data\\benchmarks\\1000genomes-chr22-grch37-1000.hgvs.txt",
+        "assembly": "hg19",
+        "node": "v22.14.0",
+        "variantLinker": "3.12.2",
+        "platform": "win32 10.0.26200 x64",
+        "fixtures": false,
+        "transport": "live",
+        "replaySha256": null,
+        "cache": false,
+        "diagnosticsEnabled": false,
+        "measuredAt": "2026-09-11T01:24:24.657Z"
+      }
+    }
+  ],
+  "replay": [
+    {
+      "endpoint": "vep",
+      "concurrency": 1,
+      "averages": {
+        "executionTime": 2.115937433333333,
+        "startupTime": 2.3778183,
+        "variantsProcessed": 1000,
+        "avgTimePerVariant": 0.0021159374333333332,
+        "variantsPerSecond": 475.4816975442395,
+        "retryCount": 0,
+        "chunkCount": 5,
+        "minExecutionTime": 1.9195441999999994,
+        "maxExecutionTime": 2.3232817,
+        "stdDeviation": 0.1650069414193707,
+        "runsCompleted": 3,
+        "totalRuns": 3
+      },
+      "git": {
+        "revision": "40232b22396b7d7066f295e919e3d7dd2f2181fa",
+        "dirty": true
+      },
+      "annotationHash": "95db9fc8671e41912978d1dfc23475b70dc3aed7d53e4ff7673c719c68c1291e",
+      "schemaMapperSha256": "1c0490c6b9d2784b8b7c5949e7d72939df4e724b60290d0eed14056e5f726299",
+      "inputSha256": "8e439d73dd7aad3da6d6a5f48ba3b7e0fa70d86069d793b2d1f622d4e1c55bec"
+    },
+    {
+      "endpoint": "vep",
+      "concurrency": 2,
+      "averages": {
+        "executionTime": 1.8708573666666677,
+        "startupTime": 1.994169600000001,
+        "variantsProcessed": 1000,
+        "avgTimePerVariant": 0.0018708573666666676,
+        "variantsPerSecond": 551.8870288619365,
+        "retryCount": 0,
+        "chunkCount": 5,
+        "minExecutionTime": 1.5194390000000002,
+        "maxExecutionTime": 2.3383533000000023,
+        "stdDeviation": 0.344248610550151,
+        "runsCompleted": 3,
+        "totalRuns": 3
+      },
+      "git": {
+        "revision": "40232b22396b7d7066f295e919e3d7dd2f2181fa",
+        "dirty": true
+      },
+      "annotationHash": "95db9fc8671e41912978d1dfc23475b70dc3aed7d53e4ff7673c719c68c1291e",
+      "schemaMapperSha256": "1c0490c6b9d2784b8b7c5949e7d72939df4e724b60290d0eed14056e5f726299",
+      "inputSha256": "8e439d73dd7aad3da6d6a5f48ba3b7e0fa70d86069d793b2d1f622d4e1c55bec"
+    },
+    {
+      "endpoint": "recoder",
+      "concurrency": 1,
+      "averages": {
+        "executionTime": 1.0728562999999995,
+        "startupTime": 0.9550501999999979,
+        "variantsProcessed": 1000,
+        "avgTimePerVariant": 0.0010728562999999995,
+        "variantsPerSecond": 942.360674742193,
+        "retryCount": 0,
+        "chunkCount": 5,
+        "minExecutionTime": 0.9343181999999979,
+        "maxExecutionTime": 1.2069624000000003,
+        "stdDeviation": 0.11135063812542892,
+        "runsCompleted": 3,
+        "totalRuns": 3
+      },
+      "git": {
+        "revision": "40232b22396b7d7066f295e919e3d7dd2f2181fa",
+        "dirty": true
+      },
+      "annotationHash": "7590ff5dc6e8d390d301d2108728276baaa985bf21bdf19d38cc1e457475b3da",
+      "schemaMapperSha256": "1c0490c6b9d2784b8b7c5949e7d72939df4e724b60290d0eed14056e5f726299",
+      "inputSha256": "9bec9502fd24f919a2955b202f5ba5ae89c2b20228c30ee0931c80f0fcad8ae1"
+    },
+    {
+      "endpoint": "recoder",
+      "concurrency": 2,
+      "averages": {
+        "executionTime": 1.549441566666666,
+        "startupTime": 1.1341074000000009,
+        "variantsProcessed": 1000,
+        "avgTimePerVariant": 0.001549441566666666,
+        "variantsPerSecond": 669.6433169216792,
+        "retryCount": 0,
+        "chunkCount": 5,
+        "minExecutionTime": 1.2869781000000002,
+        "maxExecutionTime": 1.9906908000000003,
+        "stdDeviation": 0.3138748729533941,
+        "runsCompleted": 3,
+        "totalRuns": 3
+      },
+      "git": {
+        "revision": "40232b22396b7d7066f295e919e3d7dd2f2181fa",
+        "dirty": true
+      },
+      "annotationHash": "7590ff5dc6e8d390d301d2108728276baaa985bf21bdf19d38cc1e457475b3da",
+      "schemaMapperSha256": "1c0490c6b9d2784b8b7c5949e7d72939df4e724b60290d0eed14056e5f726299",
+      "inputSha256": "9bec9502fd24f919a2955b202f5ba5ae89c2b20228c30ee0931c80f0fcad8ae1"
+    }
+  ],
+  "conclusions": {
+    "defaultConcurrency": 1,
+    "vep": "Both observed live comparisons favored opt-in concurrency 2 with all 1000 annotations and no retries. Network/server variability prevents a universal speedup claim.",
+    "recoder": "Baseline completed 1000 inputs, but subsequent public runs were unstable. Keep concurrency 1 by default; do not infer reliable live acceleration from offline replay.",
+    "equivalence": "Both complete baseline recordings replay to identical canonical output hashes at concurrency 1 and 2 (three runs each). See response-validation.json for upstream coordinate/allele checks.",
+    "instrumentation": "The initial failed concurrent Recoder run predates failure-profile retention; its absent metrics are not inferred. Initial baseline timeout was 15000ms; matched runs explicitly use 60000ms."
+  }
+}

@@ -3,7 +3,19 @@ const axios = require('axios').default;
 const debug = require('debug')('variant-linker:detailed');
 const { getCacheAsync, setCache } = require('./cache');
 const apiConfig = require('../config/apiConfig.json');
-const { resolveRequestOptions, canonicalJson, abortable, delay } = require('./api/requestContext');
+const {
+  resolveRequestOptions,
+  canonicalJson,
+  parseRetryAfter,
+  abortable,
+  delay,
+} = require('./api/requestContext');
+const { createOriginScheduler } = require('./api/originScheduler');
+const scheduler = createOriginScheduler();
+/** Once concurrency is requested, all subsequent calls on that origin share its quota.
+ * Fresh serial processes retain the existing timing until concurrency is opted in.
+ * @type {Set<string>} */
+const pacedOrigins = new Set();
 /** @typedef {import('./api/requestContext').RequestOptions} RequestOptions */
 /** @typedef {Record<string, string | number | boolean | null | undefined>} QueryOptions */
 /** @typedef {import('axios').AxiosProxyConfig | false | null} ProxyConfig */
@@ -63,6 +75,7 @@ async function fetchApi(
   requestOptions = {}
 ) {
   const context = resolveRequestOptions(requestOptions);
+  const started = Date.now();
   const controller = new AbortController();
   const cancel = () => controller.abort(context.signal?.reason || new Error('Request cancelled'));
   if (context.signal?.aborted) cancel();
@@ -80,6 +93,7 @@ async function fetchApi(
         url.searchParams.set(key, String(value));
     }
     url.searchParams.sort();
+    if (context.postConcurrency > 1) pacedOrigins.add(url.origin);
     const verb = method.toUpperCase();
     if (!['GET', 'POST'].includes(verb)) throw new Error(`Unsupported HTTP method: ${verb}`);
     const body = JSON.parse(canonicalJson(requestBody));
@@ -93,10 +107,11 @@ async function fetchApi(
       const cached = await abortable(getCacheAsync(key), signal);
       if (cached !== null && cached !== undefined) return /** @type {T} */ (cached);
     }
-    const started = Date.now();
     for (let attempt = 0; ; attempt++) {
       signal.throwIfAborted();
       try {
+        if (pacedOrigins.has(url.origin))
+          await scheduler.acquire(url.href, signal, started + context.deadlineMs);
         /** @type {import('axios').AxiosRequestConfig} */
         const config = {
           headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
@@ -114,11 +129,14 @@ async function fetchApi(
           verb === 'POST' ? axios.post(url.href, body, config) : axios.get(url.href, config),
           signal
         );
+        if (pacedOrigins.has(url.origin)) scheduler.observe(url.href, response.headers || {});
         if (cacheEnabled) await abortable(Promise.resolve(setCache(key, response.data)), signal);
         return /** @type {T} */ (response.data);
       } catch (error) {
         signal.throwIfAborted();
         const failure = /** @type {import('axios').AxiosError} */ (error);
+        if (pacedOrigins.has(url.origin))
+          scheduler.observe(url.href, failure.response?.headers || {});
         const status = failure.response?.status;
         const retryable = status
           ? apiConfig.requests.retry.retryableStatusCodes.includes(status)
@@ -126,15 +144,15 @@ async function fetchApi(
               failure.code || ''
             );
         if (!retryable || attempt >= context.maxRetries || axios.isCancel(error)) throw error;
-        const header = failure.response?.headers?.['retry-after'];
-        const retryAfter =
-          header === null || header === undefined
-            ? 0
-            : /^\d+(\.\d+)?$/.test(String(header))
-              ? Number(header) * 1000
-              : Math.max(0, Date.parse(String(header)) - Date.now());
+        const retryAfter = parseRetryAfter(failure.response?.headers?.['retry-after']);
         const backoff = apiConfig.requests.retry.baseDelayMs * 2 ** attempt;
-        await delay(Math.min(context.maxRetryDelayMs, Math.max(backoff, retryAfter || 0)), signal);
+        // The client cap applies only to exponential backoff. A server cooldown
+        // is a minimum wait, including fractional seconds returned by Ensembl.
+        const waitMs = Math.max(Math.min(context.maxRetryDelayMs, backoff), retryAfter || 0);
+        if (waitMs >= context.deadlineMs - (Date.now() - started)) {
+          throw new Error('Request deadline cannot accommodate retry delay', { cause: error });
+        }
+        await delay(waitMs, signal);
       }
     }
   } finally {

@@ -1,7 +1,8 @@
 'use strict';
 const { fetchApi } = require('./apiHelper');
 const apiConfig = require('../config/apiConfig.json');
-/** Request region annotations in sequential bounded chunks.
+const { orderedChunks } = require('./api/orderedChunks');
+/** Request region annotations in bounded chunks, optionally using two workers.
  * @param {string[]} variants
  * @param {import('./apiHelper').QueryOptions} [options]
  * @param {boolean} [cacheEnabled]
@@ -16,25 +17,27 @@ async function vepRegionsAnnotation(
   proxyConfig = null,
   requestOptions = {}
 ) {
-  const results = [];
-  const chunkSize = apiConfig.ensembl.vepPostChunkSize || 200;
-  for (let offset = 0; offset < variants.length; offset += chunkSize) {
-    const response = await fetchApi(
-      apiConfig.ensembl.endpoints.vepRegions,
-      options,
-      cacheEnabled,
-      'POST',
-      { variants: variants.slice(offset, offset + chunkSize) },
-      proxyConfig,
-      requestOptions
-    );
-    if (
-      !Array.isArray(response) ||
-      response.some((entry) => !entry || typeof entry !== 'object' || Array.isArray(entry))
-    )
-      throw new Error('VEP response must be an array of annotation objects');
-    results.push(.../** @type {import('./dataTypes').Annotation[]} */ (response));
-  }
-  return results;
+  const chunkSize = apiConfig.ensembl.vepPostChunkSize;
+  return orderedChunks(
+    variants,
+    async (chunk, _index, signal) => {
+      const response = await fetchApi(
+        apiConfig.ensembl.endpoints.vepRegions,
+        options,
+        cacheEnabled,
+        'POST',
+        { variants: chunk },
+        proxyConfig,
+        { ...requestOptions, signal }
+      );
+      if (
+        !Array.isArray(response) ||
+        response.some((entry) => !entry || typeof entry !== 'object' || Array.isArray(entry))
+      )
+        throw new Error('VEP response must be an array of annotation objects');
+      return /** @type {import('./dataTypes').Annotation[]} */ (response);
+    },
+    { chunkSize, concurrency: requestOptions.postConcurrency, signal: requestOptions.signal }
+  );
 }
 module.exports = vepRegionsAnnotation;

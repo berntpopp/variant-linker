@@ -130,21 +130,23 @@ describe('API reliability contracts', () => {
     );
   });
 
-  it('caps Retry-After and retries transient statuses with the original body', async () => {
+  it('honors Retry-After and retries transient statuses with the original body', async () => {
+    const clock = sinon.useFakeTimers();
     const transport = sinon.stub(axios, 'post');
     transport.onFirstCall().rejects(
       Object.assign(new Error('busy'), {
-        response: { status: 429, headers: { 'retry-after': '999999' } },
+        response: { status: 429, headers: { 'retry-after': '0.05' } },
       })
     );
     transport.onSecondCall().resolves({ data: { ok: true } });
-    assert.deepEqual(
-      await fetchApi('/retry', {}, false, 'POST', { id: 1 }, null, {
-        maxRetryDelayMs: 5,
-        deadlineMs: 500,
-      }),
-      { ok: true }
-    );
+    const result = fetchApi('/retry', {}, false, 'POST', { id: 1 }, null, {
+      maxRetryDelayMs: 5,
+      deadlineMs: 500,
+    });
+    await clock.tickAsync(49);
+    assert.equal(transport.callCount, 1);
+    await clock.tickAsync(1);
+    assert.deepEqual(await result, { ok: true });
     assert.equal(transport.callCount, 2);
     assert.deepEqual(transport.secondCall.args[1], { id: 1 });
   });

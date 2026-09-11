@@ -46,39 +46,41 @@ function formatResults(results, format = 'table') {
   return rows.map((row) => row.map(escape).join(delimiter)).join('\n');
 }
 
-function generateReadme(results, options) {
-  const destination = path.resolve(__dirname, '../BENCHMARK_RESULTS.md');
+function renderReadme(results, options) {
   const rows = [headers, ...results.map(cells)];
   const rendered = rows.map((row) => `| ${row.join(' | ')} |`);
   rendered.splice(1, 0, `| ${headers.map(() => '---').join(' | ')} |`);
-  fs.writeFileSync(
-    destination,
-    [
-      '# Variant-Linker benchmark results',
-      '',
-      `Generated: ${new Date().toISOString()}`,
-      '',
-      `Transport: ${options.live ? 'live Ensembl (network variability applies)' : 'synthetic offline fixtures'}.`,
-      'CLI wall time includes process startup, annotation and output serialization.',
-      'The separate --semver startup baseline is not subtracted; it is not a pure analysis timer.',
-      'Retries/chunks are N/A unless explicitly provided by result metadata; no debug-log inference.',
-      'Annotation counts come from parsed output; they may differ from submitted input counts.',
-      '',
-      ...rendered,
-      '',
-      '## Reproduction metadata',
-      '',
-      '```json',
-      JSON.stringify(
-        results.map((result) => result.measurement),
-        null,
-        2
-      ),
-      '```',
-      '',
-    ].join('\n')
-  );
+  return [
+    '# Variant-Linker benchmark results',
+    '',
+    `Generated: ${new Date().toISOString()}`,
+    '',
+    `Transport: ${options.live ? 'live Ensembl (network variability applies)' : options.replay ? 'recorded response replay (offline, no simulated network latency)' : 'synthetic offline fixtures'}.`,
+    'CLI wall time includes process startup, annotation and output serialization.',
+    'The separate --semver startup baseline is not subtracted; it is not a pure analysis timer.',
+    'Retries and attempted POST chunks come from adapter profiling; N/A means instrumentation was unavailable.',
+    'Body byte counts describe UTF-8 adapter data, not compressed wire traffic; replay JSON is reencoded.',
+    'Annotation counts come from parsed output; they may differ from submitted input counts.',
+    '',
+    ...rendered,
+    '',
+    '## Reproduction metadata',
+    '',
+    '```json',
+    JSON.stringify(
+      results.map((result) => result.measurement),
+      null,
+      2
+    ),
+    '```',
+    '',
+  ].join('\n');
+}
+
+function generateReadme(results, options) {
+  const destination = path.resolve(__dirname, '../BENCHMARK_RESULTS.md');
+  fs.writeFileSync(destination, renderReadme(results, options));
   return destination;
 }
 
-module.exports = { formatResults, generateReadme };
+module.exports = { formatResults, generateReadme, renderReadme };

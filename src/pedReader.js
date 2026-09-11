@@ -37,56 +37,7 @@ async function readPedigree(filePath) {
     // Read file content
     const fileContent = await fs.readFile(filePath, 'utf8');
 
-    // Split into lines and filter out empty lines and comments
-    const lines = fileContent
-      .split('\n')
-      .map((line) => line.trim())
-      .filter((line) => line && !line.startsWith('#'));
-
-    // Initialize Map to store parsed data
-    const pedigreeData = new Map();
-
-    // Parse each line
-    for (let i = 0; i < lines.length; i++) {
-      // Allow both tab and space delimiters by splitting on whitespace
-      const columns = lines[i].split(/\s+/);
-
-      // Standard PED has 6 required columns
-      if (columns.length < 6) {
-        debug(`Line ${i + 1}: Skipping invalid line with fewer than 6 columns: "${lines[i]}"`);
-        continue;
-      }
-
-      const [familyId, sampleId, fatherId, motherId, sexCode, affectedStatusCode] = columns;
-
-      // Parse sex and affected status to integers
-      const sex = parseInt(sexCode, 10);
-      const affectedStatus = parseInt(affectedStatusCode, 10);
-
-      // Validate sex code (0=unknown, 1=male, 2=female)
-      if (![0, 1, 2].includes(sex)) {
-        const msg = `Line ${i + 1}: Invalid sex code "${sexCode}" for "${sampleId}". Using 0.`;
-        debug(msg);
-      }
-
-      // Validate affected status (0=unknown, 1=unaffected, 2=affected)
-      if (![0, 1, 2].includes(affectedStatus)) {
-        const msg = `Line ${i + 1}: Bad status "${affectedStatusCode}" (${sampleId}). Set to 0.`;
-        debug(msg);
-      }
-
-      // Store parsed data
-      pedigreeData.set(sampleId, {
-        familyId,
-        fatherId,
-        motherId,
-        sex: [0, 1, 2].includes(sex) ? sex : 0,
-        affectedStatus: [0, 1, 2].includes(affectedStatus) ? affectedStatus : 0,
-      });
-    }
-
-    debug(`Successfully parsed ${pedigreeData.size} samples from PED file`);
-    return pedigreeData;
+    return parsePedigreeText(fileContent);
   } catch (error) {
     if (!(error instanceof Error)) throw error;
     if (('code' in error ? error.code : undefined) === 'ENOENT') {
@@ -99,6 +50,63 @@ async function readPedigree(filePath) {
   }
 }
 
+/** Parse PED text into a sample-keyed pedigree, shared by Node and browser callers.
+ * @param {string} text @returns {import('./dataTypes').Pedigree}
+ */
+function parsePedigreeText(text) {
+  // Split into lines and filter out empty lines and comments
+  const lines = text
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith('#'));
+
+  // Initialize Map to store parsed data
+  const pedigreeData = new Map();
+
+  // Parse each line
+  for (let i = 0; i < lines.length; i++) {
+    // Allow both tab and space delimiters by splitting on whitespace
+    const columns = lines[i].split(/\s+/);
+
+    // Standard PED has 6 required columns
+    if (columns.length < 6) {
+      debug(`Line ${i + 1}: Skipping invalid line with fewer than 6 columns: "${lines[i]}"`);
+      continue;
+    }
+
+    const [familyId, sampleId, fatherId, motherId, sexCode, affectedStatusCode] = columns;
+
+    // Parse sex and affected status to integers
+    const sex = parseInt(sexCode, 10);
+    const affectedStatus = parseInt(affectedStatusCode, 10);
+
+    // Validate sex code (0=unknown, 1=male, 2=female)
+    if (![0, 1, 2].includes(sex)) {
+      const msg = `Line ${i + 1}: Invalid sex code "${sexCode}" for "${sampleId}". Using 0.`;
+      debug(msg);
+    }
+
+    // Validate affected status (0=unknown, 1=unaffected, 2=affected)
+    if (![0, 1, 2].includes(affectedStatus)) {
+      const msg = `Line ${i + 1}: Bad status "${affectedStatusCode}" (${sampleId}). Set to 0.`;
+      debug(msg);
+    }
+
+    // Store parsed data
+    pedigreeData.set(sampleId, {
+      familyId,
+      fatherId,
+      motherId,
+      sex: [0, 1, 2].includes(sex) ? sex : 0,
+      affectedStatus: [0, 1, 2].includes(affectedStatus) ? affectedStatus : 0,
+    });
+  }
+
+  debug(`Successfully parsed ${pedigreeData.size} samples from PED file`);
+  return pedigreeData;
+}
+
 module.exports = {
+  parsePedigreeText,
   readPedigree,
 };

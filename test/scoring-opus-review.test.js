@@ -21,7 +21,13 @@ describe('Opus scoring review regressions', () => {
       result.map((item) => item.score),
       [3, 3, 3]
     );
-    assert.equal(parser.callCount, 2);
+    // Other suites may already have cached the ordinary "fallback" formula.
+    // Count this condition specifically: its rejection must be parsed only once.
+    assert.equal(
+      parser.getCalls().filter((call) => call.args[0].includes('process.invalidNegativeCache'))
+        .length,
+      1
+    );
     assert.equal(warning.callCount, 1);
   });
   it('charges scope capture and callback bindings against the shared operation budget', () => {

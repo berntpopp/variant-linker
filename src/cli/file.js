@@ -1,5 +1,6 @@
 'use strict';
 const fs = require('fs');
+const defaults = require('../../config/cliDefaults.json');
 const { analyzeVariant } = require('../variantLinkerCore');
 const { readVariantsFromVcf } = require('../vcfReader');
 const { readPedigree } = require('../pedReader');
@@ -21,12 +22,13 @@ function parseSampleMap(value) {
 
 /** @param {import('../analysisTypes').CliParams} params */
 async function processFileBased(params) {
-  const recoderOptions = parseOptionalParameters(params.recoder_params, { vcf_string: '1' });
+  const recoderOptions = parseOptionalParameters(params.recoder_params, {
+    ...defaults.recoderOptions,
+    ...params.recoderOptions,
+  });
   const vepOptions = parseOptionalParameters(params.vep_params, {
-    CADD: '1',
-    hgvs: '1',
-    merged: '1',
-    mane: '1',
+    ...defaults.vepOptions,
+    ...params.vepOptions,
   });
   if (params.pickOutput) vepOptions.pick = '1';
   const vcf =

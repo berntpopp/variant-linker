@@ -1,6 +1,7 @@
 'use strict';
 const { parseExpression, propertyName } = require('./expressionParser');
 const { spend, keyOf, read, array, primitive, binary } = require('./expressionValues');
+const { limits } = require('./limits');
 /** @typedef {import('acorn').AnyNode} Node */
 /** @typedef {Map<string,unknown>} Scope */
 /** @typedef {{node:import('acorn').ArrowFunctionExpression,scope:Scope}} Closure */
@@ -31,8 +32,9 @@ const constants = { PI: Math.PI, E: Math.E, LN2: Math.LN2, LN10: Math.LN10, SQRT
  */
 function evaluateExpression(source, variables) {
   const names = Object.keys(variables);
-  if (source.length > 16384) throw new Error('Scoring source length limit exceeded');
-  if (names.length > 2048 || names.join('').length > 16384)
+  if (source.length > limits.maxSourceLength)
+    throw new Error('Scoring source length limit exceeded');
+  if (names.length > limits.maxVariables || names.join('').length > limits.maxVariableNameLength)
     throw new Error('Scoring variable size limit exceeded');
   const key = JSON.stringify([source, names]);
   let program = cache.get(key);
@@ -43,11 +45,11 @@ function evaluateExpression(source, variables) {
       if (!(error instanceof Error)) throw error;
       program = error;
     }
-    if (cache.size >= 256) cache.clear();
+    if (cache.size >= limits.expressionCacheSize) cache.clear();
     cache.set(key, program);
   }
   if (program instanceof Error) throw program;
-  const budget = { remaining: 100000, depth: 0 };
+  const budget = { remaining: limits.maxOperations, depth: 0 };
   spend(budget, names.length);
   const scope = new Map(names.map((name) => [name, read(variables, name)]));
   /** @type {WeakMap<object,Closure>} */
@@ -152,7 +154,8 @@ function evaluateExpression(source, variables) {
       if (node.type === 'SpreadElement')
         result.push(...array(evaluate(node.argument, local), budget));
       else result.push(evaluate(node, local));
-      if (result.length > 10000) throw new Error('Scoring collection size limit exceeded');
+      if (result.length > limits.maxCollectionSize)
+        throw new Error('Scoring collection size limit exceeded');
     }
     return result;
   }
@@ -189,7 +192,8 @@ function evaluateExpression(source, variables) {
   /** @param {Node} node @param {Scope} local @returns {unknown} */
   function evaluate(node, local) {
     spend(budget);
-    if (++budget.depth > 128) throw new Error('Scoring evaluation depth limit exceeded');
+    if (++budget.depth > limits.maxEvaluationDepth)
+      throw new Error('Scoring evaluation depth limit exceeded');
     try {
       switch (node.type) {
         case 'Program': {

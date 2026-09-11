@@ -1,5 +1,6 @@
 'use strict';
 const acorn = require('acorn');
+const { limits } = require('./limits');
 const FORBIDDEN = new Set(['constructor', 'prototype', '__proto__']);
 const GLOBALS = new Set([
   'Math',
@@ -77,7 +78,8 @@ function propertyName(node) {
  * @param {string} source @param {string[]} names @returns {import('acorn').Program}
  */
 function parseExpression(source, names) {
-  if (source.length > 16384) throw new Error('Scoring source length limit exceeded');
+  if (source.length > limits.maxSourceLength)
+    throw new Error('Scoring source length limit exceeded');
   const scope = new Set(names);
   for (const name of names) {
     checkName(name);
@@ -94,7 +96,8 @@ function parseExpression(source, names) {
   let count = 0;
   /** @param {Node} node @param {Set<string>} bound @param {number} depth @param {boolean} [callback] @returns {void} */
   function validate(node, bound, depth, callback = false) {
-    if (++count > 2048 || depth > 64) throw new Error('Scoring syntax complexity limit exceeded');
+    if (++count > limits.maxAstNodes || depth > limits.maxAstDepth)
+      throw new Error('Scoring syntax complexity limit exceeded');
     /** @param {Node} child @returns {void} */
     const next = (child) => validate(child, bound, depth + 1);
     switch (node.type) {

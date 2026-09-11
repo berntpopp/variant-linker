@@ -1,5 +1,6 @@
 'use strict';
 const fs = require('fs');
+const defaults = require('../../config/cliDefaults.json');
 const { parseProxyConfig } = require('../apiHelper');
 const debug = require('debug')('variant-linker:main');
 const debugDetailed = require('debug')('variant-linker:detailed');
@@ -161,11 +162,7 @@ function validateParams(params) {
  * @param {import('../analysisTypes').CliParams} cliParams
  * @returns {import('../analysisTypes').CliParams} */
 function mergeParams(configParams, cliParams) {
-  return Object.assign(
-    { output: 'JSON', assembly: 'hg38', chunkSize: 100 },
-    configParams,
-    cliParams
-  );
+  return Object.assign({ ...defaults }, configParams, cliParams);
 }
 
 /** @param {number} debugLevel @param {string|undefined} logFilePath */
@@ -200,7 +197,7 @@ function enableDebugging(debugLevel, logFilePath) {
   debug('Debug mode enabled');
 }
 
-/** @param {string|undefined} paramString @param {Record<string,string>} defaultParams */
+/** @param {string|undefined} paramString @param {Record<string,string|number|boolean>} defaultParams */
 function parseOptionalParameters(paramString, defaultParams) {
   const options = { ...defaultParams }; // Start with defaults
   if (paramString) {

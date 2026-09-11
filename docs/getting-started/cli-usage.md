@@ -1,364 +1,150 @@
-# CLI Usage
+# CLI reference
 
-Variant-Linker provides a comprehensive command-line interface for genetic variant annotation. This guide covers all the available options and usage patterns.
+Run `npx variant-linker --help`, or `npm install --global variant-linker`.
+Node.js 22.14+ is required. For integration, see the [API](api-usage.md) and
+[browser/package guide](../guide/browser-and-package.md).
 
-> **Note**: If you're interested in using Variant-Linker as a JavaScript library in your Node.js applications, see the [API Usage Guide](api-usage.md) for programmatic integration options.
+## Inputs and basic usage
 
-## Basic Usage
-
-### Single Variant Analysis
+Supply one of `--variant`, `--variants`, `--variants-file` or `--vcf-input`.
+Without these, redirected stdin is read as one variant per line.
 
 ```bash
-# Process a single variant
-variant-linker --variant <variant_input> --output <output_format> [--debug]
-
-# Examples
 variant-linker --variant "rs6025" --output JSON
 variant-linker --variant "ENST00000366667:c.803C>T" --output CSV
-variant-linker --variant "9 130716739 . G GT" --output TSV
-
-# Copy Number Variants (CNVs)
-variant-linker --variant "7:117559600-117559609:DEL" --output JSON
-variant-linker --variant "1:1000-5000:DUP" --output CSV
-variant-linker --variant "chr22:10000-20000:CNV" --output TSV
+variant-linker --variant "1-65568-A-C" --output TSV
+variant-linker --variant "7:117559600-117559609:DEL" --output VCF
+variant-linker --variants "rs6025,rs1799963" --output JSON
+variant-linker --variants-file variants.txt --output TSV
+variant-linker --vcf-input family.vcf --output VCF --output-file annotated.vcf
+cat variants.txt | variant-linker --output TSV --chunk-size 100
 ```
 
-### Batch Processing
+Supported inputs include rsIDs, HGVS, VCF-style coordinates, and CNVs expressed
+as `chrom:start-end:DEL`, `DUP` or `CNV`. Use `--vcf-input` for a complete VCF
+with headers and sample genotypes. Variant text files contain one input per line.
+
+## All options
+
+| Option                    | Alias  | Purpose                                                     |
+| ------------------------- | ------ | ----------------------------------------------------------- |
+| `--variant`               | `-v`   | Single input.                                               |
+| `--variants`              | `-vs`  | Comma-separated inputs.                                     |
+| `--variants-file`         | `-vf`  | Variant text file.                                          |
+| `--vcf-input`             | `-vi`  | VCF file path.                                              |
+| `--output`                | `-o`   | `JSON` (default), `CSV`, `TSV`, `SCHEMA`, `VCF`.            |
+| `--output-file`           | `-of`  | Output path.                                                |
+| `--save`                  | `-s`   | Filename to save results (alternative to --output-file).    |
+| `--assembly`              |        | `hg38` (default), `hg19`, `hg19tohg38`.                     |
+| `--vep_params`            | `-vp`  | Comma-separated VEP `key=value` options.                    |
+| `--recoder_params`        | `-rp`  | Comma-separated Recoder `key=value` options.                |
+| `--filter`                | `-f`   | JSON-encoded result filter.                                 |
+| `--pick-output`           | `-po`  | Retain selected transcript output.                          |
+| `--scoring_config_path`   | `-scp` | Scoring configuration directory.                            |
+| `--ped`                   | `-p`   | PED pedigree file.                                          |
+| `--calculate-inheritance` | `-ci`  | Infer inheritance using genotype and pedigree/trio context. |
+| `--sample-map`            | `-sm`  | Three sample IDs in index,mother,father order.              |
+| `--bed-file`              | `-bf`  | BED path; repeat for multiple files.                        |
+| `--gene-list`             | `-gl`  | Gene-list path; repeat for multiple files.                  |
+| `--json-genes`            | `-jg`  | JSON gene path; repeat for multiple files.                  |
+| `--json-gene-mapping`     |        | JSON object with `identifier` and optional `dataFields`.    |
+| `--stream`                |        | Process a VCF in bounded record chunks.                     |
+| `--chunk-size`            | `-cs`  | Logical streaming chunk size (default 100).                 |
+| `--spreadsheet-safe`      |        | Protect CSV/TSV text cells for spreadsheet import.          |
+| `--cache`                 | `-C`   | Enable request caching.                                     |
+| `--api-base-url`          |        | Explicit Ensembl-compatible endpoint.                       |
+| `--api-timeout`           |        | Per-attempt timeout in milliseconds (default 60,000).       |
+| `--api-concurrency`       |        | Simultaneous POST batches: `1` (default) or `2`.            |
+| `--proxy`                 |        | HTTP proxy URL.                                             |
+| `--proxy-auth`            |        | `username:password`; requires `--proxy`.                    |
+| `--config`                | `-c`   | JSON config; explicit CLI options take precedence.          |
+| `--debug`                 | `-d`   | Repeat for diagnostic levels 1–3.                           |
+| `--log_file`              | `-lf`  | Diagnostic log path.                                        |
+| `--semver`                | `-sv`  | Display semantic-version details and exit.                  |
+| `--version`               | `-V`   | Display version.                                            |
+| `--help`                  | `-h`   | Display generated help.                                     |
+
+Inputs are sent to the selected annotation service. Debug logs can contain variant
+and annotation data; review logs before sharing them.
+
+## Output and streaming
+
+| Mode                  | Contract                                                                                                           |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Complete JSON         | One object with annotations and metadata.                                                                          |
+| Complete SCHEMA       | One validated JSON-LD Dataset.                                                                                     |
+| Streaming JSON/SCHEMA | NDJSON: one compact document per completed chunk.                                                                  |
+| CSV/TSV               | Fixed column order; one header for streamed output.                                                                |
+| VCF                   | Preserved source records, headers and samples plus annotations. Direct coordinate/CNV inputs can also produce VCF. |
+
+CSV quotes delimiters and quotes. TSV escapes tabs, newlines and backslashes.
+`--spreadsheet-safe` protects potentially executable text cells; signed numbers
+remain numeric. Diagnostics go to stderr. **Any failed input or chunk gives a
+nonzero exit status**, even when partial output has been written. Check pipeline
+exit status before considering output complete.
 
 ```bash
-# Process multiple variants from a file (one per line)
-variant-linker --variants-file <file_path> --output <output_format>
-
-# Process multiple variants as a comma-separated list
-variant-linker --variants <variant1,variant2,variant3> --output <output_format>
-
-# Process variants from a VCF file
-variant-linker --vcf-input <vcf_file_path> --output <output_format>
+variant-linker --vcf-input large.vcf --stream --chunk-size 100 --output VCF > annotated.vcf
+variant-linker --vcf-input large.vcf --stream --output JSON > annotations.ndjson
 ```
 
-### Streaming from stdin
+Streaming retains whole multiallelic records and respects output backpressure.
+One record can exceed the logical chunk size; duplicate records count toward it.
+Inheritance is rejected with `--stream` because it needs full-file context.
+Stdin chunks are also unsuitable for cohort-wide compound-heterozygous inference.
 
-For pipeline integration and large datasets, Variant-Linker supports streaming input from stdin:
+## Enrichment and filtering
 
 ```bash
-# Basic streaming
-cat variants.txt | variant-linker --output TSV
-
-# Stream and filter high-impact variants
-cat variants.txt | variant-linker --output TSV | grep 'HIGH'
-
-# Use in complex pipelines
-bcftools query -f '%CHROM-%POS-%REF-%ALT\n' input.vcf | \
-  variant-linker --output CSV --chunk-size 50 > annotated.csv
-
-# Stream with custom API options
-echo "1-65568-A-C" | variant-linker --output TSV --vep_params "CADD=1,hgvs=1"
+variant-linker --vcf-input family.vcf --ped family.ped --calculate-inheritance --output JSON
+variant-linker --vcf-input trio.vcf --calculate-inheritance --sample-map "child,mother,father" --output VCF
+variant-linker --variants-file variants.txt --scoring_config_path scoring/nephro_variant_score --output CSV
+variant-linker --vcf-input sample.vcf --bed-file regions.bed --gene-list panel.txt --output JSON
+variant-linker --variant rs6025 --json-genes genes.json --json-gene-mapping '{"identifier":"gene_symbol","dataFields":["panel_name"]}' --output JSON
+variant-linker --variant rs6025 --vep_params "flag_pick=1,hgvs=1" --pick-output --output TSV
 ```
 
-**Streaming Features:**
+Scoring directories contain `variable_assignment_config.json` and
+`formula_config.json`. Formulas use a restricted expression language; arbitrary
+JavaScript is rejected. See [scoring](../guides/scoring-engine.md),
+[inheritance](../guides/inheritance-analysis.md), and
+[custom annotations](../guides/custom-annotations.md) for formats.
 
-- Automatic detection when no input files are specified and stdin is available
-- Memory-efficient chunked processing (default: 100 variants per API call)
-- Incremental output with header printed once
-- Compatible with TSV, CSV, and JSON output formats
-- Configurable chunk size via `--chunk-size` option
+`--filter` takes the JSON filter syntax described in [filtering](../guide/browser-and-package.md#results-filtering-and-downloads).
+VCF filtering retains the complete original record and ALT list when any of its
+annotations survives. Transcript selection does not invent missing transcripts.
 
-## Copy Number Variant (CNV) Support
-
-Variant-Linker supports structural variants including copy number variants (CNVs) using a specialized format for regions annotation.
-
-### CNV Input Format
-
-CNVs use the format: `chr:start-end:TYPE` where:
-
-- **chr**: Chromosome (1-22, X, Y, M)
-- **start**: Start coordinate (1-based)
-- **end**: End coordinate (1-based, inclusive)
-- **TYPE**: Variant type (DEL, DUP, CNV, INS, INV, or custom types)
-
-### Supported CNV Types
-
-| Type  | Description                 | VEP Format      |
-| ----- | --------------------------- | --------------- |
-| `DEL` | Deletion                    | `deletion`      |
-| `DUP` | Duplication                 | `duplication`   |
-| `CNV` | Generic copy number variant | `CNV`           |
-| `INS` | Insertion                   | `CNV` (default) |
-| `INV` | Inversion                   | `CNV` (default) |
-
-### CNV Examples
+## Assembly and request configuration
 
 ```bash
-# Single CNV analysis
-variant-linker --variant "7:117559600-117559609:DEL" --output JSON
-
-# CNV with phenotype and dosage sensitivity data
-variant-linker --variant "1:1000-5000:DUP" --vep_params "Phenotypes=1,numbers=1" --output CSV
-
-# Mixed batch with SNVs and CNVs
-echo -e "rs6025\n7:117559600-117559609:DEL\n1:1000-5000:DUP" | variant-linker --output TSV
-
-# CNV with custom scoring
-variant-linker --variant "22:10000-20000:CNV" --scoring_config_path scoring/cnv_score_example/ --output JSON
+variant-linker --assembly hg19 --variant "22-16050075-A-G" --output JSON
+variant-linker --assembly hg19tohg38 --variant "chr17-7578406-C-A" --output JSON
+variant-linker --variants-file variants.txt --api-timeout 60000 --api-concurrency 2 --cache
+variant-linker --variant rs6025 --proxy http://proxy.example.org:8080
 ```
 
-### CNV-Specific Output Fields
+Liftover validates reference span, orientation and target reference. Ambiguous
+mappings fail explicitly. JSON metadata records original/lifted coordinates.
+Source VCF coordinates stay in their original assembly, while annotations may
+refer to the target assembly. CLI `hg19tohg38` requires coordinate or VCF input.
 
-When processing CNVs, additional columns are automatically included in CSV/TSV output:
-
-| Column               | Description                          |
-| -------------------- | ------------------------------------ |
-| `BP_Overlap`         | Base pairs overlapping with features |
-| `Percentage_Overlap` | Percentage of feature overlap        |
-| `Phenotypes`         | Associated phenotypes from databases |
-| `DosageSensitivity`  | Gene dosage sensitivity scores       |
-
-## Command-Line Options
-
-### Input Options
-
-| Option            | Short | Description                                       |
-| ----------------- | ----- | ------------------------------------------------- |
-| `--variant`       | `-v`  | Specify a single genetic variant to be analyzed   |
-| `--variants-file` | `-vf` | Path to a file containing variants (one per line) |
-| `--variants`      | `-vs` | Comma-separated list of variants                  |
-| `--vcf-input`     | `-vi` | Path to a VCF file containing variants            |
-
-### Output Options
-
-| Option     | Short | Description                                                   |
-| ---------- | ----- | ------------------------------------------------------------- |
-| `--output` | `-o`  | Output format: JSON, CSV, TSV, VCF (default: JSON)            |
-| `--save`   | `-s`  | Filename to save results (prints to console if not specified) |
-
-### API Parameters
-
-| Option             | Short  | Description                                                                               |
-| ------------------ | ------ | ----------------------------------------------------------------------------------------- |
-| `--vep_params`     | `--vp` | VEP annotation parameters in key=value format, comma-separated (default: "CADD=1")        |
-| `--recoder_params` | `--rp` | Variant Recoder parameters in key=value format, comma-separated (default: "vcf_string=1") |
-
-### Family Analysis Options
-
-| Option                    | Short | Description                                          |
-| ------------------------- | ----- | ---------------------------------------------------- |
-| `--ped`                   | `-p`  | Path to PED file defining family structure           |
-| `--calculate-inheritance` | `-ci` | Enable inheritance pattern analysis                  |
-| `--sample-map`            | `-sm` | Comma-separated sample IDs for Index, Mother, Father |
-
-### Scoring Options
-
-| Option                  | Short   | Description                                 |
-| ----------------------- | ------- | ------------------------------------------- |
-| `--scoring_config_path` | `--scp` | Path to the scoring configuration directory |
-
-### Custom Annotation Options
-
-| Option                | Short  | Description                                                                           |
-| --------------------- | ------ | ------------------------------------------------------------------------------------- |
-| `--bed-file`          | `--bf` | Path to BED file(s) containing genomic regions. Can be used multiple times            |
-| `--gene-list`         | `--gl` | Path to text file(s) with gene symbols/IDs (one per line). Can be used multiple times |
-| `--json-genes`        | `--jg` | Path to JSON file(s) containing gene information. Can be used multiple times          |
-| `--json-gene-mapping` |        | JSON string to map fields in JSON gene files (required with --json-genes)             |
-
-### Configuration Options
-
-| Option         | Short | Description                                                                  |
-| -------------- | ----- | ---------------------------------------------------------------------------- |
-| `--config`     | `-c`  | Path to JSON configuration file                                              |
-| `--debug`      | `-d`  | Enable debug mode for detailed logging                                       |
-| `--chunk-size` | `-cs` | Number of variants to process per API batch in streaming mode (default: 100) |
-
-## Configuration File Usage
-
-Variant-Linker accepts JSON configuration files to specify parameters. Command-line parameters override configuration file settings.
-
-### Example Configuration File
-
-Create a file named `config.json`:
+Advanced per-fetch budgets can be supplied in `--config config.json`:
 
 ```json
 {
-  "variant": "ENST00000366667:c.803C>T",
+  "assembly": "hg19",
   "output": "JSON",
-  "save": "output/example_output.json",
-  "debug": 3,
-  "scoring_config_path": "scoring/meta_score/"
+  "requestOptions": {
+    "timeoutMs": 60000,
+    "deadlineMs": 120000,
+    "maxRetries": 2,
+    "postConcurrency": 1
+  }
 }
 ```
 
-Use it with:
-
-```bash
-variant-linker --config config.json
-```
-
-## Output Formats
-
-### JSON Output
-
-Default format providing complete annotation data:
-
-```bash
-variant-linker --variant "rs6025" --output JSON
-```
-
-### CSV/TSV Output
-
-Tabular format with "flatten by consequence" strategy:
-
-```bash
-variant-linker --variant "rs6025" --output CSV
-variant-linker --variant "rs6025" --output TSV
-```
-
-### VCF Output
-
-Annotated VCF format with `VL_CSQ` INFO field:
-
-```bash
-# VCF output from VCF input (preserves original headers)
-variant-linker --vcf-input sample.vcf --output VCF
-
-# VCF output from non-VCF input (generates standard headers)
-variant-linker --variant "rs6025" --output VCF --save annotated_rs6025.vcf
-```
-
-## Advanced Usage Examples
-
-### Family-Based Analysis
-
-```bash
-# Using PED file for family structure
-variant-linker --vcf-input family.vcf --ped family.ped --calculate-inheritance --output VCF
-
-# Using manual trio mapping
-variant-linker --vcf-input trio.vcf --sample-map "PROBAND,MOTHER,FATHER" --calculate-inheritance
-```
-
-### Custom Scoring
-
-```bash
-# Apply custom scoring configuration
-variant-linker --variants-file variants.txt --scoring_config_path scoring/nephro_variant_score/ --output CSV
-```
-
-### Custom Annotation with Local Files
-
-```bash
-# Annotate with genomic regions from BED files
-variant-linker --variant "rs6025" --bed-file regulatory_regions.bed --output CSV
-
-# Filter by gene lists
-variant-linker --vcf-input variants.vcf --gene-list cancer_genes.txt --output JSON
-
-# Add structured gene metadata from JSON
-variant-linker --variants-file batch.txt \
-  --json-genes gene_panels.json \
-  --json-gene-mapping '{"identifier":"gene_symbol","dataFields":["panel","classification"]}' \
-  --output TSV
-
-# Combine multiple file types
-variant-linker --vcf-input sample.vcf \
-  --bed-file enhancers.bed \
-  --gene-list disease_genes.txt \
-  --json-genes clinical_data.json \
-  --json-gene-mapping '{"identifier":"gene","dataFields":["pathogenicity","evidence"]}' \
-  --output VCF
-```
-
-### API Parameter Customization
-
-```bash
-# Custom VEP parameters
-variant-linker --variant "rs6025" --vep_params "CADD=1,SIFT=1,PolyPhen=1" --output JSON
-
-# Custom Recoder parameters
-variant-linker --variant "rs6025" --recoder_params "vcf_string=1,species=homo_sapiens" --output JSON
-```
-
-### Debug Mode
-
-Enable different levels of debugging:
-
-```bash
-# Basic debug information
-variant-linker --variant "rs6025" --debug 1
-
-# Detailed API calls and processing
-variant-linker --variant "rs6025" --debug 2
-
-# All debug output including data dumps
-variant-linker --variant "rs6025" --debug 3
-```
-
-### Batch Processing with Saving
-
-```bash
-# Process batch and save to file
-variant-linker --variants-file large_batch.txt --output CSV --save results.csv
-
-# Process VCF and save annotated VCF
-variant-linker --vcf-input input.vcf --output VCF --save annotated.vcf
-```
-
-## Performance Considerations
-
-### Batch Size Optimization
-
-- Single variants: No chunking needed
-- Small batches (< 200 variants): Processed in single API calls
-- Large batches (> 200 variants): Automatically chunked for optimal performance
-
-### Assembly Selection
-
-Variant-Linker automatically detects the appropriate genome assembly (GRCh37/GRCh38) based on variant coordinates, but you can specify assembly-specific endpoints if needed.
-
-### Retry and Rate Limiting
-
-The tool automatically handles API rate limits and temporary failures with exponential backoff retry logic.
-
-## Streaming Considerations
-
-When using streaming mode with stdin input, keep these considerations in mind:
-
-### Output Format Recommendations
-
-- **TSV/CSV**: Optimal for streaming pipelines due to incremental output and easy parsing
-- **JSON**: Works but outputs complete JSON objects, less ideal for line-by-line processing
-
-### Performance Tuning
-
-- **Chunk Size**: Adjust `--chunk-size` based on your use case:
-  - Smaller chunks (10-50): Better for real-time processing and faster initial output
-  - Larger chunks (100-200): Better throughput for batch processing
-  - Default 100 provides a good balance for most use cases
-
-### Limitations in Streaming Mode
-
-- File output options (`--save`, `--output-file`) are disabled in streaming mode
-- Use shell redirection instead: `cat input.txt | variant-linker --output TSV > output.tsv`
-- VCF output in streaming mode has limited header preservation capabilities
-
-### Pipeline Integration
-
-Streaming mode is designed for Unix-style pipeline integration:
-
-```bash
-# Extract variants from VCF and annotate
-bcftools query -f '%CHROM-%POS-%REF-%ALT\n' input.vcf | \
-  variant-linker --output TSV | \
-  awk '$6=="HIGH"' > high_impact.tsv
-
-# Process large datasets in memory-efficient manner
-gunzip -c huge_variants.txt.gz | \
-  variant-linker --output CSV --chunk-size 50 | \
-  grep "protein_coding" > coding_variants.csv
-```
-
-## Next Steps
-
-- Learn about [VCF and PED file handling](../guides/vcf-and-ped-files.md)
-- Explore [inheritance analysis features](../guides/inheritance-analysis.md)
-- Set up [custom scoring](../guides/scoring-engine.md)
-- Add [custom annotations with local files](../guides/custom-annotations.md)
+The deadline includes retries and backoff for each fetch, not the entire analysis.
+`--api-base-url` or `ENSEMBL_BASE_URL` selects an explicit service; choose its
+intended assembly. Node environment proxies are supported. See [API budgets](api-usage.md#budgets-cancellation-and-concurrency),
+[proxy settings](../guides/proxy-configuration.md), [cache settings](../CACHE.md), and
+[reliable processing](../guide/reliable-processing.md).

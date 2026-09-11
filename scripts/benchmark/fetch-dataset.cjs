@@ -13,9 +13,8 @@ const { createGunzip } = require('node:zlib');
 const { createInterface } = require('node:readline');
 const { parseArgs } = require('node:util');
 
-const SOURCE_URL =
-  'https://ftp.1000genomes.ebi.ac.uk/vol1/ftp/release/20130502/' +
-  'ALL.chr22.phase3_shapeit2_mvncall_integrated_v5b.20130502.genotypes.vcf.gz';
+const { dataset: defaults } = require('../../config/benchmarkConfig.json');
+const SOURCE_URL = defaults.sourceUrl;
 const ROOT = path.resolve(__dirname, '../..');
 const sha256 = (value) => crypto.createHash('sha256').update(value).digest('hex');
 
@@ -52,17 +51,17 @@ function requestPrefix(url, maxBytes, timeoutMs) {
 }
 
 async function fetchDataset(options = {}) {
-  const count = options.count ?? 1000;
+  const count = options.count ?? defaults.count;
   if (!Number.isSafeInteger(count) || count < 1)
     throw new Error('count must be a positive integer');
   const url = options.url ?? SOURCE_URL;
-  const maxBytes = options.maxBytes ?? 8 * 1024 * 1024;
-  const timeoutMs = options.timeoutMs ?? 120000;
+  const maxBytes = options.maxBytes ?? defaults.maxCompressedBytes;
+  const timeoutMs = options.timeoutMs ?? defaults.timeoutMs;
   const outputPath =
-    options.outputPath ??
-    path.join(ROOT, `local_data/benchmarks/1000genomes-chr22-grch37-${count}.vcf`);
+    options.outputPath ?? path.join(ROOT, defaults.dataDirectory, `${defaults.name}-${count}.vcf`);
   const manifestPath =
-    options.manifestPath ?? path.join(ROOT, `docs/benchmarks/1000genomes-${count}.json`);
+    options.manifestPath ??
+    path.join(ROOT, defaults.provenanceDirectory, `1000genomes-${count}.json`);
   const { request, response } = await requestPrefix(url, maxBytes, timeoutMs);
   let compressedBytesReceived = 0;
   const counter = new Transform({
@@ -122,8 +121,10 @@ async function fetchDataset(options = {}) {
       const [chromosome, position, id, ref, alt, , filter] = fields;
       if (filter !== 'PASS' || !/^[ACGT]$/.test(ref) || !/^[ACGT]$/.test(alt) || ref === alt)
         continue;
-      if (chromosome !== '22' || !/^[1-9]\d*$/.test(position))
-        throw new Error('Expected positive GRCh37 chromosome 22 coordinates');
+      if (chromosome !== defaults.chromosome || !/^[1-9]\d*$/.test(position))
+        throw new Error(
+          `Expected positive ${defaults.assembly} chromosome ${defaults.chromosome} coordinates`
+        );
       output.push(fields.slice(0, 8).join('\t'));
       const identity = { chromosome, position: Number(position), id, ref, alt };
       firstVariant ??= identity;
@@ -146,9 +147,9 @@ async function fetchDataset(options = {}) {
   const manifest = {
     schemaVersion: 1,
     source: {
-      project: '1000 Genomes Project, phase 3',
-      release: '20130502, integrated v5b chromosome 22',
-      assembly: 'GRCh37',
+      project: defaults.project,
+      release: defaults.release,
+      assembly: defaults.assembly,
       url,
       accessedAt: new Date().toISOString(),
       lastModified: response.headers['last-modified'] ?? null,
@@ -161,8 +162,7 @@ async function fetchDataset(options = {}) {
         'UTF-8 lines with LF terminators; prefix ends after the last selected original record, including its source genotype columns',
     },
     selection: {
-      algorithm:
-        'Scan source file order from byte zero; select first N chromosome 22 records with FILTER=PASS and different single A/C/G/T REF and ALT bases',
+      algorithm: `Scan source file order from byte zero; select first N chromosome ${defaults.chromosome} records with FILTER=PASS and different single A/C/G/T REF and ALT bases`,
       requestedCount: count,
       recordsExamined: examined,
       samplePolicy:
@@ -216,7 +216,7 @@ async function fetchDataset(options = {}) {
 
 if (require.main === module) {
   const { values } = parseArgs({
-    options: { count: { type: 'string', default: '1000' } },
+    options: { count: { type: 'string', default: String(defaults.count) } },
   });
   fetchDataset({ count: Number(values.count) }).then(
     (manifest) => console.log(JSON.stringify(manifest, null, 2)),

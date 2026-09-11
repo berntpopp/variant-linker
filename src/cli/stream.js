@@ -1,5 +1,6 @@
 'use strict';
 const readline = require('readline');
+const defaults = require('../../config/cliDefaults.json');
 const { analyzeVariant } = require('../variantLinkerCore');
 const { filterAndFormatResults } = require('../variantLinkerProcessor');
 const { getDefaultColumnConfig, formatToTabular } = require('../dataExtractor');
@@ -69,12 +70,13 @@ async function processAndOutputChunk(chunk, isFirstChunk, params) {
 /** @param {import('../analysisTypes').CliParams} params
  * @returns {Promise<import('../analysisTypes').StreamParams>} */
 async function prepareStream(params) {
-  const recoderOptions = parseOptionalParameters(params.recoder_params, { vcf_string: '1' });
+  const recoderOptions = parseOptionalParameters(params.recoder_params, {
+    ...defaults.recoderOptions,
+    ...params.recoderOptions,
+  });
   const vepOptions = parseOptionalParameters(params.vep_params, {
-    CADD: '1',
-    hgvs: '1',
-    merged: '1',
-    mane: '1',
+    ...defaults.vepOptions,
+    ...params.vepOptions,
   });
   if (params.pickOutput) vepOptions.pick = '1';
   const features =
@@ -117,7 +119,7 @@ async function processStream(params) {
   const common = await prepareStream(params);
   const rl = readline.createInterface({ input: process.stdin, crlfDelay: Infinity });
   let chunk = [];
-  const chunkSize = params.chunkSize || 100;
+  const chunkSize = params.chunkSize ?? defaults.chunkSize;
   let isFirstChunk = true;
   try {
     for await (const line of rl) {
