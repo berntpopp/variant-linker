@@ -71,7 +71,7 @@
     "node-interval-tree": "^2.1.2",
     "path-browserify": "^1.0.1",
     "semver": "^7.7.1",
-    "yargs": "^17.7.2"
+    "yargs": "^18.1.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
