@@ -48,6 +48,22 @@ source/target assemblies and original/lifted identities. Annotated VCF retains t
 original input coordinates and headers; annotations may describe the target
 assembly. Use JSON when consuming detailed liftover provenance.
 
+## Upgrading from 3.x
+
+Inputs that the VEP endpoint did not annotate are now reported, not dropped. Version
+3.x returned no `annotationData` entry for such an input; version 4 returns an entry
+that keeps the input identity (`originalInput`, `variantKey`, `vcfString`), has an empty
+`transcript_consequences` and sets `error` (for example
+`"No annotation returned for this input"`). Code that treated the presence of an entry
+as success must check `annotation.error` first:
+
+```javascript
+const annotated = result.annotationData.filter((annotation) => !annotation.error);
+```
+
+`Annotation.error` is typed as `string | undefined`. Match on its presence, not on the
+message text, which may change.
+
 ## Scoring and tabular text
 
 Scoring formulas and conditions use a **restricted expression interpreter**, with
