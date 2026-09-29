@@ -97,6 +97,13 @@ export interface Annotation {
   gene_symbol?: string;
   deducedInheritancePattern?: InheritanceResult | string;
   user_feature_overlap?: FeatureOverlap[];
+  /**
+   * Set when the input produced no usable annotation, for example when the VEP endpoint
+   * returned nothing for it ("No annotation returned for this input"). Such an entry still
+   * carries the input identity (`originalInput`, `variantKey`), so check `error` before
+   * treating an entry as annotated.
+   */
+  error?: string;
 }
 
 export interface BedRegion {
